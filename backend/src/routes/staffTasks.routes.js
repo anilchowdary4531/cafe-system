@@ -1,7 +1,9 @@
 import { requireStaffJwt } from "../services/staffAuthService.js";
 import { logAuditEvent } from "../services/auditLogService.js";
 import { completeSessionAndReleaseTable } from "../services/tableSessionService.js";
-import { syncParentOrderStatusFromKots } from "../services/kotService.js";
+import { syncParentOrderStatusFromKots, getCanonicalReadyItems } from "../services/kotService.js";
+import { createAndDispatchNotification } from "../services/notificationService.js";
+import { NOTIFICATION_TYPES, RECIPIENT_TYPES } from "../constants/notificationTypes.js";
 
 export default async function staffTaskRoutes(app, deps = {}) {
   const { prisma, realtime, STAFF_ALLOWED_ROLES } = deps || {};
@@ -391,121 +393,42 @@ export default async function staffTaskRoutes(app, deps = {}) {
 
   /**
    * GET /api/v1/staff/food-runner-items
-   * GET /api/v1/staff/ready-distribution-items
-   * GET /api/v1/staff/ready-items
-   * Fetch canonical ready-to-distribute kitchen items for Servers and Stewards
+   * Fetch ready-to-run kitchen items for Stewards
    */
-  const handleGetReadyDistributionItems = async (req, reply) => {
+  app.get("/api/v1/staff/food-runner-items", { preHandler: requireStaff }, async (req, reply) => {
     try {
-      let restaurantId = getEffectiveRid(req);
-      if (req.staffActor?.restaurantId && req.staffActor?.role !== "SUPER_ADMIN") {
-        restaurantId = Number(req.staffActor.restaurantId);
-      }
+      const restaurantId = getEffectiveRid(req);
       if (!restaurantId) return reply.code(400).send({ message: "restaurantId required" });
 
-      const readyItems = await prisma.kitchenOrderTicketItem.findMany({
-        where: {
-          kot: {
-            restaurantId,
-            status: { notIn: ["SERVED", "CANCELLED"] },
-            order: {
-              status: { notIn: ["CANCELLED"] },
-            },
-          },
-          status: "READY",
-        },
-        include: {
-          kot: {
-            select: {
-              id: true,
-              kotNo: true,
-              orderId: true,
-              tableNo: true,
-              tableSessionId: true,
-              stationId: true,
-              stationName: true,
-              waiterId: true,
-              waiterName: true,
-              priority: true,
-              createdAt: true,
-              restaurantId: true,
-              order: {
-                select: {
-                  id: true,
-                  orderNo: true,
-                  customerName: true,
-                  tableNo: true,
-                  status: true,
-                  paymentStatus: true,
-                },
-              },
-            },
-          },
-        },
-        orderBy: [
-          { kot: { priority: "desc" } },
-          { readyAt: "asc" },
-          { createdAt: "asc" },
-        ],
-      });
-
-      const formatted = readyItems.map((it) => ({
-        id: it.id, // Authoritative KOTItem.id
-        kotItemId: it.id,
-        orderItemId: it.orderItemId,
-        orderId: it.kot?.orderId,
-        kotId: it.kotId,
-        restaurantId: it.kot?.restaurantId || restaurantId,
-        kotNo: it.kot?.kotNo || "",
-        orderNo: it.kot?.order?.orderNo || "",
-        tableNo: String(it.kot?.tableNo || it.kot?.order?.tableNo || "N/A").trim(),
-        tableSessionId: it.kot?.tableSessionId || null,
-        stationId: it.kot?.stationId || null,
-        stationName: it.kot?.stationName || "Kitchen",
-        priority: it.kot?.priority || "NORMAL",
-        name: it.itemName,
-        itemName: it.itemName,
-        qty: it.qty,
-        quantity: it.qty,
-        variantName: it.variantName || null,
-        selectedModifiers: it.selectedModifiers || null,
-        notes: it.notes || null,
-        status: it.status, // Always "READY"
-        preparedByUserId: it.preparedByUserId || null,
-        preparedByName: it.preparedByName || null,
-        assignedChefId: it.assignedChefId || null,
-        assignedChefName: it.assignedChefName || null,
-        assignedWaiterId: it.kot?.waiterId || null,
-        waiterName: it.kot?.waiterName || it.kot?.order?.customerName || null,
-        readyAt: it.readyAt || it.createdAt,
-        createdAt: it.createdAt,
-        kot: it.kot,
-      }));
-
-      return reply.send({ success: true, items: formatted });
+      const items = await getCanonicalReadyItems({ prisma, restaurantId });
+      return reply.send({ success: true, ok: true, count: items.length, items });
     } catch (err) {
       return reply.code(500).send({ message: err.message || "Failed to fetch food runner items" });
     }
-  };
+  });
 
-  app.get("/api/v1/staff/food-runner-items", { preHandler: requireStaff }, handleGetReadyDistributionItems);
-  app.get("/api/v1/staff/ready-distribution-items", { preHandler: requireStaff }, handleGetReadyDistributionItems);
-  app.get("/api/v1/staff/ready-items", { preHandler: requireStaff }, handleGetReadyDistributionItems);
+  app.get("/api/v1/staff/ready-items", { preHandler: requireStaff }, async (req, reply) => {
+    try {
+      const restaurantId = getEffectiveRid(req);
+      if (!restaurantId) return reply.code(400).send({ message: "restaurantId required" });
+
+      const items = await getCanonicalReadyItems({ prisma, restaurantId });
+      return reply.send({ success: true, ok: true, count: items.length, items });
+    } catch (err) {
+      return reply.code(500).send({ message: err.message || "Failed to fetch ready items" });
+    }
+  });
 
   /**
    * PUT /api/v1/staff/food-runner-items/:itemId/delivered
-   * PUT /api/v1/staff/ready-distribution-items/:itemId/delivered
-   * Mark ready food item delivered by Steward or Server
+   * Mark ready food item delivered by Steward
    */
-  const handleDeliverReadyItem = async (req, reply) => {
+  app.put("/api/v1/staff/food-runner-items/:itemId/delivered", { preHandler: requireStaff }, async (req, reply) => {
     try {
       const itemId = Number(req.params.itemId);
       if (!itemId) return reply.code(400).send({ message: "Invalid itemId" });
 
-      let restaurantId = getEffectiveRid(req);
-      if (req.staffActor?.restaurantId && req.staffActor?.role !== "SUPER_ADMIN") {
-        restaurantId = Number(req.staffActor.restaurantId);
-      }
+      const restaurantId = getEffectiveRid(req);
       const existing = await prisma.kitchenOrderTicketItem.findFirst({
         where: {
           id: itemId,
@@ -615,17 +538,44 @@ export default async function staffTaskRoutes(app, deps = {}) {
             io.to(`restaurant:${rid}`).emit("table:updated", { restaurantId: rid, tableNo: updatedItem.kot.tableNo });
           }
         }
+
+        // Phase 2.C: Dispatch persistent server delivery notification
+        try {
+          const waiterId = Number(updatedItem.kot?.waiterId || req.staffActor?.userId || 0);
+          if (waiterId && rid) {
+            const tableLabel = updatedItem.kot?.tableNo ? `Table ${updatedItem.kot.tableNo}` : "Takeaway";
+            await createAndDispatchNotification({
+              prisma,
+              realtime: { io, staff },
+              recipientType: RECIPIENT_TYPES.USER,
+              recipientId: waiterId,
+              orderId: updatedItem.kot?.orderId ? Number(updatedItem.kot.orderId) : null,
+              restaurantId: rid,
+              notificationType: NOTIFICATION_TYPES.ORDER_DELIVERED,
+              title: `Food Delivered — ${tableLabel}`,
+              message: `${updatedItem.itemName || "Food item"} delivered to ${tableLabel}.`,
+              idempotencyKey: `food_served_${rid}_${itemId}_${waiterId}_SERVED`,
+              data: {
+                restaurantId: rid,
+                orderId: updatedItem.kot?.orderId ? Number(updatedItem.kot.orderId) : null,
+                kotId: Number(kId),
+                kotItemId: Number(itemId),
+                tableSessionId: updatedItem.kot?.tableSessionId ? Number(updatedItem.kot.tableSessionId) : null,
+                tableNo: updatedItem.kot?.tableNo || null,
+                recipientId: waiterId,
+              },
+            }).catch((e) => console.warn("[staffTasks] Food delivered notification error:", e?.message));
+          }
+        } catch (notifErr) {
+          console.warn("[staffTasks] Failed to dispatch food delivered notification:", notifErr?.message);
+        }
       }
 
       return reply.send({ success: true, message: "Item delivered to table", item: updatedItem, kot: finalKot });
     } catch (err) {
       return reply.code(500).send({ message: err.message || "Failed to mark item delivered" });
     }
-  };
-
-  app.put("/api/v1/staff/food-runner-items/:itemId/delivered", { preHandler: requireStaff }, handleDeliverReadyItem);
-  app.put("/api/v1/staff/ready-distribution-items/:itemId/delivered", { preHandler: requireStaff }, handleDeliverReadyItem);
-  app.put("/api/v1/staff/ready-items/:itemId/delivered", { preHandler: requireStaff }, handleDeliverReadyItem);
+  });
 
   /**
    * POST /api/v1/staff/cashier/discount-request

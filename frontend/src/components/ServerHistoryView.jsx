@@ -236,7 +236,6 @@ export default function ServerHistoryView({ onBackToFloorPlan, onBack, title }) 
                   onClick={handleBack}
                   className="p-1.5 rounded-lg border border-[color:var(--app-border)]/40 text-slate-600 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/5 transition"
                   title="Back to Active Service"
-                  aria-label="Back to Active Service"
                 >
                   <ArrowLeft size={16} />
                 </button>
@@ -280,7 +279,6 @@ export default function ServerHistoryView({ onBackToFloorPlan, onBack, title }) 
               onClick={() => loadHistory(1)}
               className="p-2.5 rounded-xl border border-[color:var(--app-border)]/40 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-xs cursor-pointer"
               title="Refresh History"
-              aria-label="Refresh History"
             >
               <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
             </button>
@@ -315,9 +313,6 @@ export default function ServerHistoryView({ onBackToFloorPlan, onBack, title }) 
 
             {dateRange === "custom" && (
               <input
-                id="server-history-custom-date"
-                name="serverHistoryCustomDate"
-                aria-label="Select custom history date"
                 type="date"
                 data-testid="custom-date-input"
                 value={customDate}
@@ -331,9 +326,6 @@ export default function ServerHistoryView({ onBackToFloorPlan, onBack, title }) 
           <div className="relative w-full md:w-72">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
-              id="server-history-search"
-              name="serverHistorySearch"
-              aria-label="Search server history"
               type="text"
               data-testid="history-search-input"
               placeholder="Search item, order #, KOT #, or table..."
@@ -347,7 +339,6 @@ export default function ServerHistoryView({ onBackToFloorPlan, onBack, title }) 
                 onClick={handleClearSearch}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
                 title="Clear search"
-                aria-label="Clear search"
               >
                 <X size={13} />
               </button>

@@ -29,7 +29,6 @@ import {
     Clock,
     History,
     Inbox,
-    Settings,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useStaffSocket } from "../context/StaffSocketContext";
@@ -43,10 +42,6 @@ import ServerNotificationsView from "../components/ServerNotificationsView";
 import ChefWorkloadPanel from "../components/ChefWorkloadPanel";
 import KitchenAssignmentDrawer from "../components/KitchenAssignmentDrawer";
 import StaffWorkHistoryTabs from "../components/StaffWorkHistoryTabs";
-import ChefAssignmentActions from "../components/ChefAssignmentActions";
-import ReassignChefModal from "../components/ReassignChefModal";
-import AssignmentDetailsModal from "../components/AssignmentDetailsModal";
-import UnassignConfirmModal from "../components/UnassignConfirmModal";
 
 const KOT_STATUSES = ["ALL", "PENDING", "PREPARING", "READY", "SERVED", "CANCELLED"];
 const PRIORITIES = ["ALL", "NORMAL", "HIGH", "URGENT"];
@@ -130,7 +125,7 @@ export default function Kitchen() {
 
     // Active View Mode: "KDS" | "HISTORY" | "PROFILE" | "NOTIFICATIONS"
     const getInitialViewMode = () => {
-        if (location.pathname.endsWith("/profile") || location.pathname.endsWith("/settings")) return "PROFILE";
+        if (location.pathname.endsWith("/profile")) return "PROFILE";
         if (location.pathname.endsWith("/notifications")) return "NOTIFICATIONS";
         if (location.pathname.endsWith("/history") || new URLSearchParams(location.search).get("tab") === "history") return "HISTORY";
         return "KDS";
@@ -138,7 +133,7 @@ export default function Kitchen() {
     const [viewMode, setViewMode] = useState(getInitialViewMode);
 
     useEffect(() => {
-        if (location.pathname.endsWith("/profile") || location.pathname.endsWith("/settings")) {
+        if (location.pathname.endsWith("/profile")) {
             setViewMode("PROFILE");
         } else if (location.pathname.endsWith("/notifications")) {
             setViewMode("NOTIFICATIONS");
@@ -192,6 +187,7 @@ export default function Kitchen() {
     // Kitchen Config & Workload
     const [kitchenConfig, setKitchenConfig] = useState({ mode: "DISPATCHER", scope: "ITEMS" });
     const [workload, setWorkload] = useState({ chefs: [] });
+    const [showChefWorkload, setShowChefWorkload] = useState(false);
     const [selectedChefFilter, setSelectedChefFilter] = useState("ALL"); // "ALL" | "UNASSIGNED" | chefId
     const [updatingConfig, setUpdatingConfig] = useState(false);
 
@@ -199,11 +195,6 @@ export default function Kitchen() {
     const [drawerKot, setDrawerKot] = useState(null);
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [isSubmittingAssignment, setIsSubmittingAssignment] = useState(false);
-
-    // Item-level assignment modal states
-    const [reassignModalData, setReassignModalData] = useState(null); // { item, kot }
-    const [detailsModalData, setDetailsModalData] = useState(null);   // { item, kot }
-    const [unassignModalData, setUnassignModalData] = useState(null); // { item, kot }
 
     // Filters
     const [selectedStationId, setSelectedStationId] = useState("ALL");
@@ -631,7 +622,6 @@ export default function Kitchen() {
         socket.on("kitchen:workload_updated", handleKitchenWorkloadUpdated);
         socket.on("kitchen:item_assigned", handleKitchenAssignmentEvent);
         socket.on("kitchen:item_reassigned", handleKitchenAssignmentEvent);
-        socket.on("kitchen:item_unassigned", handleKitchenAssignmentEvent);
         socket.on("kitchen:item_self_picked", handleKitchenAssignmentEvent);
         socket.on("kitchen:item_status_updated", handleKitchenAssignmentEvent);
         socket.on("kitchen:item_status_updated", onKitchenHistoryUpdated);
@@ -648,7 +638,6 @@ export default function Kitchen() {
             socket.off("kitchen:workload_updated", handleKitchenWorkloadUpdated);
             socket.off("kitchen:item_assigned", handleKitchenAssignmentEvent);
             socket.off("kitchen:item_reassigned", handleKitchenAssignmentEvent);
-            socket.off("kitchen:item_unassigned", handleKitchenAssignmentEvent);
             socket.off("kitchen:item_self_picked", handleKitchenAssignmentEvent);
             socket.off("kitchen:item_status_updated", handleKitchenAssignmentEvent);
             socket.off("kitchen:item_status_updated", onKitchenHistoryUpdated);
@@ -812,79 +801,15 @@ export default function Kitchen() {
             const res = await api.post(`/owner/${restaurantId}/kitchen/items/${itemId}/reassign`, { newChefId });
             if (res.data?.ok) {
                 showToast("Item reassigned successfully", "success");
-                // Optimistically update local kots state immediately
-                setKots((prev) =>
-                    prev.map((k) => ({
-                        ...k,
-                        items: (k.items || []).map((it) =>
-                            it.id === itemId || it.orderItemId === itemId
-                                ? {
-                                      ...it,
-                                      assignedChefId: newChefId,
-                                      assignedChefName: res.data.item?.assignedChefName || it.assignedChefName,
-                                      assignmentSource: "DISPATCHED",
-                                      assignedAt: res.data.item?.assignedAt || new Date().toISOString(),
-                                  }
-                                : it
-                        ),
-                    }))
-                );
                 await Promise.all([loadKots({ silent: true }), loadWorkload()]);
                 setIsDrawerOpen(false);
             }
         } catch (err) {
             showToast(err?.response?.data?.message || "Failed to reassign item", "error");
-            throw err;
         } finally {
             setIsSubmittingAssignment(false);
         }
     };
-
-    const handleUnassignItem = async (itemId) => {
-        setIsSubmittingAssignment(true);
-        try {
-            const res = await api.post(`/owner/${restaurantId}/kitchen/items/${itemId}/unassign`);
-            if (res.data?.ok) {
-                showToast("Chef unassigned successfully", "success");
-                // Optimistically update local kots state immediately
-                setKots((prev) =>
-                    prev.map((k) => ({
-                        ...k,
-                        items: (k.items || []).map((it) =>
-                            it.id === itemId || it.orderItemId === itemId
-                                ? {
-                                      ...it,
-                                      assignedChefId: null,
-                                      assignedChefName: null,
-                                      assignmentSource: null,
-                                      assignedAt: null,
-                                  }
-                                : it
-                        ),
-                    }))
-                );
-                await Promise.all([loadKots({ silent: true }), loadWorkload()]);
-                setIsDrawerOpen(false);
-            }
-        } catch (err) {
-            showToast(err?.response?.data?.message || "Failed to unassign item", "error");
-            throw err;
-        } finally {
-            setIsSubmittingAssignment(false);
-        }
-    };
-
-    const handleOpenReassignModal = useCallback((item, kot) => {
-        setReassignModalData({ item, kot });
-    }, []);
-
-    const handleOpenDetailsModal = useCallback((item, kot) => {
-        setDetailsModalData({ item, kot });
-    }, []);
-
-    const handleOpenUnassignModal = useCallback((item, kot) => {
-        setUnassignModalData({ item, kot });
-    }, []);
 
     // Calculate unassigned items and list for prominent queue
     const unassignedItemsList = useMemo(() => {
@@ -1189,35 +1114,11 @@ export default function Kitchen() {
                             )}
                         </button>
 
-                        {/* Settings Button */}
-                        <button
-                            type="button"
-                            data-testid="senior-chef-settings-btn"
-                            onClick={() => {
-                                if (viewMode === "PROFILE" && location.pathname.endsWith("/settings")) {
-                                    setViewMode("KDS");
-                                    navigate("/kitchen");
-                                } else {
-                                    setViewMode("PROFILE");
-                                    navigate("/kitchen/settings");
-                                }
-                            }}
-                            className={`flex items-center gap-1.5 rounded-xl border px-2.5 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
-                                viewMode === "PROFILE" && location.pathname.endsWith("/settings")
-                                    ? "border-orange-500 bg-orange-500 text-white"
-                                    : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
-                            }`}
-                            title="Kitchen Settings"
-                        >
-                            <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                            <span className="hidden sm:inline font-bold">Settings</span>
-                        </button>
-
                         {/* Profile Button */}
                         <button
                             type="button"
                             onClick={() => {
-                                if (viewMode === "PROFILE" && location.pathname.endsWith("/profile")) {
+                                if (viewMode === "PROFILE") {
                                     setViewMode("KDS");
                                     navigate("/kitchen");
                                 } else {
@@ -1226,14 +1127,14 @@ export default function Kitchen() {
                                 }
                             }}
                             className={`flex items-center gap-1.5 rounded-xl border px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
-                                viewMode === "PROFILE" && location.pathname.endsWith("/profile")
+                                viewMode === "PROFILE"
                                     ? "border-orange-500 bg-orange-500 text-white"
                                     : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
                             }`}
                             title="My Profile"
                         >
                             <div className={`h-5 w-5 rounded-full flex items-center justify-center font-black text-[10px] ${
-                                viewMode === "PROFILE" && location.pathname.endsWith("/profile") ? "bg-white text-orange-600" : "bg-orange-500 text-white"
+                                viewMode === "PROFILE" ? "bg-white text-orange-600" : "bg-orange-500 text-white"
                             }`}>
                                 {(user?.name || user?.username || "C").charAt(0).toUpperCase()}
                             </div>
@@ -1412,9 +1313,6 @@ export default function Kitchen() {
 
                                     {historyDateRange === "custom" && (
                                         <input
-                                            id="kitchen-history-custom-date"
-                                            name="kitchenHistoryCustomDate"
-                                            aria-label="Select custom history date"
                                             type="date"
                                             data-testid="history-custom-date-input"
                                             value={historyCustomDate}
@@ -1453,8 +1351,6 @@ export default function Kitchen() {
                                     </label>
                                     <select
                                         id="senior-chef-history-chef-filter"
-                                        name="seniorChefHistoryChefFilter"
-                                        aria-label="Filter history by chef"
                                         data-testid="history-chef-filter"
                                         value={historyChefFilter}
                                         onChange={(e) => setHistoryChefFilter(e.target.value)}
@@ -1473,9 +1369,6 @@ export default function Kitchen() {
                                 <div className="relative w-full sm:w-72">
                                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                     <input
-                                        id="senior-chef-history-search"
-                                        name="seniorChefHistorySearch"
-                                        aria-label="Search KOT, Order, Table, Item, Chef"
                                         type="text"
                                         data-testid="senior-chef-history-search"
                                         placeholder="Search KOT, Order, Table, Item, Chef..."
@@ -1487,9 +1380,8 @@ export default function Kitchen() {
                                         <button
                                             type="button"
                                             onClick={handleClearHistorySearch}
-                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                                             title="Clear search"
-                                            aria-label="Clear search"
                                         >
                                             <X size={13} />
                                         </button>
@@ -1801,6 +1693,9 @@ export default function Kitchen() {
                             onSelectChef={setSelectedChefFilter}
                             unassignedCount={unassignedItemsCount}
                             loading={loading}
+                            showChefWorkload={showChefWorkload}
+                            isExpanded={showChefWorkload}
+                            onToggleExpand={() => setShowChefWorkload((prev) => !prev)}
                         />
                     </div>
 
@@ -1843,9 +1738,6 @@ export default function Kitchen() {
                                         </button>
 
                                         <select
-                                            id="kitchen-bulk-target-chef"
-                                            name="bulkTargetChefId"
-                                            aria-label="Select Target Chef for Bulk Dispatch"
                                             value={bulkTargetChefId}
                                             onChange={(e) => setBulkTargetChefId(e.target.value)}
                                             className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 outline-none"
@@ -1891,8 +1783,6 @@ export default function Kitchen() {
                                                     <div className="flex items-center justify-between gap-2">
                                                         <label className="flex items-center gap-2 cursor-pointer">
                                                             <input
-                                                                id={`bulk-unassigned-m-${it.id}`}
-                                                                name={`bulk_unassigned_${it.id}`}
                                                                 type="checkbox"
                                                                 aria-label={`Select ${it.itemName || it.name}`}
                                                                 checked={isSelected}
@@ -1961,8 +1851,6 @@ export default function Kitchen() {
                                                 <tr>
                                                     <th className="py-2 px-3 w-8">
                                                         <input
-                                                            id="kitchen-select-all-unassigned"
-                                                            name="selectAllUnassigned"
                                                             type="checkbox"
                                                             aria-label="Select all unassigned items"
                                                             checked={
@@ -2002,8 +1890,6 @@ export default function Kitchen() {
                                                         >
                                                             <td className="py-2.5 px-3">
                                                                 <input
-                                                                    id={`bulk-unassigned-t-${it.id}`}
-                                                                    name={`bulk_unassigned_t_${it.id}`}
                                                                     type="checkbox"
                                                                     aria-label={`Select ${it.itemName || it.name}`}
                                                                     checked={isSelected}
@@ -2083,9 +1969,6 @@ export default function Kitchen() {
                                     Station:
                                 </div>
                                 <select
-                                    id="kitchen-station-filter"
-                                    name="selectedStationId"
-                                    aria-label="Filter by kitchen station"
                                     value={selectedStationId}
                                     onChange={(e) => setSelectedStationId(e.target.value)}
                                     className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700 outline-none"
@@ -2105,9 +1988,6 @@ export default function Kitchen() {
                                     <UserCheck size={13} className="text-orange-500" /> Chef:
                                 </div>
                                 <select
-                                    id="kitchen-chef-filter"
-                                    name="selectedChefFilter"
-                                    aria-label="Filter by assigned chef"
                                     value={selectedChefFilter}
                                     onChange={(e) => setSelectedChefFilter(e.target.value)}
                                     className={`rounded-lg border px-2 py-1 text-xs font-bold outline-none ${
@@ -2178,9 +2058,6 @@ export default function Kitchen() {
                             <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 shadow-xs sm:w-64 focus-within:border-orange-500 focus-within:ring-1 focus-within:ring-orange-500">
                                 <Search size={14} className="text-slate-400" />
                                 <input
-                                    id="kitchen-instant-search"
-                                    name="kitchenSearchQuery"
-                                    aria-label="Search KOT, Table, Chef"
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -2188,13 +2065,7 @@ export default function Kitchen() {
                                     className="w-full bg-transparent text-xs text-slate-900 placeholder-slate-400 outline-none"
                                 />
                                 {searchQuery && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setSearchQuery("")}
-                                        className="text-slate-400 hover:text-slate-600 cursor-pointer"
-                                        title="Clear search"
-                                        aria-label="Clear search"
-                                    >
+                                    <button type="button" onClick={() => setSearchQuery("")} className="text-slate-400 hover:text-slate-600">
                                         <X size={14} />
                                     </button>
                                 )}
@@ -2247,9 +2118,6 @@ export default function Kitchen() {
                                                 onUpdatePriority={handleUpdatePriority}
                                                 onReprintKot={handleReprintKot}
                                                 onOpenAssignDrawer={handleOpenAssignDrawer}
-                                                onOpenReassignModal={handleOpenReassignModal}
-                                                onOpenDetailsModal={handleOpenDetailsModal}
-                                                onOpenUnassignModal={handleOpenUnassignModal}
                                             />
                                         ))}
                                         {groupedKots.NEW.length === 0 && (
@@ -2284,9 +2152,6 @@ export default function Kitchen() {
                                                 onUpdatePriority={handleUpdatePriority}
                                                 onReprintKot={handleReprintKot}
                                                 onOpenAssignDrawer={handleOpenAssignDrawer}
-                                                onOpenReassignModal={handleOpenReassignModal}
-                                                onOpenDetailsModal={handleOpenDetailsModal}
-                                                onOpenUnassignModal={handleOpenUnassignModal}
                                             />
                                         ))}
                                         {groupedKots.PREPARING.length === 0 && (
@@ -2321,9 +2186,6 @@ export default function Kitchen() {
                                                 onUpdatePriority={handleUpdatePriority}
                                                 onReprintKot={handleReprintKot}
                                                 onOpenAssignDrawer={handleOpenAssignDrawer}
-                                                onOpenReassignModal={handleOpenReassignModal}
-                                                onOpenDetailsModal={handleOpenDetailsModal}
-                                                onOpenUnassignModal={handleOpenUnassignModal}
                                             />
                                         ))}
                                         {groupedKots.READY.length === 0 && (
@@ -2350,33 +2212,6 @@ export default function Kitchen() {
                 onAssignKot={handleAssignKot}
                 onReassign={handleReassignItem}
                 isSubmitting={isSubmittingAssignment}
-            />
-
-            {/* Reassign Chef Modal */}
-            <ReassignChefModal
-                isOpen={Boolean(reassignModalData)}
-                onClose={() => setReassignModalData(null)}
-                item={reassignModalData?.item}
-                kot={reassignModalData?.kot}
-                chefs={workload.chefs}
-                onReassign={handleReassignItem}
-            />
-
-            {/* Assignment Details Modal */}
-            <AssignmentDetailsModal
-                isOpen={Boolean(detailsModalData)}
-                onClose={() => setDetailsModalData(null)}
-                item={detailsModalData?.item}
-                kot={detailsModalData?.kot}
-            />
-
-            {/* Unassign Confirm Modal */}
-            <UnassignConfirmModal
-                isOpen={Boolean(unassignModalData)}
-                onClose={() => setUnassignModalData(null)}
-                item={unassignModalData?.item}
-                kot={unassignModalData?.kot}
-                onConfirm={handleUnassignItem}
             />
 
             {/* Sound Notification Modal */}
@@ -2454,9 +2289,6 @@ function KotCard({
     onUpdatePriority,
     onReprintKot,
     onOpenAssignDrawer,
-    onOpenReassignModal,
-    onOpenDetailsModal,
-    onOpenUnassignModal,
 }) {
     const sla = getSlaStatus(kot.createdAt, kot.estimatedPrepTimeMinutes);
     const orderSource = kot.order?.orderSource || "POS";
@@ -2509,17 +2341,14 @@ function KotCard({
                             {sla.label} ({sla.elapsed}m / {kot.estimatedPrepTimeMinutes || 15}m)
                         </span>
 
-                        {!allAssigned && (
-                            <button
-                                type="button"
-                                data-testid={`kot-header-assign-btn-${kot.id}`}
-                                onClick={() => onOpenAssignDrawer && onOpenAssignDrawer(kot)}
-                                className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-600 hover:text-orange-700 hover:bg-orange-50 px-2 py-0.5 rounded transition border border-orange-200 cursor-pointer"
-                            >
-                                <ChefHat size={12} />
-                                Assign
-                            </button>
-                        )}
+                        <button
+                            type="button"
+                            onClick={() => onOpenAssignDrawer && onOpenAssignDrawer(kot)}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-600 hover:text-orange-700 hover:bg-orange-50 px-2 py-0.5 rounded transition border border-orange-200"
+                        >
+                            <ChefHat size={12} />
+                            Assign
+                        </button>
                     </div>
                 </div>
 
@@ -2530,12 +2359,13 @@ function KotCard({
                 )}
             </div>
 
-            {/* Items Checklist with Item-Level Assignment Actions */}
+            {/* Items Checklist with Chef Assignment Chips */}
             <div className="divide-y divide-slate-100 px-3.5 py-1">
                 {items.map((it) => {
                     const isCancelled = it.status === "CANCELLED";
                     const isReady = it.status === "READY";
                     const isPrep = it.status === "PREPARING";
+                    const isAssigned = Boolean(it.assignedChefId);
 
                     return (
                         <div
@@ -2544,23 +2374,35 @@ function KotCard({
                                 isCancelled ? "opacity-50" : ""
                             }`}
                         >
-                            <div className="space-y-0.5 min-w-0 flex-1">
-                                <div className="flex items-center gap-2 text-sm flex-wrap">
+                            <div className="space-y-0.5 min-w-0">
+                                <div className="flex items-center gap-1.5 text-sm flex-wrap">
                                     <span className="text-orange-600 font-bold">{it.qty || it.quantity || 1}×</span>
                                     <span className={`text-slate-900 font-medium ${isCancelled ? "line-through text-slate-400" : ""}`}>
                                         {it.itemName || it.name}
                                     </span>
 
-                                    {/* Authoritative Assignment Actions */}
-                                    <ChefAssignmentActions
-                                        item={it}
-                                        kot={kot}
-                                        onOpenAssignDrawer={onOpenAssignDrawer}
-                                        onOpenReassignModal={onOpenReassignModal}
-                                        onOpenDetailsModal={onOpenDetailsModal}
-                                        onOpenUnassignModal={onOpenUnassignModal}
-                                        disabled={isCancelled}
-                                    />
+                                    {/* Assignment Chip */}
+                                    {isAssigned ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => onOpenAssignDrawer && onOpenAssignDrawer(kot)}
+                                            className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 hover:bg-orange-100 hover:text-orange-800 transition flex items-center gap-1 border border-slate-200"
+                                            title="Click to reassign"
+                                        >
+                                            <ChefHat size={10} className="text-orange-500" />
+                                            <span>{it.assignedChefName || `Chef #${it.assignedChefId}`}</span>
+                                            <span className="text-[9px] text-slate-400">({it.assignmentSource === "SELF_PICKED" ? "SELF" : "DISP"})</span>
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => onOpenAssignDrawer && onOpenAssignDrawer(kot)}
+                                            className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition"
+                                            title="Click to assign"
+                                        >
+                                            UNASSIGNED
+                                        </button>
+                                    )}
                                 </div>
 
                                 {(it.variantName || it.variant) && (

@@ -47,36 +47,33 @@ export const inferRoleFromDesignation = (designation) => {
     return null;
 };
 
+export const mapDesignationToSystemRole = (designation) => {
+    const text = normalizeText(designation);
+    if (!text) return null;
+
+    if (text.includes("CLEANER") || text.includes("HOUSEKEEPING")) return "STAFF";
+    if (text.includes("SWIPER")) return "STAFF";
+    if (text.includes("STEWARD")) return "WAITER";
+    if (text.includes("SERVER") || text.includes("WAITER")) return "WAITER";
+    if (text.includes("CHEF") || text.includes("COOK")) return "CHEF";
+    if (text.includes("CASHIER")) return "CASHIER";
+    if (text.includes("MANAGER")) return "MANAGER";
+    if (text.includes("OWNER")) return "OWNER";
+    if (text.includes("SUPER ADMIN")) return "SUPER_ADMIN";
+
+    return "STAFF";
+};
+
 export const resolveEffectiveStaffRole = (role, designation) => {
     const normalizedRole = String(role || "").trim().toUpperCase();
     if (normalizedRole === "SUPER_ADMIN") return "SUPER_ADMIN";
+    if (normalizedRole === "OWNER") return "OWNER";
+
+    const inferred = inferRoleFromDesignation(designation);
+    if (inferred) return inferred;
+
     if (normalizedRole && normalizedRole !== "STAFF") return normalizedRole;
-
-    return inferRoleFromDesignation(designation) || normalizedRole || "STAFF";
-};
-
-export const isServerDesignation = (designation, role) => {
-    const rawDesignation = String(designation || "").trim();
-    if (rawDesignation) {
-        const inferred = inferRoleFromDesignation(rawDesignation);
-        if (inferred) {
-            return inferred === "WAITER";
-        }
-        const upper = rawDesignation.toUpperCase();
-        return upper === "SERVER" || upper === "WAITER";
-    }
-
-    const rawRole = String(role || "").trim().toUpperCase();
-    return rawRole === "WAITER" || rawRole === "SERVER";
-};
-
-export const isServerStaff = (staffUser) => {
-    if (!staffUser) return false;
-    if (staffUser.isActive === false) return false;
-    return isServerDesignation(
-        staffUser.designation || staffUser.staffDesignation || staffUser.jobTitle,
-        staffUser.role
-    );
+    return "STAFF";
 };
 
 export const isSeniorChef = (role, designation) => {

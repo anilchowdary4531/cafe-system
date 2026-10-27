@@ -299,35 +299,13 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
     await reserveStockForOrder({ tx, restaurantId, items: normalizedItems });
 
     let inputTableSessionId = body.tableSessionId ? Number(body.tableSessionId) : null;
-    let canonicalTableNo = tableNo;
-    let canonicalTableId = body.tableId ? Number(body.tableId) : null;
-    let activeSession = null;
-
-    if (inputTableSessionId) {
-      activeSession = await tx.tableSession.findFirst({
-        where: { id: inputTableSessionId, restaurantId },
-        select: { id: true, tableId: true, tableNo: true, waiterId: true, waiterName: true, status: true },
+    if (!inputTableSessionId && tableNo) {
+      const dTable = await tx.diningTable.findFirst({
+        where: { restaurantId, tableNo: String(tableNo).trim() },
+        select: { id: true, tableNo: true, assignedWaiterId: true, assignedWaiterName: true },
       });
-      if (activeSession) {
-        canonicalTableId = activeSession.tableId || canonicalTableId;
-        canonicalTableNo = activeSession.tableNo || canonicalTableNo;
-      }
-    }
-
-    if (!activeSession && (canonicalTableId || tableNo)) {
-      const dTable = canonicalTableId
-        ? await tx.diningTable.findFirst({
-            where: { id: canonicalTableId, restaurantId },
-            select: { id: true, tableNo: true, assignedWaiterId: true, assignedWaiterName: true },
-          })
-        : await tx.diningTable.findFirst({
-            where: { restaurantId, tableNo: String(tableNo).trim() },
-            select: { id: true, tableNo: true, assignedWaiterId: true, assignedWaiterName: true },
-          });
       if (dTable) {
-        canonicalTableId = dTable.id;
-        canonicalTableNo = dTable.tableNo;
-        activeSession = await tx.tableSession.findFirst({
+        let activeSession = await tx.tableSession.findFirst({
           where: {
             tableId: dTable.id,
             restaurantId,
@@ -371,7 +349,7 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
         orderNo,
         invoiceNo,
         orderSource: body.orderSource ? String(body.orderSource).trim().toUpperCase() : "POS",
-        fulfillment: body.fulfillment ? String(body.fulfillment).trim().toUpperCase() : (body.orderType ? String(body.orderType).trim().toUpperCase() : (canonicalTableNo ? "DINE_IN" : "POS")),
+        fulfillment: body.fulfillment ? String(body.fulfillment).trim().toUpperCase() : (body.orderType ? String(body.orderType).trim().toUpperCase() : (tableNo ? "DINE_IN" : "POS")),
         createdByRole: createdByRoleFromStaffRole(actor?.role),
         createdByUserId: actor?.userId || null,
         customerId,
@@ -379,7 +357,7 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
         customerName,
         phone,
         email,
-        tableNo: canonicalTableNo,
+        tableNo,
         notes,
         subtotal: bill.subtotal,
         taxAmount: bill.taxAmount,
@@ -423,16 +401,6 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
       include: {
         items: true,
         customer: true,
-        tableSession: {
-          select: {
-            id: true,
-            tableId: true,
-            tableNo: true,
-            waiterId: true,
-            waiterName: true,
-            status: true,
-          },
-        },
         statusEvents: { orderBy: { createdAt: "asc" } },
       },
     });

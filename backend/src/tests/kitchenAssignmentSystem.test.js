@@ -10,7 +10,6 @@ import {
   bulkAssignItems,
   assignAllKotItems,
   reassignItem,
-  unassignItem,
   getChefAssignedItems,
   selfPickItem,
   selfPickKot,
@@ -452,102 +451,5 @@ test("Kitchen Senior Chef Dispatch + Self-Pick System Integration Suite", async 
     assert.ok(actions.includes("KITCHEN_ITEM_ASSIGNED"), "Item assign logged");
     assert.ok(actions.includes("KITCHEN_ITEM_REASSIGNED"), "Item reassign logged");
     assert.ok(actions.includes("KITCHEN_ITEM_SELF_PICKED"), "Self pick logged");
-  });
-
-  // TEST 13: Unassign Item (Senior Chef clears assignedChefId)
-  await t.test("13. Unassign Item: Senior Chef unassigns item, clearing assignedChefId", async () => {
-    // First assign item1 to chefSuresh
-    await reassignItem({
-      restaurantId: restaurantA.id,
-      itemId: item1.id,
-      newChefId: chefSuresh.id,
-      actor: { userId: seniorChef.id, userName: seniorChef.name, role: "CHEF", designation: "Senior Chef" },
-    });
-
-    const unassignedResult = await unassignItem({
-      restaurantId: restaurantA.id,
-      itemId: item1.id,
-      actor: { userId: seniorChef.id, userName: seniorChef.name, role: "CHEF", designation: "Senior Chef" },
-    });
-
-    assert.equal(unassignedResult.ok, true);
-    assert.equal(unassignedResult.item.assignedChefId, null);
-    assert.equal(unassignedResult.item.assignedChefName, null);
-    assert.equal(unassignedResult.previousChefId, chefSuresh.id);
-
-    // Verify in database
-    const dbItem = await prisma.kitchenOrderTicketItem.findUnique({ where: { id: item1.id } });
-    assert.equal(dbItem.assignedChefId, null);
-    assert.equal(dbItem.assignedChefName, null);
-    assert.equal(dbItem.assignmentSource, null);
-
-    // Verify unassigned audit log event
-    const unassignLogs = await prisma.auditLog.findMany({
-      where: { restaurantId: restaurantA.id, action: "KITCHEN_ITEM_UNASSIGNED" },
-    });
-    assert.ok(unassignLogs.length >= 1, "KITCHEN_ITEM_UNASSIGNED audit event exists");
-  });
-
-  // TEST 14: Security: Line Chef CANNOT unassign items (403)
-  await t.test("14. Security: Unauthorized Line Chef CANNOT unassign items (403)", async () => {
-    // Assign item2 to chefRavi first
-    await assignItemToChef({
-      restaurantId: restaurantA.id,
-      itemId: item2.id,
-      chefId: chefRavi.id,
-      actor: { userId: seniorChef.id, userName: seniorChef.name, role: "CHEF", designation: "Senior Chef" },
-    });
-
-    await assert.rejects(
-      async () => {
-        await unassignItem({
-          restaurantId: restaurantA.id,
-          itemId: item2.id,
-          actor: { userId: chefRavi.id, userName: "Chef Ravi", role: "CHEF", designation: "Line Chef" },
-        });
-      },
-      (err) => {
-        assert.equal(err.status, 403);
-        assert.equal(err.code, "FORBIDDEN");
-        return true;
-      }
-    );
-  });
-
-  // TEST 15: Security: Line Chef CANNOT reassign items (403)
-  await t.test("15. Security: Unauthorized Line Chef CANNOT reassign items (403)", async () => {
-    await assert.rejects(
-      async () => {
-        await reassignItem({
-          restaurantId: restaurantA.id,
-          itemId: item2.id,
-          newChefId: chefSuresh.id,
-          actor: { userId: chefRavi.id, userName: "Chef Ravi", role: "CHEF", designation: "Line Chef" },
-        });
-      },
-      (err) => {
-        assert.equal(err.status, 403);
-        assert.equal(err.code, "FORBIDDEN");
-        return true;
-      }
-    );
-  });
-
-  // TEST 16: Security: Cross-restaurant unassign is strictly rejected (403)
-  await t.test("16. Security: Cross-restaurant unassign is rejected (403)", async () => {
-    await assert.rejects(
-      async () => {
-        await unassignItem({
-          restaurantId: restaurantA.id,
-          itemId: item2.id,
-          actor: { userId: chefOtherRest.id, userName: "Chef Other", role: "CHEF", restaurantId: restaurantB.id },
-        });
-      },
-      (err) => {
-        assert.equal(err.status, 403);
-        assert.equal(err.code, "CROSS_RESTAURANT_FORBIDDEN");
-        return true;
-      }
-    );
   });
 });

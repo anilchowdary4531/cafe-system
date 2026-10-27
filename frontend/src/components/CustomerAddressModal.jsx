@@ -542,12 +542,9 @@ export default function CustomerAddressModal({
 
                             {/* House / Flat / Building Name */}
                             <div>
-                                <label htmlFor="cust-addr-line1" className="theme-muted text-[11px] font-bold block mb-1">House / Flat / Office Name *</label>
+                                <label className="theme-muted text-[11px] font-bold block mb-1">House / Flat / Office Name *</label>
                                 <input
-                                    id="cust-addr-line1"
-                                    name="line1"
                                     type="text"
-                                    autoComplete="address-line1"
                                     placeholder="e.g. Flat 402, Sunshine Heights or Office Bay 3"
                                     value={formData.line1}
                                     onChange={(e) => setFormData((prev) => ({ ...prev, line1: e.target.value }))}
@@ -557,12 +554,9 @@ export default function CustomerAddressModal({
 
                             {/* Street / Area / Mandal */}
                             <div>
-                                <label htmlFor="cust-addr-mandal" className="theme-muted text-[11px] font-bold block mb-1">Street / Area / Mandal / Landmark *</label>
+                                <label className="theme-muted text-[11px] font-bold block mb-1">Street / Area / Mandal / Landmark *</label>
                                 <input
-                                    id="cust-addr-mandal"
-                                    name="mandal"
                                     type="text"
-                                    autoComplete="address-line2"
                                     placeholder="e.g. 2nd Main Road, Near SBI Bank, AECS Layout"
                                     value={formData.mandal}
                                     onChange={(e) => setFormData((prev) => ({ ...prev, mandal: e.target.value }))}
@@ -572,12 +566,9 @@ export default function CustomerAddressModal({
 
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label htmlFor="cust-addr-city" className="theme-muted text-[11px] font-bold block mb-1">City *</label>
+                                    <label className="theme-muted text-[11px] font-bold block mb-1">City *</label>
                                     <input
-                                        id="cust-addr-city"
-                                        name="city"
                                         type="text"
-                                        autoComplete="address-level2"
                                         placeholder="City *"
                                         value={formData.city}
                                         onChange={(e) => setFormData((prev) => ({ ...prev, city: e.target.value }))}
@@ -585,12 +576,9 @@ export default function CustomerAddressModal({
                                     />
                                 </div>
                                 <div>
-                                    <label htmlFor="cust-addr-postal-code" className="theme-muted text-[11px] font-bold block mb-1">Pincode</label>
+                                    <label className="theme-muted text-[11px] font-bold block mb-1">Pincode</label>
                                     <input
-                                        id="cust-addr-postal-code"
-                                        name="postalCode"
                                         type="text"
-                                        autoComplete="postal-code"
                                         placeholder="Postal Code"
                                         value={formData.postalCode}
                                         onChange={(e) => setFormData((prev) => ({ ...prev, postalCode: e.target.value }))}
@@ -599,10 +587,8 @@ export default function CustomerAddressModal({
                                 </div>
                             </div>
 
-                            <label htmlFor="cust-addr-default" className="flex items-center gap-2 pt-1 text-xs cursor-pointer">
+                            <label className="flex items-center gap-2 pt-1 text-xs cursor-pointer">
                                 <input
-                                    id="cust-addr-default"
-                                    name="isDefault"
                                     type="checkbox"
                                     checked={formData.isDefault}
                                     onChange={(e) => setFormData((prev) => ({ ...prev, isDefault: e.target.checked }))}

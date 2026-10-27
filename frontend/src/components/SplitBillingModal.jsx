@@ -301,7 +301,6 @@ export default function SplitBillingModal({
                         </div>
                     </div>
                     <button
-                        type="button"
                         onClick={onClose}
                         className="rounded-full p-2 text-gray-400 hover:bg-white/10 hover:text-white transition min-h-[44px] min-w-[44px] flex items-center justify-center"
                         aria-label="Close billing dialog"
@@ -313,7 +312,6 @@ export default function SplitBillingModal({
                 {/* Tabs */}
                 <div className="flex border-b border-white/10 bg-slate-950/40 px-3 sm:px-6 pt-3 gap-2 overflow-x-auto scrollbar-none">
                     <button
-                        type="button"
                         onClick={() => setActiveTab("PAY_FULL")}
                         className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-bold transition ${activeTab === "PAY_FULL" ? "border-amber-400 text-amber-400" : "border-transparent text-gray-400 hover:text-gray-200"}`}
                     >
@@ -321,7 +319,6 @@ export default function SplitBillingModal({
                         Pay Full / Single Payment
                     </button>
                     <button
-                        type="button"
                         onClick={() => setActiveTab("SPLIT_MODE")}
                         className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-bold transition ${activeTab === "SPLIT_MODE" ? "border-purple-400 text-purple-400" : "border-transparent text-gray-400 hover:text-gray-200"}`}
                     >
@@ -329,7 +326,6 @@ export default function SplitBillingModal({
                         Split Bill ({existingSplits.length ? `${existingSplits.length} Splits` : "Configure"})
                     </button>
                     <button
-                        type="button"
                         onClick={() => setActiveTab("PAYMENT_HISTORY")}
                         className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-bold transition ${activeTab === "PAYMENT_HISTORY" ? "border-sky-400 text-sky-400" : "border-transparent text-gray-400 hover:text-gray-200"}`}
                     >
@@ -443,11 +439,8 @@ export default function SplitBillingModal({
                                 {/* Amount Inputs */}
                                 <div className="space-y-3">
                                     <div>
-                                        <label htmlFor="split-pay-amount" className="block text-xs font-semibold text-gray-400 mb-1">Amount to Collect (₹)</label>
+                                        <label className="block text-xs font-semibold text-gray-400 mb-1">Amount to Collect (₹)</label>
                                         <input
-                                            id="split-pay-amount"
-                                            name="payAmount"
-                                            aria-label="Amount to Collect"
                                             type="number"
                                             step="0.01"
                                             min="1"
@@ -462,11 +455,8 @@ export default function SplitBillingModal({
                                     {paymentMode === "CASH" && (
                                         <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-2">
                                             <div className="flex justify-between items-center">
-                                                <label htmlFor="split-cash-tendered" className="text-xs font-semibold text-emerald-300">Cash Tendered by Customer (₹)</label>
+                                                <label className="text-xs font-semibold text-emerald-300">Cash Tendered by Customer (₹)</label>
                                                 <input
-                                                    id="split-cash-tendered"
-                                                    name="cashReceived"
-                                                    aria-label="Cash Tendered by Customer"
                                                     type="number"
                                                     step="0.01"
                                                     placeholder={payAmount}
@@ -484,11 +474,8 @@ export default function SplitBillingModal({
 
                                     {(paymentMode === "UPI" || paymentMode === "CARD") && (
                                         <div>
-                                            <label htmlFor="split-transaction-ref" className="block text-xs font-semibold text-gray-400 mb-1">Transaction Ref / Approval Code (Optional)</label>
+                                            <label className="block text-xs font-semibold text-gray-400 mb-1">Transaction Ref / Approval Code (Optional)</label>
                                             <input
-                                                id="split-transaction-ref"
-                                                name="transactionId"
-                                                aria-label="Transaction Ref / Approval Code"
                                                 type="text"
                                                 placeholder="e.g. UPI-998822 / Approval 443"
                                                 value={transactionId}
@@ -553,9 +540,6 @@ export default function SplitBillingModal({
                                             <div key={custIdx} className="rounded-2xl border border-white/10 bg-slate-900/60 p-4 space-y-3">
                                                 <div className="flex justify-between items-center border-b border-white/10 pb-2">
                                                     <input
-                                                        id={`split-customer-label-${custIdx}`}
-                                                        name={`customerLabel_${custIdx}`}
-                                                        aria-label={`Customer Split Label ${custIdx + 1}`}
                                                         type="text"
                                                         value={cust.label}
                                                         onChange={(e) => {

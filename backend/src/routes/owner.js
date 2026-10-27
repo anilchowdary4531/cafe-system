@@ -2,14 +2,13 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import defaultPrisma from "../prisma.js";
 import { buildReadableOrderNo, createOrderByStaff, updateOrderStatus } from "../services/orderService.js";
-import { createAndDispatchNotification } from "../services/notificationService.js";
-import { NOTIFICATION_TYPES, RECIPIENT_TYPES } from "../constants/notificationTypes.js";
 import { resolveRestaurantBillingConfig } from "../services/billingService.js";
 import { buildUploadController } from "../controllers/uploadController.js";
 import { deleteAssetByKey, uploadRestaurantAsset } from "../services/storageService.js";
 import { requireStaffJwt } from "../services/staffAuthService.js";
 import {
   inferRoleFromDesignation,
+  mapDesignationToSystemRole,
   generateStaffLoginToken,
 } from "../services/staffSessionService.js";
 import { resolveMenuPricing } from "../services/menuPricingService.js";
@@ -86,6 +85,8 @@ import { assignWaiterToTable, unassignWaiterFromTable, getWaiterAssignmentHistor
 import { getAuditLogs, logAuditEvent } from "../services/auditLogService.js";
 import { approveCancellation, approveDiscount, approveReprint } from "../controllers/managerApprovalController.js";
 import { completeSessionAndReleaseTable } from "../services/tableSessionService.js";
+import { createAndDispatchNotification } from "../services/notificationService.js";
+import { NOTIFICATION_TYPES, RECIPIENT_TYPES } from "../constants/notificationTypes.js";
 
 export default async function ownerRoutes(app, deps = {}) {
   const prisma = deps?.prisma || defaultPrisma;
@@ -144,8 +145,13 @@ export default async function ownerRoutes(app, deps = {}) {
   const resolveStaffRole = (role, designation) => {
     const normalizedRole = String(role || "STAFF").toUpperCase();
     if (normalizedRole === "SUPER_ADMIN") return "SUPER_ADMIN";
+    if (normalizedRole === "OWNER") return "OWNER";
+
+    const canonicalRole = mapDesignationToSystemRole(designation);
+    if (canonicalRole) return canonicalRole;
+
     if (normalizedRole && normalizedRole !== "STAFF") return normalizedRole;
-    return inferRoleFromDesignation(designation) || normalizedRole || "STAFF";
+    return "STAFF";
   };
   const OWNER_MANAGEMENT_ROLES = ["OWNER", "MANAGER", "SUPER_ADMIN"];
 
@@ -424,6 +430,7 @@ export default async function ownerRoutes(app, deps = {}) {
       // Broadcast Socket.IO events for real-time updates across screens
       try {
         const io = req.server?.io || realtime?.io;
+        const staff = req.server?.staff || realtime?.staff;
         if (io) {
           io.to(`restaurant_${restaurantId}`).emit("new_order", order);
           io.to(`restaurant:${restaurantId}`).emit("new_order", order);
@@ -435,53 +442,44 @@ export default async function ownerRoutes(app, deps = {}) {
             io.to(`restaurant_${restaurantId}`).emit("table:session_updated", { restaurantId, tableNo: order.tableNo });
           }
         }
-      } catch (e) {
-        console.warn("Socket broadcast error on order creation:", e?.message);
-      }
 
-      // Dispatch Server Notification when order/KOT sent to Kitchen
-      try {
-        let waiterId = order.tableSession?.waiterId || null;
-        if (!waiterId && order.tableSessionId) {
-          const sess = await prisma.tableSession.findUnique({
-            where: { id: order.tableSessionId },
-            select: { waiterId: true },
-          });
-          waiterId = sess?.waiterId || null;
-        }
-        if (!waiterId && order.tableNo) {
-          const dt = await prisma.diningTable.findFirst({
-            where: { restaurantId, tableNo: String(order.tableNo).trim() },
-            select: { assignedWaiterId: true },
-          });
-          waiterId = dt?.assignedWaiterId || null;
-        }
-        if (!waiterId && req.user?.role === "WAITER") {
-          waiterId = req.user.id;
-        }
+        // Phase 2.A: Create and dispatch persistent notification for the responsible Server / Waiter
+        const responsibleServerId =
+          order.kots?.[0]?.waiterId ||
+          req.body?.waiterId ||
+          req.body?.assignedWaiterId ||
+          actor?.userId ||
+          null;
 
-        if (waiterId) {
-          const tableDisplay = order.tableNo ? `Table ${order.tableNo}` : "Table";
+        if (responsibleServerId) {
+          const tableLabel = order.tableNo ? `Table ${order.tableNo}` : "Takeaway";
+          const orderNum = order.orderNo || order.id;
           await createAndDispatchNotification({
-            restaurantId,
+            prisma,
+            realtime: { io, staff },
             recipientType: RECIPIENT_TYPES.USER,
-            recipientId: waiterId,
-            notificationType: NOTIFICATION_TYPES.KOT_SENT || "KOT_SENT",
-            title: `🍳 Order Sent to Kitchen — ${tableDisplay}`,
-            message: `Order #${order.orderNo || order.id} sent to kitchen for ${tableDisplay}`,
+            recipientId: Number(responsibleServerId),
+            orderId: order.id,
+            restaurantId,
+            notificationType: NOTIFICATION_TYPES.ORDER_PLACED,
+            title: "Order Sent to Kitchen",
+            message: `Order #${orderNum} sent to kitchen for ${tableLabel}.`,
+            idempotencyKey: `order_sent_${restaurantId}_${order.id}_${responsibleServerId}`,
             data: {
+              restaurantId,
               orderId: order.id,
               orderNo: order.orderNo,
-              tableId: order.tableId || null,
-              tableSessionId: order.tableSessionId || null,
-              tableNo: order.tableNo,
-              action: "KOT_SENT",
+              tableId: order.tableId ? Number(order.tableId) : null,
+              tableSessionId: order.tableSessionId ? Number(order.tableSessionId) : null,
+              tableNo: order.tableNo || null,
+              recipientId: Number(responsibleServerId),
             },
-            idempotencyKey: `kot_sent_${order.id}_${waiterId}`,
+          }).catch((notifErr) => {
+            console.warn("[owner:orders] Failed to create order sent notification:", notifErr?.message);
           });
         }
-      } catch (notifErr) {
-        console.warn("Server notification dispatch error:", notifErr?.message);
+      } catch (e) {
+        console.warn("Socket broadcast error on order creation:", e?.message);
       }
 
       return reply.code(201).send({
@@ -807,11 +805,6 @@ export default async function ownerRoutes(app, deps = {}) {
             orderNo: true,
             createdAt: true,
             updatedAt: true,
-            tableSession: {
-              select: {
-                tableId: true,
-              },
-            },
           },
           orderBy: { createdAt: "desc" },
         }),
@@ -849,11 +842,10 @@ export default async function ownerRoutes(app, deps = {}) {
       for (const session of activeSessions) {
         if (session.tableId) {
           activeSessionsByTableId.set(Number(session.tableId), session);
-        } else {
-          for (const k of getTableKeys(session.tableNo)) {
-            if (!activeSessionsByTable[k]) {
-              activeSessionsByTable[k] = session;
-            }
+        }
+        for (const k of getTableKeys(session.tableNo)) {
+          if (!activeSessionsByTable[k]) {
+            activeSessionsByTable[k] = session;
           }
         }
       }
@@ -905,29 +897,21 @@ export default async function ownerRoutes(app, deps = {}) {
             activeOrdersByTableId.set(targetTableId, []);
           }
           activeOrdersByTableId.get(targetTableId).push(formattedOrder);
-        } else {
-          for (const k of getTableKeys(order.tableNo)) {
-            if (!activeOrdersByTable[k]) activeOrdersByTable[k] = [];
-            if (!activeOrdersByTable[k].some((o) => o.id === formattedOrder.id)) {
-              activeOrdersByTable[k].push(formattedOrder);
-            }
+        }
+
+        for (const k of getTableKeys(order.tableNo)) {
+          if (!activeOrdersByTable[k]) activeOrdersByTable[k] = [];
+          if (!activeOrdersByTable[k].some((o) => o.id === formattedOrder.id)) {
+            activeOrdersByTable[k].push(formattedOrder);
           }
         }
       }
 
-      const latestOrderByTableId = new Map();
       const latestOrderByTable = {};
       for (const order of latestTableOrders) {
-        const ordTableId = order.tableSession?.tableId ? Number(order.tableSession.tableId) : null;
-        if (ordTableId) {
-          if (!latestOrderByTableId.has(ordTableId)) {
-            latestOrderByTableId.set(ordTableId, order);
-          }
-        } else {
-          for (const k of getTableKeys(order.tableNo)) {
-            if (!latestOrderByTable[k]) {
-              latestOrderByTable[k] = order;
-            }
+        for (const k of getTableKeys(order.tableNo)) {
+          if (!latestOrderByTable[k]) {
+            latestOrderByTable[k] = order;
           }
         }
       }
@@ -971,13 +955,11 @@ export default async function ownerRoutes(app, deps = {}) {
             }
           }
 
-          let latestOrder = latestOrderByTableId.get(tid) || null;
-          if (!latestOrder) {
-            for (const k of getTableKeys(table.tableNo)) {
-              if (latestOrderByTable[k]) {
-                latestOrder = latestOrderByTable[k];
-                break;
-              }
+          let latestOrder = null;
+          for (const k of getTableKeys(table.tableNo)) {
+            if (latestOrderByTable[k]) {
+              latestOrder = latestOrderByTable[k];
+              break;
             }
           }
 
@@ -3241,6 +3223,7 @@ export default async function ownerRoutes(app, deps = {}) {
 
       // Invalidate existing pending unconsumed login links for this staff member upon edit
       try {
+        console.log(`[STAFF_LOGIN_DIAG] STAFF_EDIT_PUT: invalidating old tokens for staffId=${staffId} restaurantId=${restaurantId}`);
         await prisma.staffLoginToken.updateMany({
           where: {
             staffId,
@@ -3456,6 +3439,8 @@ export default async function ownerRoutes(app, deps = {}) {
       if (staff.isActive === false) {
         return reply.code(400).send({ message: "Cannot generate login link for disabled staff member" });
       }
+
+      console.log(`[STAFF_LOGIN_DIAG] GENERATE_ENDPOINT_CALLED: staffId=${staffId} restaurantId=${restaurantId}`);
 
       const linkResult = await generateStaffLoginToken({
         prisma,

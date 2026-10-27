@@ -13,6 +13,10 @@ import { clearStaffSession } from "../utils/staffSessionStorage";
 
 export { getStaffRedirectPath, getRedirectPath };
 
+// Module-level guard to prevent duplicate in-flight or re-entrant consumption requests across component remounts
+const inFlightStaffTokens = new Map();
+const consumedStaffTokens = new Set();
+
 export default function Login() {
     const { login, loginSession, loginCustomer, customer } = useAuth();
     const { t } = useLanguage();
@@ -64,6 +68,7 @@ export default function Login() {
     const [resolvedEmail, setResolvedEmail] = useState("");
     const [resendTimer, setResendTimer] = useState(0);
     const autoLoginTokenRef = useRef("");
+    const isConsumingRef = useRef(false);
     const staffLink = staffLoginToken;
 
     // Registration states (staff/restaurant registration)
@@ -184,7 +189,7 @@ export default function Login() {
         const redirectTarget =
             fromPath && fromPathname !== "/login" && !shouldIgnoreFromPath
                 ? fromPath
-                : data?.redirectPath || getRedirectPath(effectiveRole, data?.user?.designation, data?.user?.id);
+                : (data?.redirectPath || getRedirectPath(effectiveRole, data?.user?.designation, data?.user?.id));
         navigate(redirectTarget, { replace: true });
     };
 
@@ -309,8 +314,9 @@ export default function Login() {
     useEffect(() => {
         if (mode !== "staff") return;
         if (!staffLink) return;
-        if (autoLoginTokenRef.current === staffLink) return;
+        if (autoLoginTokenRef.current === staffLink || consumedStaffTokens.has(staffLink) || isConsumingRef.current) return;
         autoLoginTokenRef.current = staffLink;
+        isConsumingRef.current = true;
 
         // Clear any conflicting existing session before establishing token-authenticated session
         clearStaffSession("local");
@@ -345,7 +351,15 @@ export default function Login() {
                 setError("");
                 setPassword("");
 
-                const res = await api.post("/auth/staff-login-link", { token: staffLink });
+                let resPromise = inFlightStaffTokens.get(staffLink);
+                if (!resPromise) {
+                    resPromise = api.post("/auth/staff-login-link", { token: staffLink });
+                    inFlightStaffTokens.set(staffLink, resPromise);
+                }
+
+                const res = await resPromise;
+                consumedStaffTokens.add(staffLink);
+                inFlightStaffTokens.delete(staffLink);
 
                 if (!res.data?.user || !res.data?.token) {
                     throw new Error("Invalid response from login server");
@@ -353,6 +367,10 @@ export default function Login() {
 
                 handleSuccessfulStaffLogin(res.data, { session: true });
             } catch (err) {
+                inFlightStaffTokens.delete(staffLink);
+                // If this token was already successfully consumed in this session, do not overwrite success
+                if (consumedStaffTokens.has(staffLink)) return;
+
                 const status = err.response?.status;
                 const backendMsg = err.response?.data?.message;
                 if (backendMsg) {
@@ -365,6 +383,7 @@ export default function Login() {
                 setPassword("");
             } finally {
                 setLoading(false);
+                isConsumingRef.current = false;
             }
         };
 

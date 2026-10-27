@@ -2,7 +2,6 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import { io } from "socket.io-client";
 import { API } from "../config";
 import { useAuth } from "./AuthContext";
-import { getActiveStaffToken } from "../utils/staffSessionStorage";
 
 const StaffSocketContext = createContext(null);
 
@@ -22,11 +21,10 @@ export function StaffSocketProvider({ children }) {
 
     const [socketInstance, setSocketInstance] = useState(null);
     const [connected, setConnected] = useState(false);
-    const [connectionStatus, setConnectionStatus] = useState("disconnected");
     const [error, setError] = useState("");
 
     useEffect(() => {
-        const token = String(staffToken || getActiveStaffToken() || "").trim();
+        const token = String(staffToken || "").trim();
 
         if (!user || !token) {
             if (socketRef.current) {
@@ -36,7 +34,6 @@ export function StaffSocketProvider({ children }) {
             tokenRef.current = "";
             setSocketInstance(null);
             setConnected(false);
-            setConnectionStatus("disconnected");
             setError("");
             return undefined;
         }
@@ -52,7 +49,6 @@ export function StaffSocketProvider({ children }) {
             socketRef.current = null;
         }
 
-        setConnectionStatus("connecting");
         const socket = buildSocket(token);
         socketRef.current = socket;
         tokenRef.current = token;
@@ -60,80 +56,29 @@ export function StaffSocketProvider({ children }) {
 
         const onConnect = () => {
             setConnected(true);
-            setConnectionStatus("connected");
             setError("");
         };
-        const onDisconnect = (reason) => {
-            setConnected(false);
-            if (reason === "io server disconnect" || reason === "io client disconnect") {
-                setConnectionStatus("disconnected");
-            } else {
-                setConnectionStatus("reconnecting");
-            }
-        };
+        const onDisconnect = () => setConnected(false);
         const onConnectError = (err) => {
             setConnected(false);
-            setConnectionStatus("disconnected");
             setError(String(err?.message || "socket_error"));
-        };
-
-        const onReconnectAttempt = () => {
-            const latestToken = String(staffToken || getActiveStaffToken() || "").trim();
-            if (latestToken && socket.auth) {
-                socket.auth.token = latestToken;
-            }
-            setConnected(false);
-            setConnectionStatus("reconnecting");
-        };
-        const onReconnect = () => {
-            setConnected(true);
-            setConnectionStatus("connected");
-            setError("");
-        };
-        const onReconnectError = (err) => {
-            setConnected(false);
-            setConnectionStatus("reconnecting");
-            setError(String(err?.message || "reconnect_error"));
-        };
-        const onReconnectFailed = () => {
-            setConnected(false);
-            setConnectionStatus("disconnected");
         };
 
         socket.on("connect", onConnect);
         socket.on("disconnect", onDisconnect);
         socket.on("connect_error", onConnectError);
 
-        if (socket.io) {
-            socket.io.on("reconnect_attempt", onReconnectAttempt);
-            socket.io.on("reconnect", onReconnect);
-            socket.io.on("reconnect_error", onReconnectError);
-            socket.io.on("reconnect_failed", onReconnectFailed);
-        }
-
-        const isCurrentlyConnected = Boolean(socket.connected);
-        setConnected(isCurrentlyConnected);
-        setConnectionStatus(isCurrentlyConnected ? "connected" : "connecting");
+        setConnected(socket.connected);
 
         return () => {
             socket.off("connect", onConnect);
             socket.off("disconnect", onDisconnect);
             socket.off("connect_error", onConnectError);
-
-            if (socket.io) {
-                socket.io.off("reconnect_attempt", onReconnectAttempt);
-                socket.io.off("reconnect", onReconnect);
-                socket.io.off("reconnect_error", onReconnectError);
-                socket.io.off("reconnect_failed", onReconnectFailed);
-            }
-
             socket.disconnect();
             if (socketRef.current === socket) {
                 socketRef.current = null;
                 tokenRef.current = "";
                 setSocketInstance(null);
-                setConnected(false);
-                setConnectionStatus("disconnected");
             }
         };
     }, [staffToken, user?.id]);
@@ -142,14 +87,9 @@ export function StaffSocketProvider({ children }) {
         () => ({
             socket: socketInstance,
             connected,
-            isConnected: connected,
-            connectionStatus,
-            status: connectionStatus,
-            isConnecting: connectionStatus === "connecting",
-            isReconnecting: connectionStatus === "reconnecting",
             error,
         }),
-        [connected, connectionStatus, error, socketInstance]
+        [connected, error, socketInstance]
     );
 
     return <StaffSocketContext.Provider value={value}>{children}</StaffSocketContext.Provider>;

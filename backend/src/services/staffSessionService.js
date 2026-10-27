@@ -28,36 +28,37 @@ export const inferRoleFromDesignation = (designation) => {
   return null;
 };
 
-export const isServerDesignation = (designation, role) => {
-  const rawDesignation = String(designation || "").trim();
-  if (rawDesignation) {
-    const inferred = inferRoleFromDesignation(rawDesignation);
-    if (inferred) {
-      return inferred === "WAITER";
-    }
-    const upper = rawDesignation.toUpperCase();
-    return upper === "SERVER" || upper === "WAITER";
-  }
+export const mapDesignationToSystemRole = (designation) => {
+  const text = String(designation || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s_-]+/g, " ");
 
-  const rawRole = String(role || "").trim().toUpperCase();
-  return rawRole === "WAITER" || rawRole === "SERVER";
+  if (!text) return null;
+
+  if (text.includes("CLEANER") || text.includes("HOUSEKEEPING")) return "STAFF";
+  if (text.includes("SWIPER")) return "STAFF";
+  if (text.includes("STEWARD")) return "WAITER";
+  if (text.includes("SERVER") || text.includes("WAITER")) return "WAITER";
+  if (text.includes("CHEF") || text.includes("COOK")) return "CHEF";
+  if (text.includes("CASHIER")) return "CASHIER";
+  if (text.includes("MANAGER")) return "MANAGER";
+  if (text.includes("OWNER")) return "OWNER";
+  if (text.includes("SUPER ADMIN")) return "SUPER_ADMIN";
+
+  return "STAFF";
 };
 
-export const isServerStaff = (staffUser) => {
-  if (!staffUser) return false;
-  if (staffUser.isActive === false) return false;
-  return isServerDesignation(
-    staffUser.designation || staffUser.staffDesignation || staffUser.jobTitle,
-    staffUser.role
-  );
-};
-
-const getEffectiveStaffRole = (user) => {
+export const getEffectiveStaffRole = (user) => {
   const baseRole = String(user?.role || "STAFF").toUpperCase();
   if (baseRole === "SUPER_ADMIN") return "SUPER_ADMIN";
-  if (baseRole && baseRole !== "STAFF") return baseRole;
+  if (baseRole === "OWNER") return "OWNER";
 
-  return inferRoleFromDesignation(user?.designation) || baseRole || "STAFF";
+  const inferred = inferRoleFromDesignation(user?.designation);
+  if (inferred) return inferred;
+
+  if (baseRole && baseRole !== "STAFF") return baseRole;
+  return "STAFF";
 };
 
 export const buildStaffLoginPayload = ({ user, normalizeDbPermissions }) => {
@@ -79,42 +80,18 @@ export const buildStaffLoginPayload = ({ user, normalizeDbPermissions }) => {
   return { userPayload, effectiveRole };
 };
 
-export const STAFF_OFFLINE_GRACE_PERIOD_HOURS = 72;
-export const STAFF_OFFLINE_GRACE_PERIOD_SECONDS = STAFF_OFFLINE_GRACE_PERIOD_HOURS * 60 * 60;
-export const STAFF_OFFLINE_GRACE_PERIOD_MS = STAFF_OFFLINE_GRACE_PERIOD_SECONDS * 1000;
+export const DEFAULT_STAFF_JWT_EXPIRES_IN = "12h";
 
-export const DEFAULT_STAFF_ACCESS_TOKEN_EXPIRES_IN = "12h";
-export const DEFAULT_STAFF_REFRESH_TOKEN_EXPIRES_IN = "30d";
-export const DEFAULT_STAFF_JWT_EXPIRES_IN = DEFAULT_STAFF_ACCESS_TOKEN_EXPIRES_IN;
+export const issueStaffSession = async ({ prisma, app, user, effectiveRole }) => {
+  const updated = await prisma.user.update({
+    where: { id: user.id },
+    data: { sessionVersion: { increment: 1 } },
+    select: { sessionVersion: true, mustChangePassword: true },
+  });
 
-export const issueStaffSession = async ({
-  prisma,
-  app,
-  user,
-  effectiveRole,
-  skipVersionIncrement = false,
-}) => {
-  let sessionVersion = Number(user?.sessionVersion || 0);
-  let mustChangePassword = Boolean(user?.mustChangePassword);
-
-  if (!skipVersionIncrement) {
-    const updated = await prisma.user.update({
-      where: { id: user.id },
-      data: { sessionVersion: { increment: 1 } },
-      select: { sessionVersion: true, mustChangePassword: true },
-    });
-    sessionVersion = Number(updated.sessionVersion || 0);
-    mustChangePassword = Boolean(user?.mustChangePassword ?? updated.mustChangePassword);
-  }
-
-  const expiresIn =
-    process.env.STAFF_ACCESS_TOKEN_EXPIRES_IN ||
-    process.env.STAFF_JWT_EXPIRES_IN ||
-    DEFAULT_STAFF_ACCESS_TOKEN_EXPIRES_IN;
-  const refreshExpiresIn =
-    process.env.STAFF_REFRESH_TOKEN_EXPIRES_IN ||
-    DEFAULT_STAFF_REFRESH_TOKEN_EXPIRES_IN;
-
+  const sessionVersion = Number(updated.sessionVersion || 0);
+  const mustChangePassword = Boolean(user?.mustChangePassword ?? updated.mustChangePassword);
+  const expiresIn = process.env.STAFF_JWT_EXPIRES_IN || DEFAULT_STAFF_JWT_EXPIRES_IN;
   const token = app.jwt.sign(
     {
       id: user.id,
@@ -128,112 +105,7 @@ export const issueStaffSession = async ({
     { expiresIn }
   );
 
-  const refreshToken = app.jwt.sign(
-    {
-      id: user.id,
-      role: effectiveRole,
-      restaurantId: user.restaurantId || null,
-      branchId: user.branchId || null,
-      sessionVersion,
-      tokenType: "staff_refresh",
-      isRefresh: true,
-    },
-    { expiresIn: refreshExpiresIn }
-  );
-
-  return { token, refreshToken, sessionVersion };
-};
-
-export const refreshStaffSession = async ({ prisma, app, refreshToken, normalizeDbPermissions }) => {
-  if (!refreshToken || typeof refreshToken !== "string") {
-    const err = new Error("Refresh token is required");
-    err.statusCode = 400;
-    err.code = "REFRESH_TOKEN_REQUIRED";
-    throw err;
-  }
-
-  let decoded;
-  try {
-    decoded = app.jwt.verify(refreshToken);
-  } catch (err) {
-    const error = new Error("Invalid or expired refresh token");
-    error.statusCode = 401;
-    error.code = "INVALID_REFRESH_TOKEN";
-    throw error;
-  }
-
-  if (
-    !decoded ||
-    typeof decoded !== "object" ||
-    !decoded.id ||
-    (decoded.tokenType !== "staff_refresh" && !decoded.isRefresh)
-  ) {
-    const error = new Error("Invalid refresh token payload");
-    error.statusCode = 401;
-    error.code = "INVALID_REFRESH_TOKEN";
-    throw error;
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { id: decoded.id },
-    include: {
-      restaurant: { select: { id: true, name: true, logoUrl: true, slug: true } },
-      branch: { select: { id: true, name: true } },
-      staffAccess: { select: { permissions: true } },
-    },
-  });
-
-  if (!user || user.isActive === false) {
-    const error = new Error("Staff account is disabled or not found");
-    error.statusCode = 401;
-    error.code = "ACCOUNT_INACTIVE";
-    throw error;
-  }
-
-  if (user.lockedUntil && new Date(user.lockedUntil) > new Date()) {
-    const error = new Error("Account is temporarily locked");
-    error.statusCode = 403;
-    error.code = "ACCOUNT_LOCKED";
-    throw error;
-  }
-
-  const currentSessionVersion = Number(user.sessionVersion || 0);
-  const tokenSessionVersion = Number(decoded.sessionVersion || 0);
-
-  if (currentSessionVersion !== tokenSessionVersion) {
-    const error = new Error("Session has been invalidated. Please log in again.");
-    error.statusCode = 401;
-    error.code = "SESSION_VERSION_MISMATCH";
-    throw error;
-  }
-
-  const { userPayload, effectiveRole } = buildStaffLoginPayload({ user, normalizeDbPermissions });
-
-  const { token, refreshToken: newRefreshToken, sessionVersion } = await issueStaffSession({
-    prisma,
-    app,
-    user,
-    effectiveRole,
-    skipVersionIncrement: true,
-  });
-
-  userPayload.sessionVersion = sessionVersion;
-
-  return {
-    token,
-    refreshToken: newRefreshToken,
-    user: userPayload,
-    sessionVersion,
-  };
-};
-
-export const invalidateStaffSession = async ({ prisma, userId }) => {
-  if (!userId) return null;
-  return prisma.user.update({
-    where: { id: Number(userId) },
-    data: { sessionVersion: { increment: 1 } },
-    select: { id: true, sessionVersion: true },
-  });
+  return { token, sessionVersion };
 };
 
 export const buildStaffMagicLinkToken = ({ app, user, expiresIn = DEFAULT_STAFF_LINK_EXPIRES_IN }) =>
@@ -439,6 +311,8 @@ export const generateStaffLoginToken = async ({
   const path = `/login?mode=staff&token=${rawToken}`;
   const loginUrl = base ? `${base}${path}` : path;
 
+  console.log(`[STAFF_LOGIN_DIAG] GENERATE: userId=${staffId} restaurantId=${restaurantId} tokenHash=${tokenHash.substring(0, 10)}... expiresAt=${expiresAt.toISOString()} usedAt=null`);
+
   return {
     rawToken,
     loginUrl,
@@ -456,7 +330,10 @@ export const generateStaffLoginToken = async ({
 export const resolveStaffRedirectPath = (effectiveRole) => {
   const role = String(effectiveRole || "").toUpperCase();
   if (role === "CHEF") return "/kitchen";
-  if (role === "CASHIER") return "/owner/orders";
+  if (role === "CASHIER") return "/staff/cashier";
+  if (role === "STEWARD") return "/staff/steward";
+  if (role === "CLEANER") return "/staff/cleaner";
+  if (role === "SWIPER") return "/staff/swiper";
   if (["OWNER", "MANAGER", "SUPER_ADMIN"].includes(role)) return "/owner/staff";
   return "/server";
 };
@@ -476,6 +353,7 @@ export const consumeStaffLoginToken = async ({
   }
 
   const tokenHash = hashStaffLoginToken(rawToken);
+  console.log(`[STAFF_LOGIN_DIAG] CONSUME_ATTEMPT: tokenHash=${tokenHash.substring(0, 10)}... rawTokenLength=${rawToken.length}`);
   let tokenRecord;
   try {
     tokenRecord = await prisma.staffLoginToken.findUnique({
@@ -508,6 +386,8 @@ export const consumeStaffLoginToken = async ({
     }
   }
 
+  console.log(`[STAFF_LOGIN_DIAG] TOKEN_LOOKUP: tokenHash=${tokenHash.substring(0, 10)}... found=${Boolean(tokenRecord)} usedAt=${tokenRecord?.usedAt} expiresAt=${tokenRecord?.expiresAt}`);
+
   if (!tokenRecord || tokenRecord.purpose !== STAFF_LOGIN_PURPOSE) {
     const err = new Error("Invalid staff login link.");
     err.statusCode = 401;
@@ -530,7 +410,7 @@ export const consumeStaffLoginToken = async ({
 
   const user = tokenRecord.staff;
   if (!user) {
-    const err = new Error("Associated staff account not found");
+    const err = new Error("Invalid staff login link.");
     err.statusCode = 401;
     throw err;
   }
@@ -561,6 +441,8 @@ export const consumeStaffLoginToken = async ({
     },
   });
 
+  console.log(`[STAFF_LOGIN_DIAG] ATOMIC_CONSUME: tokenHash=${tokenHash.substring(0, 10)}... rowsUpdated=${updateResult.count}`);
+
   if (updateResult.count === 0) {
     const rechecked = await prisma.staffLoginToken.findUnique({
       where: { id: tokenRecord.id },
@@ -578,20 +460,27 @@ export const consumeStaffLoginToken = async ({
 
   // Issue standard staff session using established project architecture
   const { userPayload, effectiveRole } = buildStaffLoginPayload({ user, normalizeDbPermissions });
-  const { token: sessionToken, refreshToken, sessionVersion } = await issueStaffSession({ prisma, app, user, effectiveRole });
+  const sessionResult = await issueStaffSession({ prisma, app, user, effectiveRole });
+  const sessionToken = sessionResult.token;
+  const refreshToken = sessionResult.refreshToken || null;
+  const sessionVersion = sessionResult.sessionVersion;
   userPayload.sessionVersion = sessionVersion;
 
   const redirectPath = resolveStaffRedirectPath(effectiveRole);
 
-  return {
+  const payload = {
     message: "Login success",
     actorType: "STAFF",
     token: sessionToken,
-    refreshToken,
     user: userPayload,
     redirectPath,
     offlineMode: false,
     tokenId: tokenRecord.id,
     restaurantId: user.restaurantId,
   };
+  if (refreshToken) {
+    payload.refreshToken = refreshToken;
+  }
+
+  return payload;
 };

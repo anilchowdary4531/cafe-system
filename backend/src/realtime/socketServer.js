@@ -303,39 +303,11 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
     let chain = staff.to(restaurantRoom(rid));
     if (bid) chain = chain.to(branchRoom(rid, bid));
     chain.emit("order:created", order);
-    chain.emit("order_created", { order, source: order?.orderSource || "POS" });
-    chain.emit("new_order", order);
-    if (order?.tableNo) {
-      const tablePayload = {
-        restaurantId: rid,
-        tableNo: order.tableNo,
-        tableId: order.tableSession?.tableId || null,
-        tableSessionId: order.tableSessionId || null,
-      };
-      chain.emit("table:updated", tablePayload);
-      chain.emit("table:session_updated", tablePayload);
-    }
 
     // Also broadcast to root Socket.IO rooms for restaurant subscribers
     if (io) {
       io.to(`restaurant_${rid}`).emit("new_order", order);
       io.to(`restaurant:${rid}`).emit("new_order", order);
-      io.to(`restaurant_${rid}`).emit("order:created", order);
-      io.to(`restaurant:${rid}`).emit("order:created", order);
-      io.to(`restaurant_${rid}`).emit("order_created", { order, source: order?.orderSource || "POS" });
-      io.to(`restaurant:${rid}`).emit("order_created", { order, source: order?.orderSource || "POS" });
-      if (order?.tableNo) {
-        const tablePayload = {
-          restaurantId: rid,
-          tableNo: order.tableNo,
-          tableId: order.tableSession?.tableId || null,
-          tableSessionId: order.tableSessionId || null,
-        };
-        io.to(`restaurant_${rid}`).emit("table:updated", tablePayload);
-        io.to(`restaurant:${rid}`).emit("table:updated", tablePayload);
-        io.to(`restaurant_${rid}`).emit("table:session_updated", tablePayload);
-        io.to(`restaurant:${rid}`).emit("table:session_updated", tablePayload);
-      }
     }
 
     // Broadcast station KOTs to kitchen & trigger thermal print dispatch
@@ -368,7 +340,7 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
 
       await createAndDispatchNotification({
         prisma,
-        realtime: { io },
+        realtime: { io, staff },
         recipientType: RECIPIENT_TYPES.RESTAURANT,
         recipientId: rid,
         restaurantId: rid,
@@ -379,6 +351,39 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
         data: { orderId: order.id, orderNo: order.orderNo, total: order.total, tableNo: order.tableNo },
         idempotencyKey: `staff_order_rest_${order.id}`,
       }).catch((e) => console.log("Staff order notification dispatch error:", e?.message));
+
+      const responsibleServerId =
+        order.kots?.[0]?.waiterId ||
+        order.waiterId ||
+        order.assignedWaiterId ||
+        order.createdByUserId ||
+        null;
+
+      if (responsibleServerId) {
+        const tableLabel = order.tableNo ? `Table ${order.tableNo}` : "Takeaway";
+        const orderNum = order.orderNo || order.id;
+        await createAndDispatchNotification({
+          prisma,
+          realtime: { io, staff },
+          recipientType: RECIPIENT_TYPES.USER,
+          recipientId: Number(responsibleServerId),
+          orderId: order.id,
+          restaurantId: rid,
+          notificationType: NOTIFICATION_TYPES.ORDER_PLACED,
+          title: "Order Sent to Kitchen",
+          message: `Order #${orderNum} sent to kitchen for ${tableLabel}.`,
+          idempotencyKey: `order_sent_${rid}_${order.id}_${responsibleServerId}`,
+          data: {
+            restaurantId: rid,
+            orderId: order.id,
+            orderNo: order.orderNo,
+            tableId: order.tableId ? Number(order.tableId) : null,
+            tableSessionId: order.tableSessionId ? Number(order.tableSessionId) : null,
+            tableNo: order.tableNo || null,
+            recipientId: Number(responsibleServerId),
+          },
+        }).catch((e) => console.log("Responsible server order notification error:", e?.message));
+      }
     } catch (notifErr) {
       console.log("Order notification dispatch error:", notifErr?.message);
     }

@@ -30,6 +30,7 @@ import { API } from "../../config";
 import { showToast } from "../../utils/toast";
 import OwnerMenuButton from "../../components/OwnerMenuButton";
 import StaffSubNav from "../../components/StaffSubNav";
+import { mapDesignationToSystemRole } from "../../utils/staffRole";
 
 const DESIGNATION_OPTIONS = [
     "Chef",
@@ -63,6 +64,9 @@ const DEFAULT_DESIGNATION_BY_ROLE = {
     WAITER: "Server",
     CHEF: "Chef",
     CASHIER: "Cashier",
+    STEWARD: "Steward",
+    CLEANER: "Cleaner",
+    SWIPER: "Swiper",
     STAFF: "Staff",
     OWNER: "Owner",
 };
@@ -159,6 +163,30 @@ const defaultAccessByRole = (role) => {
             kitchen: false, printers: true, analytics: true, reports: true, paylater: true, shifts: true,
             supply: false, delivery: false, delivery_partners: false, customers: true, discounts: true,
             loyalty: true, staff: false, settings: false, notifications: true
+        };
+    }
+    if (normalizedRole === "STEWARD") {
+        return {
+            dashboard: true, billing: false, orders: true, menu: false, inventory: false, tables: true,
+            kitchen: false, printers: false, analytics: false, reports: false, paylater: false, shifts: false,
+            supply: false, delivery: false, delivery_partners: false, customers: false, discounts: false,
+            loyalty: false, staff: false, settings: false, notifications: true
+        };
+    }
+    if (normalizedRole === "CLEANER") {
+        return {
+            dashboard: true, billing: false, orders: false, menu: false, inventory: false, tables: true,
+            kitchen: false, printers: false, analytics: false, reports: false, paylater: false, shifts: false,
+            supply: false, delivery: false, delivery_partners: false, customers: false, discounts: false,
+            loyalty: false, staff: false, settings: false, notifications: true
+        };
+    }
+    if (normalizedRole === "SWIPER") {
+        return {
+            dashboard: true, billing: true, orders: false, menu: false, inventory: false, tables: false,
+            kitchen: false, printers: false, analytics: false, reports: false, paylater: false, shifts: false,
+            supply: false, delivery: false, delivery_partners: false, customers: false, discounts: false,
+            loyalty: false, staff: false, settings: false, notifications: true
         };
     }
     return {
@@ -371,12 +399,15 @@ export default function OwnerStaff() {
             setCreating(true);
             setError("");
 
+            const inferredRole = mapDesignationToSystemRole(designation);
+            const roleToSend = inferredRole || String(form.role).toUpperCase();
+
             const res = await axios.post(`${API}/owner/${restaurantId}/staff`, {
                 ...form,
                 name: trimmedName,
                 email: trimmedEmail,
                 phone: trimmedPhone,
-                role: String(form.role).toUpperCase(),
+                role: roleToSend,
                 designation,
                 password: form.password || undefined,
             });
@@ -532,6 +563,8 @@ export default function OwnerStaff() {
         setShowEditPassword(false);
         const currentDesig = resolveDesignation(staffUser);
         const isStandard = DESIGNATION_OPTIONS.includes(currentDesig);
+        const inferredRole = mapDesignationToSystemRole(staffUser.designation);
+        const resolvedRole = staffUser?.role === "OWNER" ? "OWNER" : (inferredRole || String(staffUser?.role || "STAFF"));
 
         // Clear any stale login link or temporary password for this staff user
         setLoginLinks((prev) => {
@@ -549,12 +582,12 @@ export default function OwnerStaff() {
             name: String(staffUser?.name || ""),
             email: String(staffUser?.email || ""),
             phone: String(staffUser?.phone || ""),
-            role: String(staffUser?.role || "STAFF"),
+            role: resolvedRole,
             designationOption: isStandard ? currentDesig : "OTHER",
             customDesignation: isStandard ? "" : currentDesig,
             password: "",
             isActive: Boolean(staffUser?.isActive),
-            access: staffUser.access ? { ...staffUser.access } : defaultAccessByRole(staffUser.role),
+            access: staffUser.access ? { ...staffUser.access } : defaultAccessByRole(resolvedRole),
         });
     };
 
@@ -592,12 +625,17 @@ export default function OwnerStaff() {
             setSavingEditFor(staffUser.id);
             setError("");
 
+            const inferredRole = mapDesignationToSystemRole(designation);
+            const roleToSend = staffUser.role === "OWNER"
+                ? "OWNER"
+                : (inferredRole || String(editDraft.role || "STAFF").toUpperCase());
+
             const payload = {
                 name,
                 email,
                 phone,
                 designation,
-                role: String(editDraft.role || "STAFF").toUpperCase(),
+                role: roleToSend,
                 isActive: Boolean(editDraft.isActive),
             };
             if (editDraft.password) {
@@ -1316,6 +1354,7 @@ export default function OwnerStaff() {
                                                         Role
                                                     </label>
                                                     <select
+                                                        aria-label="Role"
                                                         value={editDraft.role}
                                                         disabled={staffUser.role === "OWNER"}
                                                         onChange={(e) => {
@@ -1342,13 +1381,17 @@ export default function OwnerStaff() {
                                                         Designation
                                                     </label>
                                                     <select
+                                                        aria-label="Designation"
                                                         value={editDraft.designationOption}
-                                                        onChange={(e) =>
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            const inferredRole = mapDesignationToSystemRole(val);
                                                             setEditDraft((prev) => ({
                                                                 ...prev,
-                                                                designationOption: e.target.value,
-                                                            }))
-                                                        }
+                                                                designationOption: val,
+                                                                role: staffUser.role === "OWNER" ? "OWNER" : (inferredRole || prev.role),
+                                                            }));
+                                                        }}
                                                         className="w-full rounded-lg border border-[#D6D3D1] bg-white px-3 py-2 text-xs text-[#292524] outline-none focus:border-[#F97316] focus:ring-1 focus:ring-[#F97316]"
                                                     >
                                                         {DESIGNATION_OPTIONS.map((designation) => (
@@ -1366,13 +1409,17 @@ export default function OwnerStaff() {
                                                             Custom Designation
                                                         </label>
                                                         <input
+                                                            aria-label="Custom Designation"
                                                             value={editDraft.customDesignation}
-                                                            onChange={(e) =>
+                                                            onChange={(e) => {
+                                                                const val = e.target.value;
+                                                                const inferredRole = mapDesignationToSystemRole(val);
                                                                 setEditDraft((prev) => ({
                                                                     ...prev,
-                                                                    customDesignation: e.target.value,
-                                                                }))
-                                                            }
+                                                                    customDesignation: val,
+                                                                    role: staffUser.role === "OWNER" ? "OWNER" : (inferredRole || prev.role),
+                                                                }));
+                                                            }}
                                                             placeholder="Custom designation"
                                                             className="w-full rounded-lg border border-[#D6D3D1] bg-white px-3 py-2 text-xs text-[#292524] placeholder-[#78716C] outline-none focus:border-[#F97316] focus:ring-1 focus:ring-[#F97316]"
                                                         />

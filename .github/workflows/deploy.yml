@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -22,10 +23,48 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             set -e
+
+            echo "=== Step 1: Inspecting EC2 working directory and state ==="
             cd ~/cafe-system
+            pwd
+            git remote -v
+            git branch
+
+            echo "=== Step 2: Checking for uncommitted production changes ==="
+            if [ -n "$(git status --porcelain)" ]; then
+              echo "Production status summary:"
+              git status --short
+              TRACKED_DIFF=$(git diff --stat)
+              if [ -n "$TRACKED_DIFF" ]; then
+                echo "ERROR: Tracked files have local modifications in production. Stopping to protect work:"
+                echo "$TRACKED_DIFF"
+                exit 1
+              fi
+            fi
+
+            echo "=== Step 3: Configuring Tiffzy repository remote ==="
+            CURRENT_ORIGIN=$(git remote get-url origin 2>/dev/null || true)
+            echo "Current origin: $CURRENT_ORIGIN"
+            if [ "$CURRENT_ORIGIN" != "https://github.com/anilchowdary4531/tiffzy.git" ] && [ "$CURRENT_ORIGIN" != "git@github.com:anilchowdary4531/tiffzy.git" ]; then
+              echo "Updating git origin to https://github.com/anilchowdary4531/tiffzy.git"
+              git remote set-url origin https://github.com/anilchowdary4531/tiffzy.git
+            fi
+
+            echo "=== Step 4: Fetching main and checking out target commit ==="
             git fetch origin main
-            git reset --hard origin/main
-            cd backend
+            TARGET_COMMIT=$(git rev-parse origin/main)
+            echo "Target commit: $TARGET_COMMIT"
+
+            git checkout "$TARGET_COMMIT"
+            DEPLOYED_HEAD=$(git rev-parse HEAD)
+            echo "Successfully checked out deployed HEAD: $DEPLOYED_HEAD"
+            if [ "$DEPLOYED_HEAD" != "$TARGET_COMMIT" ]; then
+              echo "ERROR: Deployed HEAD ($DEPLOYED_HEAD) does not match target commit ($TARGET_COMMIT)"
+              exit 1
+            fi
+
+            echo "=== Step 5: Installing backend dependencies and generating Prisma client ==="
+            cd ~/cafe-system/backend
             if [ -f .env ]; then
               if grep -q "^NODE_ENV=" .env; then
                 sed -i 's/^NODE_ENV=.*/NODE_ENV=production/' .env
@@ -35,18 +74,43 @@ jobs:
             else
               echo "NODE_ENV=production" >> .env
             fi
-            sudo sed -i 's/NODE_ENV=development/NODE_ENV=production/g' /etc/systemd/system/tiffzy.service 2>/dev/null || true
-            sudo systemctl daemon-reload 2>/dev/null || true
-            npm install
+
+            npm install --production=false
             npx prisma generate
-            npx prisma migrate deploy || true
-            npx prisma db push --accept-data-loss=false || true
+
+            echo "=== Step 6: Restarting systemd service (tiffzy) ==="
+            sudo systemctl daemon-reload 2>/dev/null || true
             sudo systemctl restart tiffzy
             sleep 3
+
+            echo "=== Step 7: Verifying service is active ==="
             if ! sudo systemctl is-active --quiet tiffzy; then
-              echo "ERROR: tiffzy service is not active after restart. Journalctl logs:"
+              echo "ERROR: tiffzy.service is not active after restart. Journalctl logs:"
               sudo journalctl -u tiffzy -n 50 --no-pager
               exit 1
             fi
-            echo "Tiffzy backend restarted successfully"
 
+            sudo systemctl status tiffzy --no-pager -l
+
+            echo "=== Step 8: Health Check on localhost:3000 ==="
+            HEALTH_OK=0
+            for i in {1..15}; do
+              STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/health || true)
+              if [ "$STATUS_CODE" = "200" ]; then
+                echo "SUCCESS: Backend health endpoint responded with 200 OK"
+                curl -s http://localhost:3000/health
+                echo ""
+                HEALTH_OK=1
+                break
+              fi
+              echo "Waiting for backend on localhost:3000... (attempt $i/15, status: $STATUS_CODE)"
+              sleep 2
+            done
+
+            if [ "$HEALTH_OK" -ne 1 ]; then
+              echo "ERROR: Health check failed on localhost:3000!"
+              sudo journalctl -u tiffzy -n 50 --no-pager
+              exit 1
+            fi
+
+            echo "Deployment of commit $TARGET_COMMIT completed successfully!"

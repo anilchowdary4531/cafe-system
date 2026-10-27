@@ -468,13 +468,10 @@ export default function TablePaymentSettlementModal({
                                     )}
 
                                     <div>
-                                        <label htmlFor="settlement-upi-reference" className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">
                                             Transaction ID / UTR (Optional)
                                         </label>
                                         <input
-                                            id="settlement-upi-reference"
-                                            name="upiReference"
-                                            aria-label="Transaction ID or UTR"
                                             type="text"
                                             value={upiReference}
                                             onChange={(e) => setUpiReference(e.target.value)}

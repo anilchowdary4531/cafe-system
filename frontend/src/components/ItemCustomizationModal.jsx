@@ -216,8 +216,6 @@ export default function ItemCustomizationModal({
           <button
             type="button"
             onClick={onClose}
-            title="Close"
-            aria-label="Close customization modal"
             className="absolute top-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-zinc-900/80 text-zinc-300 hover:bg-zinc-800 hover:text-white transition"
           >
             <X className="h-5 w-5" />
@@ -366,13 +364,10 @@ export default function ItemCustomizationModal({
 
           {/* Notes Input */}
           <div className="space-y-2 border-t border-zinc-800/80 pt-4">
-            <label htmlFor="item-special-instructions" className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+            <label className="text-xs font-bold uppercase tracking-wider text-zinc-400">
               Special Preparation Instructions
             </label>
             <input
-              id="item-special-instructions"
-              name="specialInstructions"
-              aria-label="Special Preparation Instructions"
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -390,8 +385,6 @@ export default function ItemCustomizationModal({
               <button
                 type="button"
                 onClick={() => setQty((q) => Math.max(1, q - 1))}
-                aria-label="Decrease quantity"
-                title="Decrease quantity"
                 className="flex h-7 w-7 items-center justify-center rounded-xl bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white transition"
               >
                 <Minus className="h-3.5 w-3.5" />
@@ -400,8 +393,6 @@ export default function ItemCustomizationModal({
               <button
                 type="button"
                 onClick={() => setQty((q) => q + 1)}
-                aria-label="Increase quantity"
-                title="Increase quantity"
                 className="flex h-7 w-7 items-center justify-center rounded-xl bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white transition"
               >
                 <Plus className="h-3.5 w-3.5" />

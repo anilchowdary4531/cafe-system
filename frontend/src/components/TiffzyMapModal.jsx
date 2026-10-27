@@ -1,14 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import * as maplibreglRaw from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Navigation, MapPin, X, ExternalLink, Utensils, AlertTriangle } from "lucide-react";
-import { MAP_CONFIG, parseAndValidateCoords } from "../utils/mapConfig";
-
-const maplibregl = maplibreglRaw.Map ? maplibreglRaw : (maplibreglRaw.default || maplibreglRaw);
+import { MAP_CONFIG } from "../utils/mapConfig";
 import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
-
-export { parseAndValidateCoords };
 
 const toRad = (deg) => (Number(deg) * Math.PI) / 180;
 
@@ -23,6 +19,44 @@ const calculateHaversineKm = (lat1, lon1, lat2, lon2) => {
         Math.sin(dLat / 2) ** 2 +
         Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
     return 2 * R * Math.asin(Math.sqrt(a));
+};
+
+/**
+ * Validate coordinates strictly (-90..90 for lat, -180..180 for lng).
+ * Explicit Coordinate Convention:
+ * Human / DB: latitude = lat, longitude = lng
+ * MapLibre / GeoJSON: [longitude, latitude]
+ * 
+ * IMPORTANT: NEVER auto-swap coordinates.
+ * Valid-but-swapped coordinates such as (lat: 78.4867, lng: 17.3850)
+ * are both within mathematical bounds. SILENT AUTO-SWAPPING IS FORBIDDEN.
+ */
+export const parseAndValidateCoords = (rawLat, rawLng) => {
+    if (rawLat === null || rawLat === undefined || rawLng === null || rawLng === undefined) {
+        return null;
+    }
+
+    const lat = Number(rawLat);
+    const lng = Number(rawLng);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return null;
+    }
+
+    // Strict numerical bounds check
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        console.warn(`[TiffzyMap] Invalid coordinate bounds (lat: ${lat}, lng: ${lng}). Skipping...`);
+        return null;
+    }
+
+    // Log warning for geographically suspicious values
+    if (Math.abs(lat) > 70) {
+        console.warn(
+            `[TiffzyMap] WARNING: Geographically suspicious coordinate detected (lat: ${lat}, lng: ${lng}). Proceeding without auto-correction.`
+        );
+    }
+
+    return { lat, lng };
 };
 
 export default function TiffzyMapModal({ isOpen, onClose, restaurants = [] }) {
@@ -79,7 +113,6 @@ export default function TiffzyMapModal({ isOpen, onClose, restaurants = [] }) {
                     center: [MAP_CONFIG.defaultCenter.lng, MAP_CONFIG.defaultCenter.lat],
                     zoom: MAP_CONFIG.defaultCenter.zoom,
                     attributionControl: true,
-                    transformRequest: MAP_CONFIG.transformRequest,
                 });
 
                 mapRef.current = map;
@@ -237,7 +270,6 @@ export default function TiffzyMapModal({ isOpen, onClose, restaurants = [] }) {
                             type="button"
                             onClick={handleGetUserLocation}
                             disabled={locating}
-                            aria-label="Use my location"
                             className="inline-flex items-center gap-2 rounded-xl bg-[#fe5102] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#e04600] disabled:opacity-50 sm:px-4 sm:text-sm"
                         >
                             <Navigation size={15} className={locating ? "animate-spin" : ""} />
@@ -270,11 +302,7 @@ export default function TiffzyMapModal({ isOpen, onClose, restaurants = [] }) {
                             <div className="flex items-center gap-2">
                                 <AlertTriangle size={16} className="shrink-0 text-amber-400" />
                                 <span>{locationError}</span>
-                                <button
-                                    onClick={() => setLocationError(null)}
-                                    aria-label="Dismiss location warning"
-                                    className="ml-auto text-amber-400 hover:text-white"
-                                >
+                                <button onClick={() => setLocationError(null)} className="ml-auto text-amber-400 hover:text-white">
                                     <X size={14} />
                                 </button>
                             </div>
@@ -295,7 +323,6 @@ export default function TiffzyMapModal({ isOpen, onClose, restaurants = [] }) {
                                 </div>
                                 <button
                                     onClick={() => setSelectedRestaurant(null)}
-                                    aria-label="Close restaurant details"
                                     className="text-white/50 hover:text-white"
                                 >
                                     <X size={16} />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
     ArrowLeft,
     Check,
@@ -14,7 +14,7 @@ import {
     Shield,
     Sparkles,
     UserCheck,
-    UserRound,
+    Volume2,
 } from "lucide-react";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
@@ -29,35 +29,26 @@ export default function StaffProfileView({
     title = "Staff Profile & Settings",
 }) {
     const navigate = useNavigate();
+    const location = useLocation();
     const { user, logout, token } = useAuth();
-
-    const [profileData, setProfileData] = useState(null);
-    const [loadingProfile, setLoadingProfile] = useState(false);
-
-    const currentUser = profileData || user;
-    const effectiveRole = resolveEffectiveStaffRole(currentUser?.role, currentUser?.designation);
-    const restaurantId = Number(
-        currentUser?.restaurantId ||
-        currentUser?.restaurant?.id ||
-        currentUser?.restaurant_id ||
-        localStorage.getItem("restaurantId") ||
-        1
-    );
-    const restaurantName = String(currentUser?.restaurant?.name || user?.restaurant?.name || "Tiffzy Restaurant").trim();
 
     const handleBack = () => {
         if (typeof onBack === "function") {
             onBack();
-        } else if (effectiveRole === "SWIPER") {
-            navigate("/staff/swiper");
         } else {
             navigate(-1);
         }
     };
 
-    const resolvedBackLabel = backLabel !== "Back to Workspace"
-        ? backLabel
-        : (effectiveRole === "SWIPER" ? "Back to Swiper Station" : "Back to Workspace");
+    const effectiveRole = resolveEffectiveStaffRole(user?.role, user?.designation);
+    const restaurantId = Number(
+        user?.restaurantId ||
+        user?.restaurant?.id ||
+        user?.restaurant_id ||
+        localStorage.getItem("restaurantId") ||
+        1
+    );
+    const restaurantName = String(user?.restaurant?.name || "Tiffzy Restaurant").trim();
 
     // Editable profile state
     const [isEditing, setIsEditing] = useState(false);
@@ -76,47 +67,10 @@ export default function StaffProfileView({
     const [passwordError, setPasswordError] = useState("");
     const [passwordSuccess, setPasswordSuccess] = useState("");
 
-    // Fetch live authenticated staff profile on mount
     useEffect(() => {
-        let isMounted = true;
-        const fetchStaffProfile = async () => {
-            if (!token) return;
-            try {
-                setLoadingProfile(true);
-                const res = await axios.get(`${API}/api/staff/profile/me`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
-                if (res.data?.success && res.data?.user && isMounted) {
-                    setProfileData(res.data.user);
-                    if (res.data.user.name) setName(res.data.user.name);
-                    if (res.data.user.phone) setPhone(res.data.user.phone);
-                }
-            } catch (err) {
-                try {
-                    const fallbackRes = await axios.get(`${API}/staff/profile/me`, {
-                        headers: { Authorization: `Bearer ${token}` },
-                    });
-                    if (fallbackRes.data?.success && fallbackRes.data?.user && isMounted) {
-                        setProfileData(fallbackRes.data.user);
-                        if (fallbackRes.data.user.name) setName(fallbackRes.data.user.name);
-                        if (fallbackRes.data.user.phone) setPhone(fallbackRes.data.user.phone);
-                    }
-                } catch (fallbackErr) {
-                    // Retain AuthContext fallback if offline or test environment
-                }
-            } finally {
-                if (isMounted) setLoadingProfile(false);
-            }
-        };
-
-        fetchStaffProfile();
-        return () => { isMounted = false; };
-    }, [token]);
-
-    useEffect(() => {
-        if (currentUser?.name && !isEditing) setName(currentUser.name);
-        if (currentUser?.phone && !isEditing) setPhone(currentUser.phone);
-    }, [currentUser, isEditing]);
+        if (user?.name) setName(user.name);
+        if (user?.phone) setPhone(user.phone);
+    }, [user]);
 
     const handleSaveProfile = async (e) => {
         e.preventDefault();
@@ -148,7 +102,7 @@ export default function StaffProfileView({
             const msg = err.response?.data?.message || "Failed to update profile";
             setProfileError(msg);
             showToast({
-                title: "Update Failed",
+                title: "Error",
                 message: msg,
                 variant: "error",
             });
@@ -166,33 +120,33 @@ export default function StaffProfileView({
             setPasswordError("Current password is required");
             return;
         }
-        if (newPassword.length < 6) {
-            setPasswordError("New password must be at least 6 characters long");
+        if (!newPassword || newPassword.length < 6) {
+            setPasswordError("New password must be at least 6 characters");
             return;
         }
         if (newPassword !== confirmPassword) {
-            setPasswordError("New passwords do not match");
+            setPasswordError("New password and confirm password do not match");
             return;
         }
 
         try {
             setChangingPassword(true);
             const res = await axios.post(
-                `${API}/api/auth/change-password`,
+                `${API}/api/staff/change-password`,
                 { currentPassword, newPassword },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
             if (res.data?.success) {
                 setPasswordSuccess("Password updated successfully!");
+                showToast({
+                    title: "Password Changed",
+                    message: "Your password was updated successfully.",
+                    variant: "success",
+                });
                 setCurrentPassword("");
                 setNewPassword("");
                 setConfirmPassword("");
-                showToast({
-                    title: "Password Changed",
-                    message: "Your password has been successfully updated.",
-                    variant: "success",
-                });
             }
         } catch (err) {
             const msg = err.response?.data?.message || "Failed to change password";
@@ -207,55 +161,84 @@ export default function StaffProfileView({
         }
     };
 
+    const isSettingsRoute = location.pathname.includes("/settings");
+    const displayTitle = isSettingsRoute ? "Staff Settings" : title;
+
     return (
-        <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col font-sans w-full">
-            <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-4 sm:py-6 space-y-5">
-                {/* Header with back button */}
-                <div className="flex items-center justify-between gap-3 border-b border-neutral-800/80 pb-3.5">
-                    <div className="flex items-center gap-3">
+        <div className="min-h-screen bg-white text-[#171717] font-sans flex flex-col">
+            {/* Header */}
+            <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-[#E7E5E4] px-3 py-2 sm:px-4 sm:py-2.5 shadow-xs">
+                <div className="w-full flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                         <button
                             type="button"
                             onClick={handleBack}
-                            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800/80 text-neutral-300 hover:text-white hover:bg-neutral-800 transition min-h-[40px]"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-[#FFF7ED] text-[#57534E] hover:text-[#171717] border border-[#E7E5E4] transition min-h-[38px] shadow-xs cursor-pointer text-xs font-semibold"
                         >
-                            <ArrowLeft className="w-4 h-4" />
-                            <span className="text-xs sm:text-sm font-semibold">{resolvedBackLabel}</span>
+                            <ArrowLeft className="w-4 h-4 text-[#F97316]" />
+                            <span className="hidden sm:inline">{backLabel}</span>
                         </button>
-                        <h1 className="text-base sm:text-xl font-bold tracking-tight text-white">{title}</h1>
+                        <div className="min-w-0">
+                            <h1 className="text-base sm:text-lg font-bold text-[#171717] tracking-tight truncate flex items-center gap-2">
+                                <span>{displayTitle}</span>
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FFF7ED] text-[#EA580C] border border-[#F97316]/30 uppercase">
+                                    {user?.designation || effectiveRole}
+                                </span>
+                            </h1>
+                            <div className="text-xs text-[#78716C] truncate hidden sm:block">
+                                {restaurantName}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (window.confirm("Are you sure you want to log out?")) {
+                                    logout();
+                                    navigate("/login?mode=staff");
+                                }
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-[#FEF2F2] hover:bg-[#FEE2E2] text-[#DC2626] border border-[#DC2626]/20 text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer min-h-[38px]"
+                        >
+                            <LogOut className="w-3.5 h-3.5" />
+                            <span>Log Out</span>
+                        </button>
                     </div>
                 </div>
+            </header>
 
-                {/* Profile Overview Section */}
-                <div className="rounded-2xl border border-neutral-800/70 bg-neutral-900/40 p-4 sm:p-5 md:p-6 space-y-4">
-                    {/* Profile Header Row */}
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-neutral-800/60 pb-4">
-                        <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
-                            <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-orange-500/15 border border-orange-500/30 text-orange-400 flex items-center justify-center font-bold text-lg sm:text-xl shrink-0">
-                                {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : "ST"}
+            {/* Main Content - Full Width */}
+            <main className="flex-1 w-full px-3 sm:px-4 md:px-6 py-4 space-y-4 max-w-none">
+                {/* Profile Card & Info Grid */}
+                <div className="bg-white border border-[#E7E5E4] rounded-xl p-4 sm:p-5 shadow-xs space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E7E5E4]">
+                        <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-[#F97316] text-white flex items-center justify-center font-black text-xl shadow-xs shrink-0">
+                                {user?.name ? user.name.slice(0, 2).toUpperCase() : "ST"}
                             </div>
-                            <div className="min-w-0 space-y-0.5">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <h2 className="text-base sm:text-lg font-bold text-white truncate">
-                                        {currentUser?.name || "Staff Member"}
-                                    </h2>
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                            <div className="min-w-0">
+                                <h2 className="text-lg sm:text-xl font-bold text-[#171717] flex items-center gap-2 flex-wrap">
+                                    <span>{user?.name || "Staff Member"}</span>
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#ECFDF5] text-[#059669] border border-[#059669]/20">
                                         Active
                                     </span>
-                                </div>
-                                <p className="text-xs text-neutral-400 flex items-center gap-1.5 truncate">
-                                    <span className="text-orange-400 font-semibold">{currentUser?.designation || effectiveRole}</span>
-                                    <span>•</span>
+                                </h2>
+                                <p className="text-xs text-[#57534E] flex items-center gap-1.5 mt-0.5">
+                                    <span className="text-[#EA580C] font-bold">{user?.designation || effectiveRole}</span>
+                                    <span>·</span>
                                     <span>{restaurantName}</span>
                                 </p>
                             </div>
                         </div>
 
-                        <div className="shrink-0 self-end sm:self-auto">
+                        <div>
                             {!isEditing ? (
                                 <button
                                     type="button"
                                     onClick={() => setIsEditing(true)}
-                                    className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-neutral-800/90 hover:bg-neutral-700 text-neutral-200 hover:text-white text-xs sm:text-sm font-semibold border border-neutral-700/60 transition min-h-[38px]"
+                                    className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-[#FFF7ED] text-[#171717] text-xs font-bold border border-[#E7E5E4] transition min-h-[36px] shadow-xs cursor-pointer"
                                 >
                                     Edit Profile
                                 </button>
@@ -264,10 +247,10 @@ export default function StaffProfileView({
                                     type="button"
                                     onClick={() => {
                                         setIsEditing(false);
-                                        setName(currentUser?.name || "");
-                                        setPhone(currentUser?.phone || "");
+                                        setName(user?.name || "");
+                                        setPhone(user?.phone || "");
                                     }}
-                                    className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 text-xs sm:text-sm font-medium transition min-h-[38px]"
+                                    className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-[#F5F5F4] text-[#57534E] text-xs font-bold border border-[#E7E5E4] transition min-h-[36px] shadow-xs cursor-pointer"
                                 >
                                     Cancel
                                 </button>
@@ -275,65 +258,59 @@ export default function StaffProfileView({
                         </div>
                     </div>
 
-                    {/* Profile Information List / Edit Form */}
+                    {/* Details or Edit Form */}
                     {!isEditing ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 pt-1">
-                            <div className="bg-neutral-950/40 p-3 sm:p-3.5 rounded-xl border border-neutral-800/40">
-                                <div className="text-[11px] text-neutral-400 flex items-center gap-1.5 mb-1 font-medium">
-                                    <Mail className="w-3.5 h-3.5 text-neutral-500" /> Email
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3 text-sm">
+                            <div className="bg-[#FFF7ED]/30 p-3 rounded-xl border border-[#E7E5E4]">
+                                <div className="text-[11px] font-semibold text-[#78716C] flex items-center gap-1.5 mb-1">
+                                    <Mail className="w-3.5 h-3.5 text-[#F97316]" /> Email
                                 </div>
-                                <div className="font-semibold text-white text-xs sm:text-sm truncate">{currentUser?.email || "Not specified"}</div>
+                                <div className="font-bold text-[#171717] text-xs sm:text-sm truncate">{user?.email || "Not specified"}</div>
                             </div>
-                            <div className="bg-neutral-950/40 p-3 sm:p-3.5 rounded-xl border border-neutral-800/40">
-                                <div className="text-[11px] text-neutral-400 flex items-center gap-1.5 mb-1 font-medium">
-                                    <Phone className="w-3.5 h-3.5 text-neutral-500" /> Phone
+                            <div className="bg-[#FFF7ED]/30 p-3 rounded-xl border border-[#E7E5E4]">
+                                <div className="text-[11px] font-semibold text-[#78716C] flex items-center gap-1.5 mb-1">
+                                    <Phone className="w-3.5 h-3.5 text-[#F97316]" /> Phone
                                 </div>
-                                <div className="font-semibold text-white text-xs sm:text-sm truncate">{currentUser?.phone || "Not specified"}</div>
+                                <div className="font-bold text-[#171717] text-xs sm:text-sm truncate">{user?.phone || "Not specified"}</div>
                             </div>
-                            <div className="bg-neutral-950/40 p-3 sm:p-3.5 rounded-xl border border-neutral-800/40">
-                                <div className="text-[11px] text-neutral-400 flex items-center gap-1.5 mb-1 font-medium">
-                                    <Shield className="w-3.5 h-3.5 text-neutral-500" /> Designation
+                            <div className="bg-[#FFF7ED]/30 p-3 rounded-xl border border-[#E7E5E4]">
+                                <div className="text-[11px] font-semibold text-[#78716C] flex items-center gap-1.5 mb-1">
+                                    <Shield className="w-3.5 h-3.5 text-[#F97316]" /> Designation
                                 </div>
-                                <div className="font-semibold text-white text-xs sm:text-sm truncate">{currentUser?.designation || effectiveRole}</div>
+                                <div className="font-bold text-[#171717] text-xs sm:text-sm truncate">{user?.designation || effectiveRole}</div>
                             </div>
-                            <div className="bg-neutral-950/40 p-3 sm:p-3.5 rounded-xl border border-neutral-800/40">
-                                <div className="text-[11px] text-neutral-400 flex items-center gap-1.5 mb-1 font-medium">
-                                    <Sparkles className="w-3.5 h-3.5 text-neutral-500" /> Staff ID
+                            <div className="bg-[#FFF7ED]/30 p-3 rounded-xl border border-[#E7E5E4]">
+                                <div className="text-[11px] font-semibold text-[#78716C] flex items-center gap-1.5 mb-1">
+                                    <Sparkles className="w-3.5 h-3.5 text-[#F97316]" /> Staff ID
                                 </div>
-                                <div className="font-semibold text-white text-xs sm:text-sm">#{currentUser?.id || "N/A"}</div>
+                                <div className="font-bold text-[#171717] text-xs sm:text-sm truncate">#{user?.id || "N/A"}</div>
                             </div>
                         </div>
                     ) : (
-                        <form onSubmit={handleSaveProfile} className="space-y-3.5 pt-1">
+                        <form onSubmit={handleSaveProfile} className="space-y-3 pt-1">
                             {profileError && (
-                                <div className="p-3 bg-red-950/60 border border-red-800/60 text-red-200 text-xs rounded-xl">
+                                <div className="p-2.5 bg-[#FEF2F2] border border-[#DC2626]/30 text-[#DC2626] text-xs rounded-xl font-medium">
                                     {profileError}
                                 </div>
                             )}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div className="space-y-1">
-                                    <label htmlFor="staff-profile-name" className="text-xs font-semibold text-neutral-300">Full Name</label>
+                                    <label className="text-xs font-bold text-[#57534E]">Full Name</label>
                                     <input
-                                        id="staff-profile-name"
-                                        name="name"
-                                        autoComplete="name"
                                         type="text"
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
-                                        className="w-full bg-neutral-950/70 border border-neutral-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500 transition min-h-[40px]"
+                                        className="w-full bg-white border border-[#E7E5E4] rounded-xl px-3 py-2 text-[#171717] text-xs sm:text-sm focus:outline-none focus:border-[#F97316]"
                                         required
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label htmlFor="staff-profile-phone" className="text-xs font-semibold text-neutral-300">Phone Number</label>
+                                    <label className="text-xs font-bold text-[#57534E]">Phone Number</label>
                                     <input
-                                        id="staff-profile-phone"
-                                        name="phone"
-                                        autoComplete="tel"
                                         type="tel"
                                         value={phone}
                                         onChange={(e) => setPhone(e.target.value)}
-                                        className="w-full bg-neutral-950/70 border border-neutral-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500 transition min-h-[40px]"
+                                        className="w-full bg-white border border-[#E7E5E4] rounded-xl px-3 py-2 text-[#171717] text-xs sm:text-sm focus:outline-none focus:border-[#F97316]"
                                         placeholder="+91..."
                                     />
                                 </div>
@@ -342,156 +319,112 @@ export default function StaffProfileView({
                                 <button
                                     type="submit"
                                     disabled={savingProfile}
-                                    className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs sm:text-sm transition min-h-[40px] flex items-center gap-2 disabled:opacity-50 shadow-sm"
+                                    className="px-4 py-2 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white font-bold text-xs transition flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50 min-h-[38px]"
                                 >
                                     {savingProfile ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                                    Save Details
+                                    <span>Save Details</span>
                                 </button>
                             </div>
                         </form>
                     )}
                 </div>
 
-                {/* Notification Sound & Vibration Settings */}
-                <div className="space-y-2.5">
-                    <div className="px-1">
-                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 text-orange-400" />
-                            Sound & Vibration Preferences
+                {/* Sound & Vibration Preferences */}
+                <div className="bg-white border border-[#E7E5E4] rounded-xl p-4 sm:p-5 shadow-xs space-y-3">
+                    <div>
+                        <h3 className="text-sm sm:text-base font-bold text-[#171717] flex items-center gap-2">
+                            <Volume2 className="w-4 h-4 text-[#F97316]" />
+                            <span>Sound & Vibration Preferences</span>
                         </h3>
-                        <p className="text-xs text-neutral-400 mt-0.5">
-                            Customize alert tones and vibration patterns for incoming tasks, orders, and table service requests.
+                        <p className="text-xs text-[#57534E] mt-0.5">
+                            Customize operational alert tones and vibration patterns for incoming tasks, orders, and table service requests.
                         </p>
                     </div>
                     <NotificationSoundPicker defaultExpanded={false} />
                 </div>
 
-                {/* Change Password Section */}
-                <div className="rounded-2xl border border-neutral-800/70 bg-neutral-900/40 p-4 sm:p-5 md:p-6 space-y-3.5">
-                    <div>
-                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                            <KeyRound className="w-4 h-4 text-orange-400" />
-                            Security & Password Change
-                        </h3>
-                        <p className="text-xs text-neutral-400 mt-0.5">
-                            Update your login password to keep your staff account secure.
-                        </p>
-                    </div>
-
-                    <form onSubmit={handleChangePassword} className="space-y-3.5 pt-1">
+                {/* Change Password Card */}
+                <div className="bg-white border border-[#E7E5E4] rounded-xl p-4 sm:p-5 shadow-xs space-y-3">
+                    <h3 className="text-sm sm:text-base font-bold text-[#171717] flex items-center gap-2">
+                        <KeyRound className="w-4 h-4 text-[#F97316]" />
+                        <span>Security & Password Change</span>
+                    </h3>
+                    <form onSubmit={handleChangePassword} className="space-y-3">
                         {passwordError && (
-                            <div className="p-3 bg-red-950/60 border border-red-800/60 text-red-200 text-xs rounded-xl">
+                            <div className="p-2.5 bg-[#FEF2F2] border border-[#DC2626]/30 text-[#DC2626] text-xs rounded-xl font-medium">
                                 {passwordError}
                             </div>
                         )}
                         {passwordSuccess && (
-                            <div className="p-3 bg-emerald-950/60 border border-emerald-800/60 text-emerald-200 text-xs rounded-xl">
+                            <div className="p-2.5 bg-[#ECFDF5] border border-[#059669]/30 text-[#059669] text-xs rounded-xl font-medium">
                                 {passwordSuccess}
                             </div>
                         )}
-
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-                            <div className="space-y-1">
-                                <label htmlFor="staff-profile-current-password" className="text-xs font-semibold text-neutral-300">Current Password</label>
-                                <div className="relative">
-                                    <input
-                                        id="staff-profile-current-password"
-                                        name="currentPassword"
-                                        autoComplete="current-password"
-                                        type={showCurrentPassword ? "text" : "password"}
-                                        value={currentPassword}
-                                        onChange={(e) => setCurrentPassword(e.target.value)}
-                                        className="w-full bg-neutral-950/70 border border-neutral-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500 pr-9 min-h-[40px] transition"
-                                        required
-                                    />
-                                    <button
-                                        type="button"
-                                        aria-label={showCurrentPassword ? "Hide password" : "Show password"}
-                                        title={showCurrentPassword ? "Hide password" : "Show password"}
-                                        onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-200"
-                                    >
-                                        {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                    </button>
-                                </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-[#57534E]">Current Password</label>
+                            <div className="relative">
+                                <input
+                                    type={showCurrentPassword ? "text" : "password"}
+                                    value={currentPassword}
+                                    onChange={(e) => setCurrentPassword(e.target.value)}
+                                    className="w-full bg-white border border-[#E7E5E4] rounded-xl px-3 py-2 text-[#171717] text-xs sm:text-sm focus:outline-none focus:border-[#F97316] pr-10"
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#78716C] hover:text-[#171717]"
+                                >
+                                    {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                </button>
                             </div>
-
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div className="space-y-1">
-                                <label htmlFor="staff-profile-new-password" className="text-xs font-semibold text-neutral-300">New Password</label>
+                                <label className="text-xs font-bold text-[#57534E]">New Password</label>
                                 <div className="relative">
                                     <input
-                                        id="staff-profile-new-password"
-                                        name="newPassword"
-                                        autoComplete="new-password"
                                         type={showNewPassword ? "text" : "password"}
                                         value={newPassword}
                                         onChange={(e) => setNewPassword(e.target.value)}
-                                        className="w-full bg-neutral-950/70 border border-neutral-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500 pr-9 min-h-[40px] transition"
+                                        className="w-full bg-white border border-[#E7E5E4] rounded-xl px-3 py-2 text-[#171717] text-xs sm:text-sm focus:outline-none focus:border-[#F97316] pr-10"
                                         required
                                         minLength={6}
                                     />
                                     <button
                                         type="button"
-                                        aria-label={showNewPassword ? "Hide password" : "Show password"}
-                                        title={showNewPassword ? "Hide password" : "Show password"}
                                         onClick={() => setShowNewPassword(!showNewPassword)}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-200"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#78716C] hover:text-[#171717]"
                                     >
                                         {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                     </button>
                                 </div>
                             </div>
-
                             <div className="space-y-1">
-                                <label htmlFor="staff-profile-confirm-password" className="text-xs font-semibold text-neutral-300">Confirm New Password</label>
+                                <label className="text-xs font-bold text-[#57534E]">Confirm New Password</label>
                                 <input
-                                    id="staff-profile-confirm-password"
-                                    name="confirmPassword"
-                                    autoComplete="new-password"
                                     type="password"
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
-                                    className="w-full bg-neutral-950/70 border border-neutral-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500 min-h-[40px] transition"
+                                    className="w-full bg-white border border-[#E7E5E4] rounded-xl px-3 py-2 text-[#171717] text-xs sm:text-sm focus:outline-none focus:border-[#F97316]"
                                     required
                                     minLength={6}
                                 />
                             </div>
                         </div>
-
                         <div className="flex justify-end pt-1">
                             <button
                                 type="submit"
                                 disabled={changingPassword}
-                                className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs sm:text-sm transition min-h-[40px] flex items-center gap-2 disabled:opacity-50 shadow-sm"
+                                className="px-4 py-2 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white font-bold text-xs transition min-h-[38px] flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
                             >
                                 {changingPassword ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
-                                Update Password
+                                <span>Update Password</span>
                             </button>
                         </div>
                     </form>
                 </div>
-
-                {/* Logout Footer Section */}
-                <div className="rounded-xl border border-neutral-800/60 bg-neutral-900/30 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                        <h4 className="text-xs sm:text-sm font-bold text-white">Log Out of Station</h4>
-                        <p className="text-xs text-neutral-400 mt-0.5">End your current shift and log out on this device.</p>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            if (window.confirm("Are you sure you want to log out?")) {
-                                logout();
-                                navigate("/login?mode=staff");
-                            }
-                        }}
-                        className="px-4 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 text-rose-300 hover:text-white border border-rose-800/50 text-xs sm:text-sm font-semibold transition min-h-[38px] flex items-center justify-center gap-2 shrink-0"
-                    >
-                        <LogOut className="w-4 h-4" />
-                        Log Out
-                    </button>
-                </div>
-            </div>
+            </main>
         </div>
     );
 }

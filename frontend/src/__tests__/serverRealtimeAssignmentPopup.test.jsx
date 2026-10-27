@@ -16,13 +16,9 @@ const mockPlayNotificationSound = vi.fn();
 vi.mock("../utils/toast", () => ({
     showToast: (...args) => mockShowToast(...args),
 }));
-vi.mock("../utils/soundPlayer", async (importOriginal) => {
-    const actual = await importOriginal();
-    return {
-        ...actual,
-        playNotificationSound: () => mockPlayNotificationSound(),
-    };
-});
+vi.mock("../utils/soundPlayer", () => ({
+    playNotificationSound: () => mockPlayNotificationSound(),
+}));
 
 // Mock API calls
 const mockGet = vi.fn();

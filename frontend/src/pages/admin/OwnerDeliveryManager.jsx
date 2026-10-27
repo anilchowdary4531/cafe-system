@@ -2,11 +2,9 @@ import { useEffect, useState, useRef } from "react";
 import { Truck, Search, Plus, MapPin, User, Clock, Phone, AlertCircle, RefreshCw, CheckCircle2, ShieldAlert, Loader2, Navigation } from "lucide-react";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
-import * as maplibreglRaw from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { MAP_CONFIG } from "../../utils/mapConfig";
-
-const maplibregl = maplibreglRaw.Map ? maplibreglRaw : (maplibreglRaw.default || maplibreglRaw);
 import OwnerMenuButton from "../../components/OwnerMenuButton";
 
 const DELIVERY_STATUS_TABS = [
@@ -445,7 +443,6 @@ function DeliveryLiveMapModal({ delivery, onClose }) {
         style: MAP_CONFIG.styleUrl,
         center: [restLng, restLat],
         zoom: 13,
-        transformRequest: MAP_CONFIG.transformRequest,
       });
 
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");

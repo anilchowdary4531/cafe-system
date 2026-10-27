@@ -238,7 +238,7 @@ export const resolveQrToken = async (token, prisma) => {
       restaurant: table.restaurant,
       table: {
         tableNo: table.tableNo,
-        section: table.section || null,
+        section: table.section || "Main Floor",
         seats: table.seats,
         qrToken: table.qrToken,
         isReserved: true,
@@ -272,7 +272,7 @@ export const resolveQrToken = async (token, prisma) => {
         restaurant: table.restaurant,
         table: {
           tableNo: table.tableNo,
-          section: table.section || null,
+          section: table.section || "Main Floor",
           seats: table.seats,
           qrToken: table.qrToken,
           isReserved: true,
@@ -298,7 +298,7 @@ export const resolveQrToken = async (token, prisma) => {
     restaurant: table.restaurant,
     table: {
       tableNo: table.tableNo,
-      section: table.section || null,
+      section: table.section || "Main Floor",
       seats: table.seats,
       qrToken: table.qrToken,
     },
@@ -786,7 +786,7 @@ export const callWaiterForTable = async ({ token, reason = "Assistance requested
   const payload = {
     tableId: table.id,
     tableNo: table.tableNo,
-    section: table.section || null,
+    section: table.section || "Main Floor",
     sessionId: activeSession?.id || null,
     reason: String(reason || "Assistance / Service"),
     requestedAt: new Date(),
@@ -813,7 +813,7 @@ export const callWaiterForTable = async ({ token, reason = "Assistance requested
       restaurantId: rid,
       notificationType: NOTIFICATION_TYPES.IMPORTANT_ORDER_ALERT,
       title: `🔔 Waiter Call — Table ${table.tableNo}`,
-      message: `Guest at Table ${table.tableNo}${table.section ? ` (${table.section})` : ""} called for waiter: ${payload.reason}`,
+      message: `Guest at Table ${table.tableNo} (${table.section || "Main Floor"}) called for waiter: ${payload.reason}`,
       data: payload,
       idempotencyKey: `waiter_call_${table.id}_${Math.floor(Date.now() / 30000)}`, // 30 sec cooldown key
     }).catch(() => {});
@@ -879,7 +879,7 @@ export const requestBillForTable = async ({ token, prisma, io }) => {
   const payload = {
     tableId: table.id,
     tableNo: table.tableNo,
-    section: table.section || null,
+    section: table.section || "Main Floor",
     sessionId: activeSession.id,
     subtotal: activeSession.subtotal,
     taxAmount: activeSession.taxAmount,

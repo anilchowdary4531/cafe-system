@@ -7,7 +7,6 @@ import {
   bulkAssignItems,
   assignAllKotItems,
   reassignItem,
-  unassignItem,
   getChefAssignedItems,
   selfPickItem,
   selfPickKot,
@@ -159,26 +158,6 @@ export const reassignItemController = async (req, res) => {
       restaurantId,
       itemId,
       newChefId,
-      actor,
-      req,
-      realtime: req.server?.realtime,
-    });
-    return res.send(result);
-  } catch (err) {
-    return handleError(res, err);
-  }
-};
-
-export const unassignItemController = async (req, res) => {
-  try {
-    const restaurantId = Number(req.params.restaurantId || req.user?.restaurantId || req.staffActor?.restaurantId || 0);
-    const itemId = Number(req.params.itemId || req.body?.itemId);
-    const actor = req.staffActor || req.user || null;
-
-    const result = await unassignItem({
-      prisma: req.prisma,
-      restaurantId,
-      itemId,
       actor,
       req,
       realtime: req.server?.realtime,

@@ -11,6 +11,7 @@ import {
     RefreshCw,
     Search,
     ShoppingBag,
+    Volume2,
     CheckCircle2,
 } from "lucide-react";
 import axios from "axios";
@@ -18,6 +19,7 @@ import { useAuth } from "../context/AuthContext";
 import { useStaffSocket } from "../context/StaffSocketContext";
 import { API } from "../config";
 import { showToast } from "../utils/toast";
+import NotificationSoundPicker from "./NotificationSoundPicker";
 
 const formatTime = (value) => {
     const dt = new Date(value);
@@ -43,7 +45,7 @@ export default function ServerNotificationsView({
 }) {
     const handleBack = onBack || onBackToFloorPlan;
     const effectiveBackLabel = backLabel || "Floor Plan";
-    const { token } = useAuth();
+    const { user, token } = useAuth();
     const { socket } = useStaffSocket();
 
     const [notifications, setNotifications] = useState([]);
@@ -54,6 +56,7 @@ export default function ServerNotificationsView({
     const [hasMore, setHasMore] = useState(false);
     const [filterType, setFilterType] = useState("ALL"); // ALL | UNREAD | ORDERS | KITCHEN | SUCCESS | INFO
     const [searchQuery, setSearchQuery] = useState("");
+    const [showSoundSettings, setShowSoundSettings] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
 
     const onUnreadCountChangeRef = useRef(onUnreadCountChange);
@@ -243,13 +246,13 @@ export default function ServerNotificationsView({
             if (filterType === "UNREAD" && !isUnread) return false;
 
             if (filterType === "ORDERS") {
-                if (!typeUpper.includes("ORDER") && !typeUpper.includes("KOT")) return false;
+                if (!typeUpper.includes("ORDER") || typeUpper.includes("DELIVERED")) return false;
             } else if (filterType === "KITCHEN") {
                 if (!typeUpper.includes("KOT") && !typeUpper.includes("KITCHEN") && !typeUpper.includes("FOOD") && !typeUpper.includes("PASS") && !typeUpper.includes("READY")) return false;
             } else if (filterType === "SUCCESS") {
                 if (!typeUpper.includes("SUCCESS") && !typeUpper.includes("PAYMENT") && !typeUpper.includes("DELIVERED") && !typeUpper.includes("ACCEPTED")) return false;
             } else if (filterType === "INFO") {
-                if (typeUpper.includes("ORDER") || typeUpper.includes("KOT") || typeUpper.includes("KITCHEN") || typeUpper.includes("SUCCESS")) return false;
+                if (typeUpper.includes("ORDER") || typeUpper.includes("KOT") || typeUpper.includes("KITCHEN") || typeUpper.includes("SUCCESS") || typeUpper.includes("DELIVERED")) return false;
             }
 
             // Search Query
@@ -300,11 +303,24 @@ export default function ServerNotificationsView({
                 <div className="flex items-center gap-2">
                     <button
                         type="button"
+                        onClick={() => setShowSoundSettings((prev) => !prev)}
+                        className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-bold transition ${
+                            showSoundSettings
+                                ? "bg-orange-500 text-white shadow-sm"
+                                : "bg-black/5 dark:bg-white/5 theme-muted hover:text-[color:var(--app-text)]"
+                        }`}
+                        title="Adjust Notification Sound"
+                    >
+                        <Volume2 className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Sound Settings</span>
+                    </button>
+
+                    <button
+                        type="button"
                         onClick={() => fetchNotifications(1, true)}
                         disabled={refreshing}
                         className="rounded-lg bg-black/5 dark:bg-white/5 p-1.5 text-xs font-bold theme-muted hover:text-[color:var(--app-text)] transition cursor-pointer"
                         title="Refresh Notifications"
-                        aria-label="Refresh Notifications"
                     >
                         <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
                     </button>
@@ -320,13 +336,19 @@ export default function ServerNotificationsView({
                 </div>
             </div>
 
+            {/* Notification Sound Picker - Toggle Panel */}
+            {showSoundSettings && (
+                <div className="animate-in fade-in duration-200">
+                    <NotificationSoundPicker defaultExpanded={true} />
+                </div>
+            )}
+
             {/* Filter & Search Bar - Alignment with Owner Notifications */}
             <div className="flex flex-wrap items-center justify-between gap-2 py-1 text-xs">
                 {/* Filter Quick Tabs */}
                 <div className="flex items-center gap-1 overflow-x-auto py-0.5 text-[11px] scrollbar-none">
                     {["ALL", "UNREAD", "ORDERS", "KITCHEN", "SUCCESS", "INFO"].map((tab) => (
                         <button
-                            type="button"
                             key={tab}
                             onClick={() => setFilterType(tab)}
                             className={`rounded-lg px-3 py-1 font-bold transition whitespace-nowrap cursor-pointer ${
@@ -344,9 +366,6 @@ export default function ServerNotificationsView({
                 <div className="relative w-full md:w-56">
                     <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 theme-muted" />
                     <input
-                        id="server-notifications-search"
-                        name="serverNotificationsSearch"
-                        aria-label="Search notifications"
                         type="text"
                         placeholder="Search notifications..."
                         value={searchQuery}
@@ -372,8 +391,8 @@ export default function ServerNotificationsView({
                         const isUnread = !item.isRead && !item.read;
                         const typeUpper = String(item.notificationType || item.type || "INFO").toUpperCase();
                         const isKitchen = typeUpper.includes("KOT") || typeUpper.includes("KITCHEN") || typeUpper.includes("FOOD") || typeUpper.includes("PASS") || typeUpper.includes("READY");
-                        const isOrder = typeUpper.includes("ORDER");
-                        const isSuccess = typeUpper.includes("SUCCESS") || typeUpper.includes("PAYMENT") || typeUpper.includes("DELIVERED");
+                        const isSuccess = typeUpper.includes("SUCCESS") || typeUpper.includes("PAYMENT") || typeUpper.includes("DELIVERED") || typeUpper.includes("ACCEPTED");
+                        const isOrder = typeUpper.includes("ORDER") && !isSuccess;
 
                         const tableNo = item.data?.tableNo || item.data?.table_number || item.metadata?.tableNo || item.data?.table;
 
@@ -395,12 +414,12 @@ export default function ServerNotificationsView({
                                         </h4>
                                         <span
                                             className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                                                isOrder
-                                                    ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                                                isSuccess
+                                                    ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
                                                     : isKitchen
                                                     ? "bg-sky-500/15 text-sky-600 dark:text-sky-400"
-                                                    : isSuccess
-                                                    ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                                                    : isOrder
+                                                    ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
                                                     : "bg-orange-500/15 text-orange-600 dark:text-orange-400"
                                             }`}
                                         >
@@ -424,14 +443,7 @@ export default function ServerNotificationsView({
                                     {tableNo && handleSelectTable && (
                                         <button
                                             type="button"
-                                            onClick={() => {
-                                                const tid = item.tableId || item.data?.tableId;
-                                                if (tid !== undefined && tid !== null) {
-                                                    handleSelectTable(tableNo, tid);
-                                                } else {
-                                                    handleSelectTable(tableNo);
-                                                }
-                                            }}
+                                            onClick={() => handleSelectTable(tableNo)}
                                             className="rounded-lg bg-orange-500/10 hover:bg-orange-500 text-orange-600 dark:text-orange-400 hover:text-white px-2 py-0.5 font-bold transition flex items-center gap-0.5 cursor-pointer"
                                             title={`View Table ${tableNo}`}
                                         >

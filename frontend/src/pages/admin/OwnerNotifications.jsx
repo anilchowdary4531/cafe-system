@@ -6,6 +6,7 @@ import {
     Clock,
     Filter,
     Search,
+    Volume2,
 } from "lucide-react";
 import {
     getOwnerNotifications,
@@ -14,6 +15,7 @@ import {
     subscribeOwnerNotifications,
 } from "../../utils/ownerNotifications";
 import OwnerMenuButton from "../../components/OwnerMenuButton";
+import NotificationSoundPicker from "../../components/NotificationSoundPicker";
 
 const formatTime = (value) => {
     const dt = new Date(value);
@@ -33,6 +35,7 @@ export default function OwnerNotifications() {
     const [notifications, setNotifications] = useState(() => getOwnerNotifications());
     const [filterType, setFilterType] = useState("ALL"); // ALL | UNREAD | ORDERS | SUCCESS | INFO
     const [searchQuery, setSearchQuery] = useState("");
+    const [showSoundSettings, setShowSoundSettings] = useState(true);
 
     const unreadCount = useMemo(
         () => notifications.reduce((sum, item) => sum + (item.read ? 0 : 1), 0),
@@ -104,6 +107,20 @@ export default function OwnerNotifications() {
                 <div className="flex items-center gap-2">
                     <button
                         type="button"
+                        onClick={() => setShowSoundSettings((prev) => !prev)}
+                        className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-bold transition ${
+                            showSoundSettings
+                                ? "bg-orange-500 text-white shadow-sm"
+                                : "bg-black/5 dark:bg-white/5 theme-muted hover:text-[color:var(--app-text)]"
+                        }`}
+                        title="Adjust Notification Sound"
+                    >
+                        <Volume2 className="h-3.5 w-3.5" />
+                        <span>Sound & Vibration</span>
+                    </button>
+
+                    <button
+                        type="button"
                         onClick={onMarkAllRead}
                         disabled={unreadCount === 0}
                         className="rounded-lg bg-orange-500 px-3 py-1 text-xs font-bold text-white shadow-sm hover:bg-orange-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
@@ -113,13 +130,19 @@ export default function OwnerNotifications() {
                 </div>
             </div>
 
+            {/* Notification Sound Picker - Hidden by default, toggled via Sound Settings button */}
+            {showSoundSettings && (
+                <div className="animate-in fade-in duration-200">
+                    <NotificationSoundPicker defaultExpanded={true} />
+                </div>
+            )}
+
             {/* Filter & Search Bar - Borderless "Words on Paper" */}
             <div className="flex flex-wrap items-center justify-between gap-2 py-1 text-xs">
                 {/* Filter Quick Tabs */}
                 <div className="flex items-center gap-1 overflow-x-auto py-0.5 text-[11px]">
                     {["ALL", "UNREAD", "ORDERS", "SUCCESS", "INFO"].map((tab) => (
                         <button
-                            type="button"
                             key={tab}
                             onClick={() => setFilterType(tab)}
                             className={`rounded-lg px-3 py-1 font-bold transition ${
@@ -137,9 +160,6 @@ export default function OwnerNotifications() {
                 <div className="relative w-full md:w-56">
                     <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 theme-muted" />
                     <input
-                        id="owner-notifications-search"
-                        name="ownerNotificationsSearch"
-                        aria-label="Search notifications"
                         type="text"
                         placeholder="Search notifications..."
                         value={searchQuery}

@@ -3,83 +3,12 @@
  * MapLibre GL JS with CARTO Voyager Raster Tiles (OpenStreetMap data)
  */
 
-export const sanitizeApiKey = (rawKey) => {
-    if (!rawKey) return "";
-    let key = String(rawKey).trim();
-    if (
-        (key.startsWith('"') && key.endsWith('"')) ||
-        (key.startsWith("'") && key.endsWith("'"))
-    ) {
-        key = key.slice(1, -1).trim();
-    }
-    return key;
-};
+const CARTO_API_KEY = (import.meta.env.VITE_CARTO_API_KEY || "").trim();
+const keyParam = CARTO_API_KEY && CARTO_API_KEY !== "YOUR_KEY" ? `?key=${encodeURIComponent(CARTO_API_KEY)}` : "";
 
-export const getCartoApiKey = () => {
-    const candidateKeys = [
-        "VITE_CARTO_API_KEY",
-        "VITE_CARTO_KEY",
-        "VITE_CARTO_TOKEN",
-        "VITE_CARTO_ACCESS_TOKEN",
-        "VITE_CARTO_MAP_KEY",
-        "CARTO_API_KEY",
-        "VITE_MAP_KEY",
-        "VITE_MAPS_API_KEY",
-    ];
-
-    try {
-        if (typeof import.meta !== "undefined" && import.meta.env) {
-            for (const name of candidateKeys) {
-                const val = import.meta.env[name];
-                if (val && typeof val === "string" && val.trim() !== "" && val.trim() !== "YOUR_KEY") {
-                    return sanitizeApiKey(val);
-                }
-            }
-        }
-    } catch {
-        // ignore in non-Vite environments
-    }
-
-    try {
-        if (typeof process !== "undefined" && process.env) {
-            for (const name of candidateKeys) {
-                const val = process.env[name];
-                if (val && typeof val === "string" && val.trim() !== "" && val.trim() !== "YOUR_KEY") {
-                    return sanitizeApiKey(val);
-                }
-            }
-        }
-    } catch {
-        // ignore in environments without process.env
-    }
-
-    return "";
-};
-
-/**
- * Request transformer to guarantee that every network request to CARTO CDN
- * has the authenticated API key appended as ?key=... parameter.
- */
-export const transformMapRequest = (url) => {
-    const key = getCartoApiKey();
-    if (key && url && typeof url === "string" && url.includes("basemaps.cartocdn.com") && !url.includes("key=")) {
-        const separator = url.includes("?") ? "&" : "?";
-        return {
-            url: `${url}${separator}key=${encodeURIComponent(key)}`,
-        };
-    }
-    return { url };
-};
-
-/**
- * Returns a fresh, unmutated MapLibre GL style specification object.
- * Always returns a new copy to avoid MapLibre's in-place style mutations across map instances.
- */
-export const getMapStyle = () => {
-    const key = getCartoApiKey();
-    const keyParam = key && key !== "YOUR_KEY" ? `?key=${encodeURIComponent(key)}` : "";
-
-    return {
+export const MAP_CONFIG = {
+    // CARTO Voyager Raster Tile Style with OSM attribution
+    styleUrl: {
         version: 8,
         sources: {
             "carto-voyager": {
@@ -104,64 +33,7 @@ export const getMapStyle = () => {
                 maxzoom: 19,
             },
         ],
-    };
-};
-
-/**
- * Validate coordinates strictly (-90..90 for lat, -180..180 for lng).
- * Explicit Coordinate Convention:
- * Human / DB: latitude = lat, longitude = lng
- * MapLibre / GeoJSON: [longitude, latitude]
- * 
- * IMPORTANT: NEVER auto-swap coordinates.
- * Valid-but-swapped coordinates such as (lat: 78.4867, lng: 17.3850)
- * are both within mathematical bounds. SILENT AUTO-SWAPPING IS FORBIDDEN.
- */
-export const parseAndValidateCoords = (rawLat, rawLng) => {
-    if (rawLat === null || rawLat === undefined || rawLng === null || rawLng === undefined) {
-        return null;
-    }
-    if (typeof rawLat === "boolean" || typeof rawLng === "boolean") {
-        return null;
-    }
-    if (typeof rawLat === "string" && rawLat.trim() === "") {
-        return null;
-    }
-    if (typeof rawLng === "string" && rawLng.trim() === "") {
-        return null;
-    }
-
-    const lat = Number(rawLat);
-    const lng = Number(rawLng);
-
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        return null;
-    }
-
-    // Strict numerical bounds check
-    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-        console.warn(`[TiffzyMap] Invalid coordinate bounds (lat: ${lat}, lng: ${lng}). Skipping...`);
-        return null;
-    }
-
-    // Log warning for geographically suspicious values
-    if (Math.abs(lat) > 70) {
-        console.warn(
-            `[TiffzyMap] WARNING: Geographically suspicious coordinate detected (lat: ${lat}, lng: ${lng}). Proceeding without auto-correction.`
-        );
-    }
-
-    return { lat, lng };
-};
-
-export const MAP_CONFIG = {
-    // Dynamic getter so every consumer receives a fresh, unmutated style object
-    get styleUrl() {
-        return getMapStyle();
     },
-
-    // Request transformer ensuring all CARTO network tile/style requests include API key
-    transformRequest: transformMapRequest,
 
     // Default Map Center (Bengaluru, India: lat=12.9716, lng=77.5946)
     defaultCenter: {
@@ -179,4 +51,3 @@ export const MAP_CONFIG = {
         description: "Temporary Test Marker (Not in Database)",
     },
 };
-

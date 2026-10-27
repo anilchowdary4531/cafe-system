@@ -266,52 +266,6 @@ export const assignItemToChef = async ({
     throw new KitchenAssignmentError("restaurantId, itemId, and chefId are required", 400, "MISSING_PARAMS");
   }
 
-  // 0. Authorization check: Senior Chef, Manager, Owner, or Super Admin
-  if (actor) {
-    if (actor.restaurantId && Number(actor.restaurantId) !== rid) {
-      throw new KitchenAssignmentError("Access denied. Cross-restaurant assignment is strictly forbidden.", 403, "CROSS_RESTAURANT_FORBIDDEN");
-    }
-    const actorRole = String(actor?.role || "").toUpperCase();
-    const actorDesignation = String(actor?.designation || "").toLowerCase();
-    let isPrivileged =
-      actorRole === "OWNER" ||
-      actorRole === "MANAGER" ||
-      actorRole === "SUPER_ADMIN" ||
-      actorRole === "ADMIN" ||
-      actorDesignation.includes("senior chef") ||
-      actorDesignation.includes("head chef") ||
-      actorDesignation.includes("executive chef");
-
-    if (!isPrivileged && (actor.userId || actor.id)) {
-      const dbActor = await prisma.user.findUnique({
-        where: { id: Number(actor.userId || actor.id) },
-        select: { designation: true, role: true, restaurantId: true },
-      });
-      if (dbActor) {
-        if (dbActor.restaurantId && Number(dbActor.restaurantId) !== rid) {
-          throw new KitchenAssignmentError("Access denied. Cross-restaurant assignment is strictly forbidden.", 403, "CROSS_RESTAURANT_FORBIDDEN");
-        }
-        const dbRole = String(dbActor.role || "").toUpperCase();
-        const dbDesig = String(dbActor.designation || "").toLowerCase();
-        if (
-          dbRole === "OWNER" ||
-          dbRole === "MANAGER" ||
-          dbRole === "SUPER_ADMIN" ||
-          dbRole === "ADMIN" ||
-          dbDesig.includes("senior chef") ||
-          dbDesig.includes("head chef") ||
-          dbDesig.includes("executive chef")
-        ) {
-          isPrivileged = true;
-        }
-      }
-    }
-
-    if (!isPrivileged) {
-      throw new KitchenAssignmentError("Access denied. Only Senior Chef or Kitchen Manager can dispatch or assign items.", 403, "FORBIDDEN");
-    }
-  }
-
   // 1. Verify chef exists and belongs to this restaurant
   const chef = await prisma.user.findFirst({
     where: {
@@ -329,7 +283,7 @@ export const assignItemToChef = async ({
   // 2. Verify item exists, belongs to restaurant, and is eligible
   const item = await prisma.kitchenOrderTicketItem.findFirst({
     where: {
-      OR: [{ id: iId }, { orderItemId: iId }],
+      id: iId,
       kot: { restaurantId: rid },
     },
     include: { kot: true },
@@ -351,7 +305,7 @@ export const assignItemToChef = async ({
 
   // 3. Update assignment
   const updatedItem = await prisma.kitchenOrderTicketItem.update({
-    where: { id: item.id },
+    where: { id: iId },
     data: {
       assignedChefId: cId,
       assignedChefName: chef.name,
@@ -719,174 +673,6 @@ export const reassignItem = async ({
     req,
     realtime,
   });
-};
-
-/**
- * 7b. Unassign a chef from an item (clears assignedChefId, returns to unassigned queue)
- */
-export const unassignItem = async ({
-  prisma = defaultPrisma,
-  restaurantId,
-  itemId,
-  actor = null,
-  req = null,
-  realtime = null,
-} = {}) => {
-  const rid = Number(restaurantId);
-  const iId = Number(itemId);
-
-  if (!rid || !iId) {
-    throw new KitchenAssignmentError("restaurantId and itemId are required", 400, "MISSING_PARAMS");
-  }
-
-  // 1. Authorization check: Senior Chef, Manager, Owner or Super Admin
-  if (actor) {
-    if (actor.restaurantId && Number(actor.restaurantId) !== rid) {
-      throw new KitchenAssignmentError("Access denied. Cross-restaurant action is strictly forbidden.", 403, "CROSS_RESTAURANT_FORBIDDEN");
-    }
-    const actorRole = String(actor?.role || "").toUpperCase();
-    const actorDesignation = String(actor?.designation || "").toLowerCase();
-    let isPrivileged =
-      actorRole === "OWNER" ||
-      actorRole === "MANAGER" ||
-      actorRole === "SUPER_ADMIN" ||
-      actorRole === "ADMIN" ||
-      actorDesignation.includes("senior chef") ||
-      actorDesignation.includes("head chef") ||
-      actorDesignation.includes("executive chef");
-
-    if (!isPrivileged && (actor.userId || actor.id)) {
-      const dbActor = await prisma.user.findUnique({
-        where: { id: Number(actor.userId || actor.id) },
-        select: { designation: true, role: true, restaurantId: true },
-      });
-      if (dbActor) {
-        if (dbActor.restaurantId && Number(dbActor.restaurantId) !== rid) {
-          throw new KitchenAssignmentError("Access denied. Cross-restaurant action is strictly forbidden.", 403, "CROSS_RESTAURANT_FORBIDDEN");
-        }
-        const dbRole = String(dbActor.role || "").toUpperCase();
-        const dbDesig = String(dbActor.designation || "").toLowerCase();
-        if (
-          dbRole === "OWNER" ||
-          dbRole === "MANAGER" ||
-          dbRole === "SUPER_ADMIN" ||
-          dbRole === "ADMIN" ||
-          dbDesig.includes("senior chef") ||
-          dbDesig.includes("head chef") ||
-          dbDesig.includes("executive chef")
-        ) {
-          isPrivileged = true;
-        }
-      }
-    }
-
-    if (!isPrivileged) {
-      throw new KitchenAssignmentError("Access denied. Only Senior Chef or Kitchen Manager can unassign items.", 403, "FORBIDDEN");
-    }
-  }
-
-  // 2. Find item
-  const item = await prisma.kitchenOrderTicketItem.findFirst({
-    where: {
-      OR: [{ id: iId }, { orderItemId: iId }],
-      kot: { restaurantId: rid },
-    },
-    include: { kot: true },
-  });
-
-  if (!item) {
-    throw new KitchenAssignmentError("KOT item not found", 404, "ITEM_NOT_FOUND");
-  }
-
-  if (item.kot.status === "CANCELLED" || item.kot.status === "SERVED" || item.kot.status === "DELIVERED") {
-    throw new KitchenAssignmentError(`Cannot unassign item from ${item.kot.status} KOT`, 400, "KOT_INELIGIBLE");
-  }
-
-  if (item.status === "CANCELLED" || item.status === "SERVED") {
-    throw new KitchenAssignmentError(`Cannot unassign ${item.status} item`, 400, "ITEM_INELIGIBLE");
-  }
-
-  const previousChefId = item.assignedChefId;
-  const previousChefName = item.assignedChefName;
-
-  // 3. Clear assignment in database
-  const updatedItem = await prisma.kitchenOrderTicketItem.update({
-    where: { id: item.id },
-    data: {
-      assignedChefId: null,
-      assignedChefName: null,
-      assignmentSource: null,
-      assignedAt: null,
-      assignedByUserId: null,
-      assignedByName: null,
-    },
-    include: {
-      kot: {
-        select: {
-          id: true,
-          kotNo: true,
-          tableNo: true,
-          status: true,
-          priority: true,
-          restaurantId: true,
-        },
-      },
-    },
-  });
-
-  // 4. Audit Log
-  await logAuditEvent({
-    prisma,
-    restaurantId: rid,
-    actor,
-    action: "KITCHEN_ITEM_UNASSIGNED",
-    entity: "KOT_ITEM",
-    entityId: String(item.id),
-    details: {
-      kotNumber: item.kot?.kotNo,
-      itemName: item.itemName,
-      previousChefId,
-      previousChefName,
-      unassignedBy: actor?.userName || actor?.name || "Senior Chef",
-    },
-    req,
-  });
-
-  // 5. Realtime Notification
-  const targetUsers = previousChefId ? [previousChefId] : [];
-  await notifyWorkloadAndAssignment({
-    prisma,
-    restaurantId: rid,
-    event: "kitchen:item_unassigned",
-    payload: {
-      ok: true,
-      itemId: item.id,
-      orderItemId: item.orderItemId,
-      kotId: item.kotId,
-      previousChefId,
-      item: {
-        ...updatedItem,
-        kotNumber: updatedItem.kot?.kotNo,
-        name: updatedItem.itemName,
-        quantity: updatedItem.qty,
-      },
-    },
-    targetUserIds: targetUsers,
-    req,
-    realtime,
-  });
-
-  return {
-    ok: true,
-    message: "Item unassigned successfully",
-    previousChefId,
-    item: {
-      ...updatedItem,
-      kotNumber: updatedItem.kot?.kotNo,
-      name: updatedItem.itemName,
-      quantity: updatedItem.qty,
-    },
-  };
 };
 
 /**

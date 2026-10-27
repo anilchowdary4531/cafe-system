@@ -66,7 +66,7 @@ export default function MealShiftConfigModal({
                             <p className="text-[11px] theme-muted">Set start & end times for Breakfast, Lunch, Dinner filters</p>
                         </div>
                     </div>
-                    <button type="button" onClick={onClose} title="Close" aria-label="Close shift configuration modal" className="rounded-full p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+                    <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
                         <X className="h-4 w-4" />
                     </button>
                 </div>
@@ -79,10 +79,8 @@ export default function MealShiftConfigModal({
                         </h4>
                         <div className="grid grid-cols-2 gap-2">
                             <div>
-                                <label htmlFor="shift-breakfast-start" className="block text-[11px] font-medium mb-1">Start Time</label>
+                                <label className="block text-[11px] font-medium mb-1">Start Time</label>
                                 <input
-                                    id="shift-breakfast-start"
-                                    name="breakfastStart"
                                     type="time"
                                     value={breakfastStart}
                                     onChange={(e) => setBreakfastStart(e.target.value)}
@@ -91,10 +89,8 @@ export default function MealShiftConfigModal({
                                 />
                             </div>
                             <div>
-                                <label htmlFor="shift-breakfast-end" className="block text-[11px] font-medium mb-1">End Time</label>
+                                <label className="block text-[11px] font-medium mb-1">End Time</label>
                                 <input
-                                    id="shift-breakfast-end"
-                                    name="breakfastEnd"
                                     type="time"
                                     value={breakfastEnd}
                                     onChange={(e) => setBreakfastEnd(e.target.value)}
@@ -112,10 +108,8 @@ export default function MealShiftConfigModal({
                         </h4>
                         <div className="grid grid-cols-2 gap-2">
                             <div>
-                                <label htmlFor="shift-lunch-start" className="block text-[11px] font-medium mb-1">Start Time</label>
+                                <label className="block text-[11px] font-medium mb-1">Start Time</label>
                                 <input
-                                    id="shift-lunch-start"
-                                    name="lunchStart"
                                     type="time"
                                     value={lunchStart}
                                     onChange={(e) => setLunchStart(e.target.value)}
@@ -124,10 +118,8 @@ export default function MealShiftConfigModal({
                                 />
                             </div>
                             <div>
-                                <label htmlFor="shift-lunch-end" className="block text-[11px] font-medium mb-1">End Time</label>
+                                <label className="block text-[11px] font-medium mb-1">End Time</label>
                                 <input
-                                    id="shift-lunch-end"
-                                    name="lunchEnd"
                                     type="time"
                                     value={lunchEnd}
                                     onChange={(e) => setLunchEnd(e.target.value)}
@@ -145,10 +137,8 @@ export default function MealShiftConfigModal({
                         </h4>
                         <div className="grid grid-cols-2 gap-2">
                             <div>
-                                <label htmlFor="shift-dinner-start" className="block text-[11px] font-medium mb-1">Start Time</label>
+                                <label className="block text-[11px] font-medium mb-1">Start Time</label>
                                 <input
-                                    id="shift-dinner-start"
-                                    name="dinnerStart"
                                     type="time"
                                     value={dinnerStart}
                                     onChange={(e) => setDinnerStart(e.target.value)}
@@ -157,10 +147,8 @@ export default function MealShiftConfigModal({
                                 />
                             </div>
                             <div>
-                                <label htmlFor="shift-dinner-end" className="block text-[11px] font-medium mb-1">End Time</label>
+                                <label className="block text-[11px] font-medium mb-1">End Time</label>
                                 <input
-                                    id="shift-dinner-end"
-                                    name="dinnerEnd"
                                     type="time"
                                     value={dinnerEnd}
                                     onChange={(e) => setDinnerEnd(e.target.value)}

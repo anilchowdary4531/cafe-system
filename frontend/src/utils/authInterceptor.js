@@ -1,12 +1,4 @@
-import axios from "axios";
-import { API } from "../config";
-import {
-    clearStaffSession,
-    getActiveStaffSession,
-    getStaffRefreshToken,
-    writeStaffSession,
-    isStaffWithinOfflineGracePeriod,
-} from "./staffSessionStorage";
+import { clearStaffSession, getActiveStaffSession } from "./staffSessionStorage";
 
 /**
  * Safely extracts the pathname from any URL string or object.
@@ -161,213 +153,48 @@ export const applyAuthHeaders = (config) => {
     return config;
 };
 
-let isRefreshingStaff = false;
-let staffRefreshQueue = [];
-
-const processStaffQueue = (err, newToken = null) => {
-    staffRefreshQueue.forEach(({ resolve, reject }) => {
-        if (err) {
-            reject(err);
-        } else {
-            resolve(newToken);
-        }
-    });
-    staffRefreshQueue = [];
-};
-
 /**
  * Response interceptor for handling 401 Unauthorized status.
  * Strictly evicts only the session matching the failing endpoint's scope.
  * Prevents customer 401s from nuking the staff session, and vice-versa.
- * Implements single-flight staff token refresh and 72-hour offline grace protection.
  */
 export const handleAuth401 = (error) => {
     const status = error?.response?.status;
-    const originalRequest = error?.config || {};
-    const scope = resolveEndpointScope(originalRequest);
-
     if (status === 401) {
-        if (scope === "customer") {
-            try {
+        const scope = resolveEndpointScope(error?.config);
+        const activeStaffSession = getActiveStaffSession();
+
+        try {
+            if (scope === "customer") {
                 if (typeof localStorage !== "undefined") {
                     localStorage.removeItem("customerToken");
                     localStorage.removeItem("customer");
                 }
-            } catch {
-                // Ignore storage errors in non-browser envs
-            }
-            try {
-                if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
-                    window.dispatchEvent(new CustomEvent("auth:logout", { detail: { scope: "customer" } }));
-                }
-            } catch {
-                // Ignore event errors in non-browser envs
-            }
-            return Promise.reject(error);
-        }
-
-        if (scope === "supplier") {
-            try {
+            } else if (scope === "supplier") {
                 if (typeof localStorage !== "undefined") {
                     localStorage.removeItem("supplierToken");
                     localStorage.removeItem("supplier");
                     localStorage.removeItem("supplier_refresh_token");
                 }
-            } catch {
-                // Ignore storage errors in non-browser envs
+            } else {
+                // Staff / Super Admin
+                clearStaffSession(activeStaffSession?.scope || "local");
             }
-            try {
-                if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
-                    window.dispatchEvent(new CustomEvent("auth:logout", { detail: { scope: "supplier" } }));
-                }
-            } catch {
-                // Ignore event errors in non-browser envs
-            }
-            return Promise.reject(error);
+        } catch {
+            // Ignore storage errors in non-browser envs
         }
 
-        // Staff / Super Admin Scope
-        const requestUrl = pathFromUrl(originalRequest?.url).toLowerCase();
-        const isRefreshCall = requestUrl.includes("/auth/staff/refresh") || originalRequest._isStaffRefresh;
-
-        if (isRefreshCall) {
-            // The refresh call itself returned 401: explicit server revocation
-            isRefreshingStaff = false;
-            processStaffQueue(error, null);
-
-            clearStaffSession();
-            try {
-                if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
-                    window.dispatchEvent(new CustomEvent("auth:logout", { detail: { scope: "staff" } }));
-                }
-            } catch {
-                // Ignore event errors in non-browser envs
+        try {
+            if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+                window.dispatchEvent(
+                    new CustomEvent("auth:logout", {
+                        detail: { scope },
+                    })
+                );
             }
-            return Promise.reject(error);
+        } catch {
+            // Ignore event errors in non-browser envs
         }
-
-        if (originalRequest._retry) {
-            // Already retried once and still got 401
-            clearStaffSession();
-            try {
-                if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
-                    window.dispatchEvent(new CustomEvent("auth:logout", { detail: { scope: "staff" } }));
-                }
-            } catch {
-                // Ignore event errors in non-browser envs
-            }
-            return Promise.reject(error);
-        }
-
-        const refreshToken = getStaffRefreshToken();
-        if (!refreshToken) {
-            // No refresh token available to renew
-            clearStaffSession();
-            try {
-                if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
-                    window.dispatchEvent(new CustomEvent("auth:logout", { detail: { scope: "staff" } }));
-                }
-            } catch {
-                // Ignore event errors in non-browser envs
-            }
-            return Promise.reject(error);
-        }
-
-        // Single-flight refresh queue: if a refresh is already in-flight, wait for it
-        if (isRefreshingStaff) {
-            return new Promise((resolve, reject) => {
-                staffRefreshQueue.push({ resolve, reject });
-            })
-                .then((newToken) => {
-                    originalRequest._retry = true;
-                    originalRequest.headers = originalRequest.headers || {};
-                    originalRequest.headers.Authorization = `Bearer ${newToken}`;
-                    return axios(originalRequest);
-                })
-                .catch((queueErr) => Promise.reject(queueErr));
-        }
-
-        originalRequest._retry = true;
-        isRefreshingStaff = true;
-
-        return new Promise((resolve, reject) => {
-            axios
-                .post(
-                    `${API}/auth/staff/refresh`,
-                    { refreshToken },
-                    {
-                        _isStaffRefresh: true,
-                        headers: { "Content-Type": "application/json" },
-                    }
-                )
-                .then((res) => {
-                    const newToken = res.data?.token;
-                    const newRefreshToken = res.data?.refreshToken || refreshToken;
-                    const newUser = res.data?.user;
-
-                    if (!newToken) {
-                        throw new Error("No token returned from staff refresh");
-                    }
-
-                    const activeSession = getActiveStaffSession();
-                    const targetScope = activeSession?.scope || "local";
-
-                    writeStaffSession({
-                        token: newToken,
-                        refreshToken: newRefreshToken,
-                        user: newUser || activeSession?.user,
-                        scope: targetScope,
-                        validatedAt: Date.now(),
-                    });
-
-                    if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
-                        window.dispatchEvent(
-                            new CustomEvent("auth:token-refreshed", {
-                                detail: { token: newToken, user: newUser },
-                            })
-                        );
-                    }
-
-                    processStaffQueue(null, newToken);
-
-                    originalRequest.headers = originalRequest.headers || {};
-                    originalRequest.headers.Authorization = `Bearer ${newToken}`;
-                    resolve(axios(originalRequest));
-                })
-                .catch((refreshErr) => {
-                    const isNetwork =
-                        !refreshErr.response ||
-                        refreshErr.code === "ERR_NETWORK" ||
-                        refreshErr.code === "ECONNABORTED" ||
-                        refreshErr.message === "Network Error" ||
-                        (typeof navigator !== "undefined" && navigator.onLine === false);
-
-                    const withinGrace = isStaffWithinOfflineGracePeriod();
-
-                    if (isNetwork && withinGrace) {
-                        // Genuinely offline and within 72-hour grace period!
-                        // Preserve session; do NOT clear storage or log out.
-                        processStaffQueue(refreshErr, null);
-                        reject(refreshErr);
-                        return;
-                    }
-
-                    // Genuine server rejection or grace period expired
-                    clearStaffSession();
-                    try {
-                        if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
-                            window.dispatchEvent(new CustomEvent("auth:logout", { detail: { scope: "staff" } }));
-                        }
-                    } catch {
-                        // Ignore event errors in non-browser envs
-                    }
-                    processStaffQueue(refreshErr, null);
-                    reject(refreshErr);
-                })
-                .finally(() => {
-                    isRefreshingStaff = false;
-                });
-        });
     }
 
     return Promise.reject(error);

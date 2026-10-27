@@ -73,7 +73,7 @@ export default function TableBlockModal({
                             </p>
                         </div>
                     </div>
-                    <button type="button" onClick={onClose} title="Close" aria-label="Close block modal" className="rounded-full p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+                    <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
                         <X className="h-4 w-4" />
                     </button>
                 </div>
@@ -87,10 +87,8 @@ export default function TableBlockModal({
                             </div>
 
                             <div>
-                                <label htmlFor="table-block-reason" className="block text-xs font-medium mb-1">Select Block Reason *</label>
+                                <label className="block text-xs font-medium mb-1">Select Block Reason *</label>
                                 <select
-                                    id="table-block-reason"
-                                    name="blockReason"
                                     value={reasonOption}
                                     onChange={(e) => setReasonOption(e.target.value)}
                                     className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs outline-none"
@@ -106,10 +104,8 @@ export default function TableBlockModal({
 
                             {reasonOption === "Custom" && (
                                 <div>
-                                    <label htmlFor="table-block-custom-reason" className="block text-xs font-medium mb-1">Custom Reason Details</label>
+                                    <label className="block text-xs font-medium mb-1">Custom Reason Details</label>
                                     <input
-                                        id="table-block-custom-reason"
-                                        name="customReason"
                                         type="text"
                                         placeholder="e.g. Broken chair, deep cleaning"
                                         value={customReason}

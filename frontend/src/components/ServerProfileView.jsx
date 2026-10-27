@@ -21,7 +21,6 @@ import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { API } from "../config";
 import { showToast } from "../utils/toast";
-import NotificationSoundPicker from "./NotificationSoundPicker";
 
 export default function ServerProfileView({
     onBackToFloorPlan,
@@ -170,7 +169,7 @@ export default function ServerProfileView({
     const designationLabel = user?.designation || (roleBadge === "WAITER" ? "Server" : roleBadge);
 
     return (
-        <div className="flex-1 w-full max-w-full space-y-4 animate-in fade-in duration-200">
+        <div className="flex-1 p-3 sm:p-4 max-w-4xl mx-auto w-full space-y-4 animate-in fade-in duration-200">
             {/* Top Navigation Bar */}
             <div className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)]/40 pb-3">
                 <div className="flex items-center gap-3">
@@ -267,11 +266,8 @@ export default function ServerProfileView({
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                             <div>
-                                <label htmlFor="server-profile-fullname" className="block text-[11px] font-bold theme-muted mb-1">Full Name</label>
+                                <label className="block text-[11px] font-bold theme-muted mb-1">Full Name</label>
                                 <input
-                                    id="server-profile-fullname"
-                                    name="name"
-                                    autoComplete="name"
                                     type="text"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
@@ -282,11 +278,8 @@ export default function ServerProfileView({
                             </div>
 
                             <div>
-                                <label htmlFor="server-profile-phone" className="block text-[11px] font-bold theme-muted mb-1">Mobile Phone Number</label>
+                                <label className="block text-[11px] font-bold theme-muted mb-1">Mobile Phone Number</label>
                                 <input
-                                    id="server-profile-phone"
-                                    name="phone"
-                                    autoComplete="tel"
                                     type="text"
                                     value={phone}
                                     onChange={(e) => setPhone(e.target.value)}
@@ -330,18 +323,6 @@ export default function ServerProfileView({
                 )}
             </div>
 
-            {/* Sound & Vibration Section */}
-            <div className="rounded-2xl border border-[color:var(--app-border)]/40 bg-white dark:bg-slate-900 p-4 shadow-xs space-y-3">
-                <div className="flex items-center gap-2 border-b border-[color:var(--app-border)]/40 pb-2.5">
-                    <Sparkles className="h-4 w-4 text-orange-500" />
-                    <div>
-                        <h3 className="text-sm font-extrabold text-[color:var(--app-text)]">Sound & Vibration</h3>
-                        <p className="text-[11px] theme-muted">Customize alert tones and vibration patterns for notifications.</p>
-                    </div>
-                </div>
-                <NotificationSoundPicker defaultExpanded={false} />
-            </div>
-
             {/* Security & Password Section */}
             <div className="rounded-2xl border border-[color:var(--app-border)]/40 bg-white dark:bg-slate-900 p-4 shadow-xs space-y-3">
                 <div className="flex items-center gap-2 border-b border-[color:var(--app-border)]/40 pb-2.5">
@@ -363,12 +344,9 @@ export default function ServerProfileView({
 
                 <form onSubmit={handleChangePassword} className="space-y-3 text-xs">
                     <div>
-                        <label htmlFor="server-profile-current-password" className="block text-[11px] font-bold theme-muted mb-1">Current Password</label>
+                        <label className="block text-[11px] font-bold theme-muted mb-1">Current Password</label>
                         <div className="relative">
                             <input
-                                id="server-profile-current-password"
-                                name="currentPassword"
-                                autoComplete="current-password"
                                 type={showCurrentPassword ? "text" : "password"}
                                 value={currentPassword}
                                 onChange={(e) => setCurrentPassword(e.target.value)}
@@ -378,8 +356,6 @@ export default function ServerProfileView({
                             />
                             <button
                                 type="button"
-                                aria-label={showCurrentPassword ? "Hide current password" : "Show current password"}
-                                title={showCurrentPassword ? "Hide password" : "Show password"}
                                 onClick={() => setShowCurrentPassword((prev) => !prev)}
                                 className="absolute right-3 top-2.5 theme-muted hover:text-[color:var(--app-text)]"
                             >
@@ -390,12 +366,9 @@ export default function ServerProfileView({
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label htmlFor="server-profile-new-password" className="block text-[11px] font-bold theme-muted mb-1">New Password</label>
+                            <label className="block text-[11px] font-bold theme-muted mb-1">New Password</label>
                             <div className="relative">
                                 <input
-                                    id="server-profile-new-password"
-                                    name="newPassword"
-                                    autoComplete="new-password"
                                     type={showNewPassword ? "text" : "password"}
                                     value={newPassword}
                                     onChange={(e) => setNewPassword(e.target.value)}
@@ -405,8 +378,6 @@ export default function ServerProfileView({
                                 />
                                 <button
                                     type="button"
-                                    aria-label={showNewPassword ? "Hide new password" : "Show new password"}
-                                    title={showNewPassword ? "Hide password" : "Show password"}
                                     onClick={() => setShowNewPassword((prev) => !prev)}
                                     className="absolute right-3 top-2.5 theme-muted hover:text-[color:var(--app-text)]"
                                 >
@@ -416,11 +387,8 @@ export default function ServerProfileView({
                         </div>
 
                         <div>
-                            <label htmlFor="server-profile-confirm-password" className="block text-[11px] font-bold theme-muted mb-1">Confirm New Password</label>
+                            <label className="block text-[11px] font-bold theme-muted mb-1">Confirm New Password</label>
                             <input
-                                id="server-profile-confirm-password"
-                                name="confirmPassword"
-                                autoComplete="new-password"
                                 type="password"
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}

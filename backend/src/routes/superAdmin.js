@@ -59,26 +59,6 @@ export default async function superAdminRoutes(app, deps) {
       state: restaurant.state,
       country: restaurant.country,
       pincode: restaurant.pincode,
-      latitude: restaurant.latitude !== null && restaurant.latitude !== undefined && Number.isFinite(Number(restaurant.latitude))
-        ? Number(restaurant.latitude)
-        : null,
-      longitude: restaurant.longitude !== null && restaurant.longitude !== undefined && Number.isFinite(Number(restaurant.longitude))
-        ? Number(restaurant.longitude)
-        : null,
-      deliveryRadiusKm: Number(restaurant.deliveryRadiusKm !== null && restaurant.deliveryRadiusKm !== undefined ? restaurant.deliveryRadiusKm : 5.0),
-      hasValidLocation: Boolean(
-        restaurant.latitude !== null &&
-        restaurant.latitude !== undefined &&
-        restaurant.longitude !== null &&
-        restaurant.longitude !== undefined &&
-        Number.isFinite(Number(restaurant.latitude)) &&
-        Number.isFinite(Number(restaurant.longitude)) &&
-        Number(restaurant.latitude) >= -90 &&
-        Number(restaurant.latitude) <= 90 &&
-        Number(restaurant.longitude) >= -180 &&
-        Number(restaurant.longitude) <= 180 &&
-        !(Number(restaurant.latitude) === 0 && Number(restaurant.longitude) === 0)
-      ),
       gstNumber: restaurant.gstNumber || "N/A",
       invoicePrefix: restaurant.invoicePrefix || "INV",
       defaultTaxPercent: restaurant.defaultTaxPercent || 5,
@@ -1102,55 +1082,6 @@ export default async function superAdminRoutes(app, deps) {
         updateData.tobaccoApproved = req.body.tobaccoApproved === true || req.body.tobaccoApproved === "true" || req.body.tobaccoApproved === 1;
       }
 
-      // Location fields update
-      if (req.body?.latitude !== undefined) {
-        if (req.body.latitude === null || req.body.latitude === "") {
-          updateData.latitude = null;
-        } else {
-          const lat = Number(req.body.latitude);
-          if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
-            return reply.code(400).send({ message: "Invalid latitude. Must be a finite number between -90 and 90 or null." });
-          }
-          updateData.latitude = lat;
-        }
-      }
-
-      if (req.body?.longitude !== undefined) {
-        if (req.body.longitude === null || req.body.longitude === "") {
-          updateData.longitude = null;
-        } else {
-          const lng = Number(req.body.longitude);
-          if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
-            return reply.code(400).send({ message: "Invalid longitude. Must be a finite number between -180 and 180 or null." });
-          }
-          updateData.longitude = lng;
-        }
-      }
-
-      if (req.body?.deliveryRadiusKm !== undefined) {
-        const rad = Number(req.body.deliveryRadiusKm);
-        if (!Number.isFinite(rad) || rad <= 0) {
-          return reply.code(400).send({ message: "Invalid delivery radius. Must be a positive number in km." });
-        }
-        updateData.deliveryRadiusKm = rad;
-      }
-
-      if (req.body?.addressLine1 !== undefined) {
-        updateData.addressLine1 = req.body.addressLine1 ? String(req.body.addressLine1).trim() : null;
-      }
-      if (req.body?.city !== undefined) {
-        updateData.city = req.body.city ? String(req.body.city).trim() : null;
-      }
-      if (req.body?.state !== undefined) {
-        updateData.state = req.body.state ? String(req.body.state).trim() : null;
-      }
-      if (req.body?.country !== undefined) {
-        updateData.country = req.body.country ? String(req.body.country).trim() : "India";
-      }
-      if (req.body?.pincode !== undefined) {
-        updateData.pincode = req.body.pincode ? String(req.body.pincode).trim() : null;
-      }
-
       let restaurant;
       try {
         restaurant = await prisma.restaurant.update({
@@ -1176,35 +1107,11 @@ export default async function superAdminRoutes(app, deps) {
         }).catch(() => {});
       }
 
-      const hasValidLocation = Boolean(
-        restaurant?.latitude !== null &&
-        restaurant?.latitude !== undefined &&
-        restaurant?.longitude !== null &&
-        restaurant?.longitude !== undefined &&
-        Number.isFinite(Number(restaurant?.latitude)) &&
-        Number.isFinite(Number(restaurant?.longitude)) &&
-        Number(restaurant?.latitude) >= -90 &&
-        Number(restaurant?.latitude) <= 90 &&
-        Number(restaurant?.longitude) >= -180 &&
-        Number(restaurant?.longitude) <= 180 &&
-        !(Number(restaurant?.latitude) === 0 && Number(restaurant?.longitude) === 0)
-      );
-
       return {
         message: `Restaurant updated`,
         restaurant: {
           id: restaurant?.id || restaurantId,
           name: restaurant?.name || "",
-          slug: restaurant?.slug,
-          city: restaurant?.city,
-          state: restaurant?.state,
-          country: restaurant?.country,
-          addressLine1: restaurant?.addressLine1,
-          pincode: restaurant?.pincode,
-          latitude: restaurant?.latitude !== null && restaurant?.latitude !== undefined ? Number(restaurant.latitude) : null,
-          longitude: restaurant?.longitude !== null && restaurant?.longitude !== undefined ? Number(restaurant.longitude) : null,
-          deliveryRadiusKm: Number(restaurant?.deliveryRadiusKm || 5.0),
-          hasValidLocation,
           isActive: restaurant?.isActive,
           tobaccoApproved: Boolean(restaurant?.tobaccoApproved),
         },
@@ -1212,83 +1119,6 @@ export default async function superAdminRoutes(app, deps) {
     } catch (err) {
       console.error("[SuperAdmin] update restaurant error:", err);
       return reply.code(500).send({ message: "Failed to update restaurant" });
-    }
-  });
-
-  // Safe Geocoding helper for Super Admin using existing OpenStreetMap Nominatim mechanism
-  app.post("/super-admin/restaurants/:restaurantId/geocode", { preHandler: requireSuperAdmin }, async (req, reply) => {
-    try {
-      const restaurantId = Number(req.params.restaurantId);
-      if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
-
-      const restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId } });
-      if (!restaurant) return reply.code(404).send({ message: "Restaurant not found" });
-
-      const query = req.body?.query || [
-        restaurant.addressLine1,
-        restaurant.city,
-        restaurant.state,
-        restaurant.pincode,
-        restaurant.country || "India"
-      ].filter(Boolean).join(", ");
-
-      if (!query.trim()) {
-        return reply.code(400).send({ message: "Cannot geocode: Restaurant has no address, city, or state." });
-      }
-
-      const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
-      const geoRes = await fetch(nominatimUrl, {
-        headers: { "User-Agent": "Tiffzy-SuperAdmin/1.0 (admin@tiffzy.com)" },
-      });
-
-      if (!geoRes.ok) {
-        return reply.code(502).send({ message: "Geocoding service unavailable." });
-      }
-
-      const results = await geoRes.json();
-      if (!Array.isArray(results) || results.length === 0) {
-        return reply.code(404).send({ message: `No coordinates found for address: ${query}` });
-      }
-
-      const matched = results[0];
-      const lat = Number(matched.lat);
-      const lng = Number(matched.lon);
-
-      if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-        return reply.code(500).send({ message: "Geocoding returned invalid coordinates." });
-      }
-
-      if (req.body?.save === true) {
-        const updated = await prisma.restaurant.update({
-          where: { id: restaurantId },
-          data: { latitude: lat, longitude: lng },
-        });
-
-        return reply.code(200).send({
-          success: true,
-          message: "Restaurant geocoded and updated successfully.",
-          latitude: lat,
-          longitude: lng,
-          displayName: matched.display_name,
-          restaurant: {
-            id: updated.id,
-            name: updated.name,
-            latitude: lat,
-            longitude: lng,
-            hasValidLocation: true,
-          },
-        });
-      }
-
-      return reply.code(200).send({
-        success: true,
-        latitude: lat,
-        longitude: lng,
-        displayName: matched.display_name,
-      });
-    } catch (err) {
-      console.error("[SuperAdmin] Geocoding error:", err);
-      return reply.code(500).send({ message: "Failed to geocode address." });
     }
   });
 

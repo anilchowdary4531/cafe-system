@@ -107,9 +107,9 @@ export const createAndDispatchNotification = async ({
         orderId: notification.orderId,
         restaurantId: notification.restaurantId,
         tableId: notification.data?.tableId ? Number(notification.data.tableId) : null,
-        tableSessionId: notification.data?.tableSessionId ? Number(notification.data.tableSessionId) : null,
         tableNo: notification.data?.tableNo || null,
         data: notification.data,
+        isRead: false,
         createdAt: notification.createdAt,
       };
 
@@ -129,8 +129,6 @@ export const createAndDispatchNotification = async ({
         }
       };
 
-      const staffTarget = realtime?.staff || (typeof realtime?.io?.of === "function" ? realtime.io.of("/staff") : null);
-
       if (recipientType === RECIPIENT_TYPES.CUSTOMER) {
         emitToTargetRooms(realtime.io, [`customer:${recipientId}`, `customer_${recipientId}`], "notification:new", payload);
       } else if (recipientType === "SUPPLIER") {
@@ -138,15 +136,19 @@ export const createAndDispatchNotification = async ({
       } else if (recipientType === RECIPIENT_TYPES.USER) {
         // User-targeted notification: dispatch ONLY to user room, never broadcast restaurant-wide
         emitToTargetRooms(realtime.io, [`user:${recipientId}`, `user_${recipientId}`], "notification:new", payload);
-        if (staffTarget) {
-          emitToTargetRooms(staffTarget, [`user:${recipientId}`, `user_${recipientId}`], "notification:new", payload);
+        if (realtime?.staff) {
+          emitToTargetRooms(realtime.staff, [`user:${recipientId}`, `user_${recipientId}`], "notification:new", payload);
+        } else if (typeof realtime?.io?.of === "function") {
+          emitToTargetRooms(realtime.io.of("/staff"), [`user:${recipientId}`, `user_${recipientId}`], "notification:new", payload);
         }
       } else if (recipientType === RECIPIENT_TYPES.RESTAURANT) {
         // Restaurant-wide notification: broadcast to restaurant rooms
         if (restaurantId) {
           emitToTargetRooms(realtime.io, [`restaurant:${restaurantId}`, `restaurant_${restaurantId}`], "notification:new", payload);
-          if (staffTarget) {
-            emitToTargetRooms(staffTarget, [`restaurant:${restaurantId}`, `restaurant_${restaurantId}`], "notification:new", payload);
+          if (realtime?.staff) {
+            emitToTargetRooms(realtime.staff, [`restaurant:${restaurantId}`, `restaurant_${restaurantId}`], "notification:new", payload);
+          } else if (typeof realtime?.io?.of === "function") {
+            emitToTargetRooms(realtime.io.of("/staff"), [`restaurant:${restaurantId}`, `restaurant_${restaurantId}`], "notification:new", payload);
           }
         }
       }
@@ -319,36 +321,31 @@ export const getUserNotifications = async ({
     };
   } else if (recipientType === RECIPIENT_TYPES.USER) {
     const userConditions = [
-      {
-        recipientType: RECIPIENT_TYPES.USER,
-        recipientId: Number(recipientId),
-        ...(restaurantId ? { restaurantId: Number(restaurantId) } : {}),
-      },
+      { recipientType: RECIPIENT_TYPES.USER, recipientId: Number(recipientId) },
     ];
     if (restaurantId) {
-      userConditions.push({
-        recipientType: RECIPIENT_TYPES.RESTAURANT,
-        recipientId: Number(restaurantId),
-      });
+      userConditions.push({ recipientType: RECIPIENT_TYPES.RESTAURANT, recipientId: Number(restaurantId) });
     }
     where = {
+      ...(restaurantId ? { restaurantId: Number(restaurantId) } : {}),
       OR: userConditions,
       ...(isRead !== null ? { isRead: Boolean(isRead) } : {}),
     };
     unreadWhere = {
+      ...(restaurantId ? { restaurantId: Number(restaurantId) } : {}),
       OR: userConditions,
       isRead: false,
     };
   } else if (recipientType === RECIPIENT_TYPES.RESTAURANT) {
-    const restId = Number(restaurantId || recipientId);
+    const rid = Number(restaurantId || recipientId);
     where = {
       recipientType: RECIPIENT_TYPES.RESTAURANT,
-      recipientId: restId,
+      recipientId: rid,
       ...(isRead !== null ? { isRead: Boolean(isRead) } : {}),
     };
     unreadWhere = {
       recipientType: RECIPIENT_TYPES.RESTAURANT,
-      recipientId: restId,
+      recipientId: rid,
       isRead: false,
     };
   } else {
@@ -395,29 +392,27 @@ export const getUserNotifications = async ({
  */
 export const markNotificationRead = async ({ prisma, notificationId, recipientType, recipientId, restaurantId = null }) => {
   let where;
-  if (recipientType === RECIPIENT_TYPES.USER) {
-    const userConditions = [
-      {
-        recipientType: RECIPIENT_TYPES.USER,
-        recipientId: Number(recipientId),
-        ...(restaurantId ? { restaurantId: Number(restaurantId) } : {}),
-      },
-    ];
-    if (restaurantId) {
-      userConditions.push({
-        recipientType: RECIPIENT_TYPES.RESTAURANT,
-        recipientId: Number(restaurantId),
-      });
-    }
+  if (recipientType === RECIPIENT_TYPES.USER && restaurantId) {
     where = {
       id: Number(notificationId),
-      OR: userConditions,
+      restaurantId: Number(restaurantId),
+      OR: [
+        { recipientType: RECIPIENT_TYPES.USER, recipientId: Number(recipientId) },
+        { recipientType: RECIPIENT_TYPES.RESTAURANT, recipientId: Number(restaurantId) },
+      ],
+    };
+  } else if (recipientType === RECIPIENT_TYPES.USER) {
+    where = {
+      id: Number(notificationId),
+      recipientType: RECIPIENT_TYPES.USER,
+      recipientId: Number(recipientId),
     };
   } else if (recipientType === RECIPIENT_TYPES.RESTAURANT) {
+    const rid = Number(restaurantId || recipientId);
     where = {
       id: Number(notificationId),
       recipientType: RECIPIENT_TYPES.RESTAURANT,
-      recipientId: Number(restaurantId || recipientId),
+      recipientId: rid,
     };
   } else {
     const recipientCondition = Array.isArray(recipientId)
@@ -427,6 +422,7 @@ export const markNotificationRead = async ({ prisma, notificationId, recipientTy
       id: Number(notificationId),
       recipientType,
       recipientId: recipientCondition,
+      ...(restaurantId ? { restaurantId: Number(restaurantId) } : {}),
     };
   }
 
@@ -444,28 +440,26 @@ export const markNotificationRead = async ({ prisma, notificationId, recipientTy
  */
 export const markAllNotificationsRead = async ({ prisma, recipientType, recipientId, restaurantId = null }) => {
   let where;
-  if (recipientType === RECIPIENT_TYPES.USER) {
-    const userConditions = [
-      {
-        recipientType: RECIPIENT_TYPES.USER,
-        recipientId: Number(recipientId),
-        ...(restaurantId ? { restaurantId: Number(restaurantId) } : {}),
-      },
-    ];
-    if (restaurantId) {
-      userConditions.push({
-        recipientType: RECIPIENT_TYPES.RESTAURANT,
-        recipientId: Number(restaurantId),
-      });
-    }
+  if (recipientType === RECIPIENT_TYPES.USER && restaurantId) {
     where = {
-      OR: userConditions,
+      restaurantId: Number(restaurantId),
+      OR: [
+        { recipientType: RECIPIENT_TYPES.USER, recipientId: Number(recipientId) },
+        { recipientType: RECIPIENT_TYPES.RESTAURANT, recipientId: Number(restaurantId) },
+      ],
+      isRead: false,
+    };
+  } else if (recipientType === RECIPIENT_TYPES.USER) {
+    where = {
+      recipientType: RECIPIENT_TYPES.USER,
+      recipientId: Number(recipientId),
       isRead: false,
     };
   } else if (recipientType === RECIPIENT_TYPES.RESTAURANT) {
+    const rid = Number(restaurantId || recipientId);
     where = {
       recipientType: RECIPIENT_TYPES.RESTAURANT,
-      recipientId: Number(restaurantId || recipientId),
+      recipientId: rid,
       isRead: false,
     };
   } else {
@@ -475,6 +469,7 @@ export const markAllNotificationsRead = async ({ prisma, recipientType, recipien
     where = {
       recipientType,
       recipientId: recipientCondition,
+      ...(restaurantId ? { restaurantId: Number(restaurantId) } : {}),
       isRead: false,
     };
   }

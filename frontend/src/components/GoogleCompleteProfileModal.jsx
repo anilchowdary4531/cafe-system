@@ -47,8 +47,6 @@ export default function GoogleCompleteProfileModal({
                     type="button"
                     onClick={onClose}
                     disabled={loading}
-                    title="Close"
-                    aria-label="Close modal"
                     className="absolute right-4 top-4 rounded-full p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition"
                 >
                     <X size={20} />
@@ -89,16 +87,13 @@ export default function GoogleCompleteProfileModal({
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label htmlFor="google-complete-name" className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1">
                             Full Name *
                         </label>
                         <div className="relative">
                             <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                             <input
-                                id="google-complete-name"
-                                name="name"
                                 type="text"
-                                autoComplete="name"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 placeholder="Enter your full name"
@@ -109,16 +104,13 @@ export default function GoogleCompleteProfileModal({
                     </div>
 
                     <div>
-                        <label htmlFor="google-complete-phone" className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1">
                             Mobile Phone Number *
                         </label>
                         <div className="relative">
                             <Phone size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                             <input
-                                id="google-complete-phone"
-                                name="phone"
                                 type="tel"
-                                autoComplete="tel"
                                 value={phone}
                                 onChange={(e) => setPhone(e.target.value)}
                                 placeholder="10-digit mobile number"

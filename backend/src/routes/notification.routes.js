@@ -153,23 +153,32 @@ export default async function notificationRoutes(app, deps) {
     const actor = await resolveActor(req);
     if (!actor) return reply.code(401).send({ message: "Authentication required" });
 
-    if (actor.recipientType === RECIPIENT_TYPES.USER) {
-      const userConditions = [
-        {
-          recipientType: RECIPIENT_TYPES.USER,
-          recipientId: Number(actor.recipientId),
-          ...(actor.restaurantId ? { restaurantId: Number(actor.restaurantId) } : {}),
-        },
-      ];
-      if (actor.restaurantId) {
-        userConditions.push({
-          recipientType: RECIPIENT_TYPES.RESTAURANT,
-          recipientId: Number(actor.restaurantId),
-        });
-      }
+    let count;
+    if (actor.recipientType === RECIPIENT_TYPES.USER && actor.restaurantId) {
       count = await prisma.notification.count({
         where: {
-          OR: userConditions,
+          restaurantId: Number(actor.restaurantId),
+          OR: [
+            { recipientType: RECIPIENT_TYPES.USER, recipientId: Number(actor.recipientId) },
+            { recipientType: RECIPIENT_TYPES.RESTAURANT, recipientId: Number(actor.restaurantId) },
+          ],
+          isRead: false,
+        },
+      });
+    } else if (actor.recipientType === RECIPIENT_TYPES.USER) {
+      count = await prisma.notification.count({
+        where: {
+          recipientType: RECIPIENT_TYPES.USER,
+          recipientId: Number(actor.recipientId),
+          isRead: false,
+        },
+      });
+    } else if (actor.recipientType === RECIPIENT_TYPES.RESTAURANT) {
+      const rid = Number(actor.restaurantId || actor.recipientId);
+      count = await prisma.notification.count({
+        where: {
+          recipientType: RECIPIENT_TYPES.RESTAURANT,
+          recipientId: rid,
           isRead: false,
         },
       });

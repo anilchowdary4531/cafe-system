@@ -754,7 +754,7 @@ export default async function publicRoutes(app, deps = {}) {
 
       const mustChangePassword = Boolean(user.mustChangePassword);
       const { userPayload, effectiveRole } = buildStaffLoginPayload({ user, normalizeDbPermissions });
-      const { token, refreshToken, sessionVersion } = await issueStaffSession({ prisma, app, user, effectiveRole });
+      const { token, sessionVersion } = await issueStaffSession({ prisma, app, user, effectiveRole });
       userPayload.sessionVersion = sessionVersion;
 
       if (mustChangePassword) {
@@ -795,7 +795,6 @@ export default async function publicRoutes(app, deps = {}) {
           message: "Password change required",
           mustChangePassword: true,
           token,
-          refreshToken,
           user: userPayload,
           offlineMode: false,
         };
@@ -805,7 +804,6 @@ export default async function publicRoutes(app, deps = {}) {
         message: "Login success",
         mustChangePassword: false,
         token,
-        refreshToken,
         user: userPayload,
         offlineMode: false,
       };
@@ -1184,13 +1182,12 @@ export default async function publicRoutes(app, deps = {}) {
       });
 
       const { userPayload, effectiveRole } = buildStaffLoginPayload({ user, normalizeDbPermissions });
-      const { token, refreshToken, sessionVersion } = await issueStaffSession({ prisma, app, user, effectiveRole });
+      const { token, sessionVersion } = await issueStaffSession({ prisma, app, user, effectiveRole });
       userPayload.sessionVersion = sessionVersion;
 
       return {
         message: "Registration success",
         token,
-        refreshToken,
         user: userPayload,
         offlineMode: false,
       };

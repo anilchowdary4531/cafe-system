@@ -36,7 +36,7 @@ export default function WaitlistDrawer({
     const [customerName, setCustomerName] = useState("");
     const [customerPhone, setCustomerPhone] = useState("");
     const [guestCount, setGuestCount] = useState(2);
-    const [preferredSection, setPreferredSection] = useState("ANY");
+    const [preferredSection, setPreferredSection] = useState("Main Floor");
     const [notes, setNotes] = useState("");
     const [submitting, setSubmitting] = useState(false);
 
@@ -183,13 +183,7 @@ export default function WaitlistDrawer({
                             <p className="text-[11px] theme-muted">Manage waiting guests & seat when tables free up</p>
                         </div>
                     </div>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                        title="Close"
-                        aria-label="Close waitlist queue"
-                    >
+                    <button onClick={onClose} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
                         <X className="h-4 w-4" />
                     </button>
                 </div>
@@ -200,9 +194,6 @@ export default function WaitlistDrawer({
                         <div className="relative flex-1">
                             <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
                             <input
-                                id="waitlist-search-query"
-                                name="waitlistSearch"
-                                aria-label="Search waitlist name or phone"
                                 type="text"
                                 placeholder="Search waitlist name, phone..."
                                 value={searchQuery}
@@ -211,7 +202,6 @@ export default function WaitlistDrawer({
                             />
                         </div>
                         <button
-                            type="button"
                             onClick={() => setShowAddForm(!showAddForm)}
                             className="flex items-center gap-1 rounded-xl bg-orange-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-orange-600 transition shrink-0"
                         >
@@ -228,11 +218,8 @@ export default function WaitlistDrawer({
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label htmlFor="waitlist-customer-name" className="block text-[11px] font-medium mb-0.5">Guest Name *</label>
+                                    <label className="block text-[11px] font-medium mb-0.5">Guest Name *</label>
                                     <input
-                                        id="waitlist-customer-name"
-                                        name="customerName"
-                                        autoComplete="name"
                                         type="text"
                                         placeholder="e.g. Rahul Sharma"
                                         value={customerName}
@@ -242,11 +229,8 @@ export default function WaitlistDrawer({
                                     />
                                 </div>
                                 <div>
-                                    <label htmlFor="waitlist-customer-phone" className="block text-[11px] font-medium mb-0.5">Phone *</label>
+                                    <label className="block text-[11px] font-medium mb-0.5">Phone *</label>
                                     <input
-                                        id="waitlist-customer-phone"
-                                        name="customerPhone"
-                                        autoComplete="tel"
                                         type="tel"
                                         placeholder="e.g. 9876543210"
                                         value={customerPhone}
@@ -259,10 +243,8 @@ export default function WaitlistDrawer({
 
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label htmlFor="waitlist-guest-count" className="block text-[11px] font-medium mb-0.5">Party Size</label>
+                                    <label className="block text-[11px] font-medium mb-0.5">Party Size</label>
                                     <input
-                                        id="waitlist-guest-count"
-                                        name="guestCount"
                                         type="number"
                                         min="1"
                                         max="30"
@@ -272,15 +254,13 @@ export default function WaitlistDrawer({
                                     />
                                 </div>
                                 <div>
-                                    <label htmlFor="waitlist-preferred-section" className="block text-[11px] font-medium mb-0.5">Preferred Area</label>
+                                    <label className="block text-[11px] font-medium mb-0.5">Preferred Area</label>
                                     <select
-                                        id="waitlist-preferred-section"
-                                        name="preferredSection"
                                         value={preferredSection}
                                         onChange={(e) => setPreferredSection(e.target.value)}
                                         className="w-full rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-xs"
                                     >
-                                        <option value="ANY">Any Area</option>
+                                        <option value="Main Floor">Main Floor</option>
                                         <option value="Main Hall">Main Hall</option>
                                         <option value="Patio">Patio</option>
                                         <option value="Roof Top">Roof Top</option>
@@ -290,10 +270,8 @@ export default function WaitlistDrawer({
                             </div>
 
                             <div>
-                                <label htmlFor="waitlist-notes" className="block text-[11px] font-medium mb-0.5">Notes (Optional)</label>
+                                <label className="block text-[11px] font-medium mb-0.5">Notes (Optional)</label>
                                 <input
-                                    id="waitlist-notes"
-                                    name="notes"
                                     type="text"
                                     placeholder="e.g. Needs high chair, birthday booth"
                                     value={notes}
@@ -353,7 +331,7 @@ export default function WaitlistDrawer({
                                             <p className="text-[11px] theme-muted flex items-center gap-2 mt-0.5">
                                                 <span>🪑 {entry.guestCount} Guests</span>
                                                 <span>•</span>
-                                                <span>📍 {entry.preferredSection && entry.preferredSection !== "ANY" && entry.preferredSection !== "Main Floor" ? entry.preferredSection : "Any Area"}</span>
+                                                <span>📍 {entry.preferredSection || "Main Floor"}</span>
                                             </p>
                                         </div>
                                         <div className="text-right">
@@ -376,13 +354,10 @@ export default function WaitlistDrawer({
                                     {/* Inline Table Selection for Seating */}
                                     {isSeatingThis ? (
                                         <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-2 space-y-2">
-                                            <label htmlFor={`seat-table-select-${entry.id}`} className="block text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
+                                            <label className="block text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
                                                 Select Available Table to Seat {entry.customerName}:
                                             </label>
                                             <select
-                                                id={`seat-table-select-${entry.id}`}
-                                                name={`seatTableSelect_${entry.id}`}
-                                                aria-label={`Select Available Table to Seat ${entry.customerName}`}
                                                 value={selectedTableId}
                                                 onChange={(e) => setSelectedTableId(e.target.value)}
                                                 className="w-full rounded-lg border border-emerald-400 bg-white dark:bg-slate-800 px-2 py-1 text-xs outline-none"
@@ -390,7 +365,7 @@ export default function WaitlistDrawer({
                                                 <option value="">-- Choose Available Table --</option>
                                                 {availableTables.map((t) => (
                                                     <option key={t.id} value={t.id}>
-                                                        Table {t.tableNo} ({t.seats} Seats){t.section ? ` - ${t.section}` : ''}
+                                                        Table {t.tableNo} ({t.seats} Seats) - {t.section || "Main Area"}
                                                     </option>
                                                 ))}
                                             </select>
@@ -415,14 +390,12 @@ export default function WaitlistDrawer({
                                     ) : (
                                         <div className="flex items-center gap-1.5 pt-1 border-t border-gray-100 dark:border-slate-800/80">
                                             <button
-                                                type="button"
                                                 onClick={() => handleNotifyCustomer(entry)}
                                                 className="flex-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-1 text-[11px] font-bold hover:bg-emerald-500/20 flex items-center justify-center gap-1"
                                             >
                                                 <BellRing className="h-3 w-3" /> Notify
                                             </button>
                                             <button
-                                                type="button"
                                                 onClick={() => {
                                                     setSeatingEntryId(entry.id);
                                                     setSelectedTableId("");
@@ -432,7 +405,6 @@ export default function WaitlistDrawer({
                                                 <UserCheck className="h-3 w-3" /> Seat Guest
                                             </button>
                                             <button
-                                                type="button"
                                                 onClick={() => handleCancelEntry(entry)}
                                                 className="rounded-lg border border-red-500/20 text-red-500 px-2 py-1 text-[11px] hover:bg-red-500/10"
                                             >

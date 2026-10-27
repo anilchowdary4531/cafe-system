@@ -287,8 +287,6 @@ export default function OwnerStaffSchedules() {
                     <button
                         type="button"
                         onClick={handlePrevPeriod}
-                        title="Previous period"
-                        aria-label="Previous period"
                         className="p-1 hover:bg-[color:var(--app-border)]/30 rounded text-[color:var(--app-text)] transition-colors"
                     >
                         <ChevronLeft className="w-4 h-4" />
@@ -296,8 +294,6 @@ export default function OwnerStaffSchedules() {
                     <button
                         type="button"
                         onClick={handleNextPeriod}
-                        title="Next period"
-                        aria-label="Next period"
                         className="p-1 hover:bg-[color:var(--app-border)]/30 rounded text-[color:var(--app-text)] transition-colors"
                     >
                         <ChevronRight className="w-4 h-4" />
@@ -419,10 +415,7 @@ export default function OwnerStaffSchedules() {
                                 {editingShift ? "Edit Shift" : "Add New Shift"}
                             </h3>
                             <button
-                                type="button"
                                 onClick={() => setShowShiftModal(false)}
-                                title="Close"
-                                aria-label="Close shift modal"
                                 className="text-neutral-400 hover:text-neutral-600 font-bold"
                             >
                                 ✕
@@ -431,10 +424,8 @@ export default function OwnerStaffSchedules() {
 
                         <form onSubmit={handleSaveShift} className="space-y-4 text-xs">
                             <div>
-                                <label htmlFor="shift-staff-user" className="block font-semibold text-neutral-700 mb-1">Staff Member</label>
+                                <label className="block font-semibold text-neutral-700 mb-1">Staff Member</label>
                                 <select
-                                    id="shift-staff-user"
-                                    name="userId"
                                     value={shiftForm.userId}
                                     onChange={(e) => setShiftForm({ ...shiftForm, userId: e.target.value })}
                                     className="w-full p-2.5 rounded-xl border border-neutral-300 bg-white focus:ring-2 focus:ring-orange-500 outline-none"
@@ -448,10 +439,8 @@ export default function OwnerStaffSchedules() {
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label htmlFor="shift-date" className="block font-semibold text-neutral-700 mb-1">Shift Date</label>
+                                    <label className="block font-semibold text-neutral-700 mb-1">Shift Date</label>
                                     <input
-                                        id="shift-date"
-                                        name="shiftDate"
                                         type="date"
                                         value={shiftForm.shiftDate}
                                         onChange={(e) => setShiftForm({ ...shiftForm, shiftDate: e.target.value })}
@@ -460,10 +449,8 @@ export default function OwnerStaffSchedules() {
                                     />
                                 </div>
                                 <div>
-                                    <label htmlFor="shift-role" className="block font-semibold text-neutral-700 mb-1">Assigned Role</label>
+                                    <label className="block font-semibold text-neutral-700 mb-1">Assigned Role</label>
                                     <select
-                                        id="shift-role"
-                                        name="role"
                                         value={shiftForm.role}
                                         onChange={(e) => setShiftForm({ ...shiftForm, role: e.target.value })}
                                         className="w-full p-2.5 rounded-xl border border-neutral-300 bg-white focus:ring-2 focus:ring-orange-500 outline-none"
@@ -479,10 +466,8 @@ export default function OwnerStaffSchedules() {
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label htmlFor="shift-start-time" className="block font-semibold text-neutral-700 mb-1">Start Time</label>
+                                    <label className="block font-semibold text-neutral-700 mb-1">Start Time</label>
                                     <input
-                                        id="shift-start-time"
-                                        name="startTime"
                                         type="time"
                                         value={shiftForm.startTime}
                                         onChange={(e) => setShiftForm({ ...shiftForm, startTime: e.target.value })}
@@ -491,10 +476,8 @@ export default function OwnerStaffSchedules() {
                                     />
                                 </div>
                                 <div>
-                                    <label htmlFor="shift-end-time" className="block font-semibold text-neutral-700 mb-1">End Time</label>
+                                    <label className="block font-semibold text-neutral-700 mb-1">End Time</label>
                                     <input
-                                        id="shift-end-time"
-                                        name="endTime"
                                         type="time"
                                         value={shiftForm.endTime}
                                         onChange={(e) => setShiftForm({ ...shiftForm, endTime: e.target.value })}
@@ -505,10 +488,8 @@ export default function OwnerStaffSchedules() {
                             </div>
 
                             <div>
-                                <label htmlFor="shift-break-mins" className="block font-semibold text-neutral-700 mb-1">Break Duration (mins)</label>
+                                <label className="block font-semibold text-neutral-700 mb-1">Break Duration (mins)</label>
                                 <input
-                                    id="shift-break-mins"
-                                    name="breakMins"
                                     type="number"
                                     value={shiftForm.breakMins}
                                     onChange={(e) => setShiftForm({ ...shiftForm, breakMins: Number(e.target.value) })}
@@ -517,10 +498,8 @@ export default function OwnerStaffSchedules() {
                             </div>
 
                             <div>
-                                <label htmlFor="shift-notes" className="block font-semibold text-neutral-700 mb-1">Shift Notes</label>
+                                <label className="block font-semibold text-neutral-700 mb-1">Shift Notes</label>
                                 <textarea
-                                    id="shift-notes"
-                                    name="notes"
                                     value={shiftForm.notes}
                                     onChange={(e) => setShiftForm({ ...shiftForm, notes: e.target.value })}
                                     rows={2}

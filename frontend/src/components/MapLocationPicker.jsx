@@ -1,9 +1,7 @@
 import { useEffect, useRef } from "react";
-import * as maplibreglRaw from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { MAP_CONFIG, parseAndValidateCoords } from "../utils/mapConfig";
-
-const maplibregl = maplibreglRaw.Map ? maplibreglRaw : (maplibreglRaw.default || maplibreglRaw);
+import { MAP_CONFIG } from "../utils/mapConfig";
 
 /**
  * MapLocationPicker - Interactive MapLibre Location Selector Component
@@ -24,17 +22,22 @@ export default function MapLocationPicker({
     const mapRef = useRef(null);
     const markerRef = useRef(null);
 
-    const validated = parseAndValidateCoords(latitude, longitude);
-    const hasValidCoords = Boolean(validated);
-    const centerLng = validated ? validated.lng : MAP_CONFIG.defaultCenter.lng;
-    const centerLat = validated ? validated.lat : MAP_CONFIG.defaultCenter.lat;
+    const hasValidCoords =
+        Number.isFinite(Number(latitude)) &&
+        Number.isFinite(Number(longitude)) &&
+        Number(latitude) >= -90 &&
+        Number(latitude) <= 90 &&
+        Number(longitude) >= -180 &&
+        Number(longitude) <= 180;
+
+    const centerLng = hasValidCoords ? Number(longitude) : MAP_CONFIG.defaultCenter.lng;
+    const centerLat = hasValidCoords ? Number(latitude) : MAP_CONFIG.defaultCenter.lat;
 
     useEffect(() => {
         if (!mapContainerRef.current) return;
 
         let map = null;
         let resizeObserver = null;
-        let tId = null;
 
         try {
             map = new maplibregl.Map({
@@ -43,7 +46,6 @@ export default function MapLocationPicker({
                 center: [centerLng, centerLat],
                 zoom: hasValidCoords ? 14 : 12,
                 attributionControl: true,
-                transformRequest: MAP_CONFIG.transformRequest,
             });
 
             mapRef.current = map;
@@ -88,7 +90,7 @@ export default function MapLocationPicker({
             requestAnimationFrame(() => {
                 map?.resize();
             });
-            tId = setTimeout(() => {
+            const tId = setTimeout(() => {
                 map?.resize();
             }, 100);
 
@@ -98,39 +100,35 @@ export default function MapLocationPicker({
                 });
                 resizeObserver.observe(mapContainerRef.current);
             }
+
+            return () => {
+                clearTimeout(tId);
+            };
         } catch (err) {
             console.warn("[MapLocationPicker] MapLibre initialization warning:", err?.message || err);
         }
 
         return () => {
-            if (tId) {
-                clearTimeout(tId);
-            }
             if (resizeObserver) {
                 resizeObserver.disconnect();
-                resizeObserver = null;
             }
             if (mapRef.current) {
-                try {
-                    mapRef.current.remove();
-                } catch {
-                    // ignore cleanup error if canvas already destroyed
-                }
+                mapRef.current.remove();
                 mapRef.current = null;
             }
-            markerRef.current = null;
         };
     }, []);
 
     // Update marker position if props change externally
     useEffect(() => {
         if (!mapRef.current || !markerRef.current) return;
-        const valid = parseAndValidateCoords(latitude, longitude);
-        if (valid) {
-            markerRef.current.setLngLat([valid.lng, valid.lat]);
-            mapRef.current.flyTo({ center: [valid.lng, valid.lat], zoom: 14 });
+        if (hasValidCoords) {
+            const nextLat = Number(latitude);
+            const nextLng = Number(longitude);
+            markerRef.current.setLngLat([nextLng, nextLat]);
+            mapRef.current.flyTo({ center: [nextLng, nextLat], zoom: 14 });
         }
-    }, [latitude, longitude]);
+    }, [latitude, longitude, hasValidCoords]);
 
     return (
         <div className="space-y-2">
@@ -144,11 +142,10 @@ export default function MapLocationPicker({
                 <p>Click map or drag pin to select location.</p>
                 {hasValidCoords && (
                     <span className="font-mono text-[11px] text-[#fe5102]">
-                        {validated.lat.toFixed(4)}, {validated.lng.toFixed(4)}
+                        {Number(latitude).toFixed(4)}, {Number(longitude).toFixed(4)}
                     </span>
                 )}
             </div>
         </div>
     );
 }
-

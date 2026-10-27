@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import * as maplibreglRaw from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-
-const maplibregl = maplibreglRaw.Map ? maplibreglRaw : (maplibreglRaw.default || maplibreglRaw);
 import {
     Menu,
     Search,
@@ -16,13 +14,10 @@ import {
     ExternalLink,
     Store,
     X,
-    Edit3,
-    Compass,
-    Check,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../utils/apiClient";
-import { MAP_CONFIG, parseAndValidateCoords } from "../../utils/mapConfig";
+import { MAP_CONFIG } from "../../utils/mapConfig";
 import SuperAdminSidebar from "../../components/super-admin/SuperAdminSidebar";
 
 /**
@@ -50,46 +45,6 @@ function createGeoJSONCircle(centerLat, centerLng, radiusKm, points = 64) {
     };
 }
 
-/**
- * Robust Client-Side Normalization for Restaurant Location Data.
- * Handles latitude/lat, longitude/lng/lon, string or number representations,
- * bounds checking (-90..90, -180..180), and non-zero validation.
- */
-export function normalizeRestaurant(r) {
-    if (!r) return null;
-
-    // Resolve latitude and longitude from all possible keys
-    const rawLat = r.latitude !== undefined && r.latitude !== null ? r.latitude : r.lat;
-    const rawLng = r.longitude !== undefined && r.longitude !== null
-        ? r.longitude
-        : (r.lng !== undefined && r.lng !== null ? r.lng : r.lon);
-
-    const validCoords = parseAndValidateCoords(rawLat, rawLng);
-    const isNotZeroZero = validCoords ? !(validCoords.lat === 0 && validCoords.lng === 0) : false;
-    const hasValidLocation = Boolean(validCoords && isNotZeroZero);
-
-    return {
-        ...r,
-        id: r.id,
-        name: r.name || "Unnamed Restaurant",
-        slug: r.slug || "",
-        latitude: hasValidLocation ? validCoords.lat : null,
-        longitude: hasValidLocation ? validCoords.lng : null,
-        rawLatitude: rawLat,
-        rawLongitude: rawLng,
-        hasValidLocation,
-        deliveryRadiusKm: Number(r.deliveryRadiusKm !== null && r.deliveryRadiusKm !== undefined ? r.deliveryRadiusKm : 5.0),
-        isActive: Boolean(r.isActive),
-        isOpen: Boolean(r.isOpen),
-        city: r.city || "",
-        state: r.state || "",
-        country: r.country || "India",
-        addressLine1: r.addressLine1 || "",
-        pincode: r.pincode || "",
-        phone: r.phone || "",
-    };
-}
-
 export default function SuperAdminRestaurantMap() {
     const navigate = useNavigate();
     const { logout } = useAuth();
@@ -113,22 +68,6 @@ export default function SuperAdminRestaurantMap() {
     const [statusFilter, setStatusFilter] = useState("all"); // 'all' | 'located' | 'missing' | 'active' | 'inactive'
     const [selectedRestaurant, setSelectedRestaurant] = useState(null);
 
-    // Location Configuration Modal State
-    const [editingRestaurant, setEditingRestaurant] = useState(null);
-    const [editForm, setEditForm] = useState({
-        addressLine1: "",
-        city: "",
-        state: "",
-        pincode: "",
-        country: "India",
-        latitude: "",
-        longitude: "",
-        deliveryRadiusKm: 5,
-    });
-    const [modalLoading, setModalLoading] = useState(false);
-    const [modalError, setModalError] = useState("");
-    const [modalSuccess, setModalSuccess] = useState("");
-
     // Map Refs
     const mapContainerRef = useRef(null);
     const mapRef = useRef(null);
@@ -136,43 +75,34 @@ export default function SuperAdminRestaurantMap() {
     const activePopupRef = useRef(null);
     const resizeObserverRef = useRef(null);
 
-    // Fetch Restaurant Map Data from backend with fallback support and robust normalization
+    // Fetch Restaurant Map Data from backend
     const loadMapData = useCallback(async () => {
         try {
             setLoading(true);
             setApiError("");
-            let data = null;
-            try {
-                const res = await api.get("/super-admin/restaurants/map");
-                data = res?.data?.data || res?.data || res;
-            } catch (mapApiErr) {
-                console.warn("[SuperAdminRestaurantMap] /map endpoint unavailable, trying fallback to /restaurants:", mapApiErr);
-                const fallbackRes = await api.get("/super-admin/restaurants");
-                data = fallbackRes?.data || fallbackRes;
+            const res = await api.get("/super-admin/restaurants/map");
+            const data = res?.data?.data || res?.data || res;
+            if (data?.restaurants) {
+                setRestaurants(data.restaurants);
+                setSummary({
+                    totalRestaurants: data.totalRestaurants ?? data.restaurants.length,
+                    locatedRestaurants: data.locatedRestaurants ?? data.restaurants.filter((r) => r.hasValidLocation).length,
+                    missingLocationRestaurants: data.missingLocationRestaurants ?? data.restaurants.filter((r) => !r.hasValidLocation).length,
+                    activeRestaurants: data.activeRestaurants ?? data.restaurants.filter((r) => r.isActive).length,
+                    inactiveRestaurants: data.inactiveRestaurants ?? data.restaurants.filter((r) => !r.isActive).length,
+                });
+            } else if (Array.isArray(data)) {
+                setRestaurants(data);
+                const located = data.filter((r) => r.hasValidLocation).length;
+                const active = data.filter((r) => r.isActive).length;
+                setSummary({
+                    totalRestaurants: data.length,
+                    locatedRestaurants: located,
+                    missingLocationRestaurants: data.length - located,
+                    activeRestaurants: active,
+                    inactiveRestaurants: data.length - active,
+                });
             }
-
-            const rawList = data?.restaurants || (Array.isArray(data) ? data : []);
-            const normalized = rawList.map(normalizeRestaurant).filter(Boolean);
-
-            const located = normalized.filter((r) => r.hasValidLocation).length;
-            const missing = normalized.filter((r) => !r.hasValidLocation).length;
-            const active = normalized.filter((r) => r.isActive).length;
-            const inactive = normalized.filter((r) => !r.isActive).length;
-
-            setRestaurants(normalized);
-            setSummary({
-                totalRestaurants: normalized.length,
-                locatedRestaurants: located,
-                missingLocationRestaurants: missing,
-                activeRestaurants: active,
-                inactiveRestaurants: inactive,
-            });
-
-            // Update selectedRestaurant reference if it was previously selected
-            setSelectedRestaurant((prev) => {
-                if (!prev) return null;
-                return normalized.find((r) => r.id === prev.id) || prev;
-            });
         } catch (err) {
             console.error("[SuperAdminRestaurantMap] Error fetching map data:", err);
             setApiError(err.response?.data?.message || "Failed to load restaurant locations.");
@@ -343,14 +273,6 @@ export default function SuperAdminRestaurantMap() {
         (restaurant) => {
             setSelectedRestaurant(restaurant);
 
-            // Scroll card into view in restaurant list if present
-            if (restaurant?.id) {
-                const cardEl = document.getElementById(`restaurant-card-${restaurant.id}`);
-                if (cardEl && typeof cardEl.scrollIntoView === "function") {
-                    cardEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
-                }
-            }
-
             if (!restaurant || !restaurant.hasValidLocation) {
                 // If no coordinates, clear radius and popup
                 updateRadiusLayer(null);
@@ -411,122 +333,6 @@ export default function SuperAdminRestaurantMap() {
         });
     }, [locatedRestaurants]);
 
-    // Open Location Configuration Modal for a restaurant
-    const handleOpenEditModal = (restaurant) => {
-        setEditingRestaurant(restaurant);
-        setEditForm({
-            addressLine1: restaurant.addressLine1 || "",
-            city: restaurant.city || "",
-            state: restaurant.state || "",
-            pincode: restaurant.pincode || "",
-            country: restaurant.country || "India",
-            latitude: restaurant.latitude !== null && restaurant.latitude !== undefined ? String(restaurant.latitude) : "",
-            longitude: restaurant.longitude !== null && restaurant.longitude !== undefined ? String(restaurant.longitude) : "",
-            deliveryRadiusKm: restaurant.deliveryRadiusKm || 5,
-        });
-        setModalError("");
-        setModalSuccess("");
-    };
-
-    // Geocode restaurant address via backend Nominatim proxy
-    const handleGeocodeInModal = async () => {
-        if (!editingRestaurant) return;
-        setModalLoading(true);
-        setModalError("");
-        setModalSuccess("");
-
-        try {
-            const query = [
-                editForm.addressLine1,
-                editForm.city,
-                editForm.state,
-                editForm.pincode,
-                editForm.country,
-            ].filter(Boolean).join(", ");
-
-            if (!query.trim()) {
-                setModalError("Please provide an address, city, or state to geocode.");
-                return;
-            }
-
-            const res = await api.post(`/super-admin/restaurants/${editingRestaurant.id}/geocode`, {
-                query,
-                save: false,
-            });
-
-            const data = res?.data || res;
-            if (data?.latitude && data?.longitude) {
-                setEditForm((prev) => ({
-                    ...prev,
-                    latitude: String(data.latitude),
-                    longitude: String(data.longitude),
-                }));
-                setModalSuccess(`Found coordinates: ${data.latitude}, ${data.longitude}`);
-            } else {
-                setModalError("No coordinates found for this address.");
-            }
-        } catch (err) {
-            console.error("Geocoding failed:", err);
-            setModalError(err.response?.data?.message || "Failed to geocode address.");
-        } finally {
-            setModalLoading(false);
-        }
-    };
-
-    // Save Location Configuration
-    const handleSaveLocation = async (e) => {
-        e.preventDefault();
-        if (!editingRestaurant) return;
-
-        setModalLoading(true);
-        setModalError("");
-        setModalSuccess("");
-
-        try {
-            const payload = {
-                addressLine1: editForm.addressLine1 || null,
-                city: editForm.city || null,
-                state: editForm.state || null,
-                country: editForm.country || "India",
-                pincode: editForm.pincode || null,
-                deliveryRadiusKm: Number(editForm.deliveryRadiusKm || 5),
-            };
-
-            if (editForm.latitude.trim() === "" || editForm.longitude.trim() === "") {
-                payload.latitude = null;
-                payload.longitude = null;
-            } else {
-                const lat = Number(editForm.latitude);
-                const lng = Number(editForm.longitude);
-                if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
-                    setModalError("Latitude must be a valid number between -90 and 90.");
-                    setModalLoading(false);
-                    return;
-                }
-                if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
-                    setModalError("Longitude must be a valid number between -180 and 180.");
-                    setModalLoading(false);
-                    return;
-                }
-                payload.latitude = lat;
-                payload.longitude = lng;
-            }
-
-            await api.patch(`/super-admin/restaurants/${editingRestaurant.id}`, payload);
-
-            setModalSuccess("Restaurant location updated successfully!");
-            setTimeout(() => {
-                setEditingRestaurant(null);
-                loadMapData();
-            }, 600);
-        } catch (err) {
-            console.error("Save location failed:", err);
-            setModalError(err.response?.data?.message || "Failed to update restaurant location.");
-        } finally {
-            setModalLoading(false);
-        }
-    };
-
     // Initialize MapLibre Map Instance
     const initMap = useCallback(() => {
         if (!mapContainerRef.current) return;
@@ -559,7 +365,6 @@ export default function SuperAdminRestaurantMap() {
                 center: initialCenter,
                 zoom: initialZoom,
                 attributionControl: true,
-                transformRequest: MAP_CONFIG.transformRequest,
             });
 
             map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-right");
@@ -634,52 +439,46 @@ export default function SuperAdminRestaurantMap() {
 
         locatedRestaurants.forEach((r) => {
             const el = document.createElement("div");
+            el.className = `tiffzy-admin-marker cursor-pointer transition-transform duration-200 hover:scale-125`;
+            el.style.zIndex = "10";
+
             const isSelected = selectedRestaurant?.id === r.id;
             const statusDotColor = r.isActive ? (r.isOpen ? "#059669" : "#D97706") : "#795548";
-            const pinBgColor = r.isActive ? "#FE5102" : "#78716C";
-            const pinStrokeColor = isSelected ? "#FFFFFF" : "#FFFFFF";
-            const pinStrokeWidth = isSelected ? "2.5" : "1.5";
-
-            el.className = `tiffzy-restaurant-marker tiffzy-admin-marker cursor-pointer ${
-                isSelected ? "tiffzy-marker-selected" : ""
-            } ${r.isActive ? "tiffzy-marker-active" : "tiffzy-marker-inactive"}`;
-            el.style.zIndex = isSelected ? "30" : "10";
-            el.setAttribute("role", "button");
-            el.setAttribute("tabindex", "0");
-            el.setAttribute("aria-label", `Restaurant: ${r.name}`);
-            el.setAttribute("title", `${r.name} (${r.city || "No City"}${r.state ? `, ${r.state}` : ""})`);
-            el.setAttribute("data-testid", `map-marker-${r.id}`);
-            el.id = `map-marker-${r.id}`;
 
             el.innerHTML = `
-                <div class="tiffzy-marker-pulse-wrapper">
-                    <div class="tiffzy-marker-pulse"></div>
-                </div>
-                <div class="tiffzy-marker-pin">
-                    <svg class="tiffzy-pin-svg" viewBox="0 0 38 48" width="38" height="48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <!-- Tiffzy Pin Silhouette -->
-                        <path
-                            d="M 19 46 C 16 39 4 25 4 16 A 15 15 0 1 1 34 16 C 34 25 22 39 19 46 Z"
-                            fill="${pinBgColor}"
-                            stroke="${pinStrokeColor}"
-                            stroke-width="${pinStrokeWidth}"
-                            stroke-linejoin="round"
-                        />
-                        <!-- White Restaurant Utensils / Store Icon -->
-                        <g transform="translate(11, 8)" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none" class="tiffzy-restaurant-icon" data-testid="restaurant-icon">
-                            <!-- Fork -->
-                            <path d="M12 1v4a2 2 0 0 1-2 2 2 2 0 0 1-2-2V1" />
-                            <path d="M10 1v7" />
-                            <path d="M10 8v7" />
-                            <!-- Knife -->
-                            <path d="M4 1v14" />
-                            <path d="M4 1a3.5 3.5 0 0 1 3.5 3.5v3.5a1.5 1.5 0 0 1-1.5 1.5H4" />
-                        </g>
-                    </svg>
-                    <!-- Status dot: Active Open (green) / Active Closed (amber) / Inactive (slate) -->
-                    <div class="tiffzy-marker-status-dot" style="background: ${statusDotColor};" title="${
-                        r.isActive ? (r.isOpen ? "Active & Open" : "Active & Closed") : "Inactive"
-                    }"></div>
+                <div style="position: relative; display: flex; align-items: center; justify-content: center;">
+                    <div style="
+                        background: ${isSelected ? "#FE5102" : "#FE5102"}; 
+                        color: #ffffff; 
+                        width: ${isSelected ? "38px" : "32px"}; 
+                        height: ${isSelected ? "38px" : "32px"}; 
+                        border-radius: 50%; 
+                        display: flex; 
+                        align-items: center; 
+                        justify-content: center; 
+                        box-shadow: ${isSelected ? "0 4px 16px rgba(254,81,2,0.5)" : "0 3px 10px rgba(43,23,16,0.25)"}; 
+                        border: ${isSelected ? "3px solid #FFFBF7" : "2.5px solid #ffffff"};
+                        transition: all 0.2s ease;
+                    ">
+                        <svg width="${isSelected ? "20" : "16"}" height="${isSelected ? "20" : "16"}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
+                            <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
+                            <line x1="6" y1="1" x2="6" y2="4"></line>
+                            <line x1="10" y1="1" x2="10" y2="4"></line>
+                            <line x1="14" y1="1" x2="14" y2="4"></line>
+                        </svg>
+                    </div>
+                    <div style="
+                        position: absolute; 
+                        top: -2px; 
+                        right: -2px; 
+                        width: 10px; 
+                        height: 10px; 
+                        border-radius: 50%; 
+                        background: ${statusDotColor}; 
+                        border: 2px solid #ffffff;
+                        box-shadow: 0 0 4px ${statusDotColor};
+                    "></div>
                 </div>
             `;
 
@@ -688,15 +487,7 @@ export default function SuperAdminRestaurantMap() {
                 focusRestaurant(r);
             });
 
-            el.addEventListener("keydown", (e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    focusRestaurant(r);
-                }
-            });
-
-            const marker = new maplibregl.Marker({ element: el, anchor: "bottom" })
+            const marker = new maplibregl.Marker({ element: el })
                 .setLngLat([r.longitude, r.latitude])
                 .addTo(map);
 
@@ -1003,13 +794,7 @@ export default function SuperAdminRestaurantMap() {
                                     None of the restaurants have valid latitude and longitude coordinates in the database.
                                 </p>
                                 <button
-                                    onClick={() => {
-                                        if (restaurants.length > 0) {
-                                            handleOpenEditModal(restaurants[0]);
-                                        } else {
-                                            navigate("/super-admin/restaurant-profiles");
-                                        }
-                                    }}
+                                    onClick={() => navigate("/super-admin/restaurant-profiles")}
                                     className="px-5 py-2.5 rounded-full text-xs font-bold text-white bg-[#FE5102] hover:bg-[#E04600] transition shadow-md shadow-orange-500/20 inline-flex items-center gap-2"
                                 >
                                     <Store size={14} /> Configure Restaurant Locations
@@ -1023,14 +808,8 @@ export default function SuperAdminRestaurantMap() {
                         <p className="text-[10px] uppercase tracking-wider font-extrabold text-[#795548] mb-1.5">MAP LEGEND</p>
                         <div className="flex flex-col gap-1.5">
                             <div className="flex items-center gap-2">
-                                <div className="relative w-4 h-5 flex items-center justify-center shrink-0">
-                                    <span className="w-3.5 h-3.5 rounded-full bg-[#FE5102]/25 animate-ping absolute inset-0 m-auto pointer-events-none"></span>
-                                    <svg viewBox="0 0 38 48" className="w-3.5 h-4.5 drop-shadow-xs relative z-1" fill="none">
-                                        <path d="M 19 46 C 16 39 4 25 4 16 A 15 15 0 1 1 34 16 C 34 25 22 39 19 46 Z" fill="#FE5102" stroke="#FFF" strokeWidth="2" />
-                                        <circle cx="19" cy="16" r="4.5" fill="#FFF" />
-                                    </svg>
-                                </div>
-                                <span className="text-[11px] font-semibold text-[#2B1710]">Tiffzy Restaurant Pin</span>
+                                <div className="w-3.5 h-3.5 rounded-full bg-[#FE5102] border-2 border-white flex items-center justify-center text-[8px] text-white">☕</div>
+                                <span className="text-[11px] font-semibold text-[#2B1710]">Restaurant Outlet</span>
                             </div>
                             <div className="flex items-center gap-2">
                                 <div className="w-2.5 h-2.5 rounded-full bg-[#059669] shadow-[0_0_4px_#059669]"></div>
@@ -1050,7 +829,7 @@ export default function SuperAdminRestaurantMap() {
                                 <div>
                                     <h3 className="text-sm font-black text-[#2B1710] leading-tight">{selectedRestaurant.name}</h3>
                                     <p className="text-[11px] text-[#795548]">
-                                        {selectedRestaurant.city || "No City"}{selectedRestaurant.state ? `, ${selectedRestaurant.state}` : ""}
+                                        {selectedRestaurant.city || "No city"}{selectedRestaurant.state ? `, ${selectedRestaurant.state}` : ""}
                                     </p>
                                 </div>
                                 <button
@@ -1066,7 +845,7 @@ export default function SuperAdminRestaurantMap() {
                                 </button>
                             </div>
 
-                            <div className="flex items-center gap-2 mb-3 flex-wrap">
+                            <div className="flex items-center gap-2 mb-3">
                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                     selectedRestaurant.isActive
                                         ? "bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]"
@@ -1097,37 +876,17 @@ export default function SuperAdminRestaurantMap() {
                                     Coordinates: {Number(selectedRestaurant.latitude).toFixed(4)}, {Number(selectedRestaurant.longitude).toFixed(4)}
                                 </p>
                             ) : (
-                                <div className="text-[11px] text-[#B45309] mb-3 bg-[#FEF9ED] p-2.5 rounded-xl border border-[#FDE68A] space-y-1">
-                                    <div className="font-bold flex items-center gap-1 text-[#D97706]">
-                                        <AlertTriangle size={13} />
-                                        <span>
-                                            {!selectedRestaurant.city && !selectedRestaurant.addressLine1
-                                                ? "Address & coordinates unavailable"
-                                                : "Missing latitude & longitude in database"}
-                                        </span>
-                                    </div>
-                                    <p className="text-[10px] text-[#795548] leading-tight">
-                                        {!selectedRestaurant.city && !selectedRestaurant.addressLine1
-                                            ? "No address or coordinates are set for this restaurant. Tap Configure Location to add coordinates."
-                                            : `Configured address: ${[selectedRestaurant.addressLine1, selectedRestaurant.city, selectedRestaurant.state].filter(Boolean).join(", ")}.`}
-                                    </p>
-                                </div>
+                                <p className="text-[11px] text-[#B45309] mb-3 bg-[#FEF9ED] p-2 rounded-lg border border-[#FDE68A]">
+                                    Coordinates are not set. This restaurant cannot be shown on the map or calculated for nearby delivery.
+                                </p>
                             )}
 
                             <div className="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => handleOpenEditModal(selectedRestaurant)}
-                                    className="flex-1 text-center py-2 px-3 rounded-xl bg-[#FFF3EB] hover:bg-[#FFE8D6] text-[#FE5102] border border-[#FED7AA] font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-xs"
-                                >
-                                    <MapPin size={13} />
-                                    <span>Configure Location</span>
-                                </button>
                                 <a
                                     href={`/super-admin/restaurant-profiles?q=${encodeURIComponent(selectedRestaurant.slug || selectedRestaurant.name)}`}
-                                    className="py-2 px-3 rounded-xl bg-[#FE5102] hover:bg-[#E04600] text-white font-bold text-xs transition shadow-md shadow-orange-500/20 flex items-center justify-center gap-1.5"
+                                    className="flex-1 text-center py-2 px-3 rounded-xl bg-[#FE5102] hover:bg-[#E04600] text-white font-bold text-xs transition shadow-md shadow-orange-500/20 flex items-center justify-center gap-1.5"
                                 >
-                                    <span>Profile</span>
+                                    <span>View Restaurant Profile</span>
                                     <ExternalLink size={13} />
                                 </a>
                             </div>
@@ -1172,8 +931,6 @@ export default function SuperAdminRestaurantMap() {
                                 return (
                                     <div
                                         key={r.id}
-                                        id={`restaurant-card-${r.id}`}
-                                        data-testid={`restaurant-card-${r.id}`}
                                         onClick={() => focusRestaurant(r)}
                                         className={`p-3 rounded-xl border text-left cursor-pointer transition-all duration-150 ${
                                             isSelected
@@ -1205,27 +962,13 @@ export default function SuperAdminRestaurantMap() {
                                                     <span>Radius: {r.deliveryRadiusKm || 5} km</span>
                                                 </div>
                                             ) : (
-                                                <div
-                                                    className="flex items-center gap-1 text-[#D97706] font-semibold bg-[#FEF9ED] px-2 py-0.5 rounded border border-[#FDE68A]"
-                                                    title={!r.city && !r.addressLine1 ? "No address or coordinates set" : "Address set but latitude/longitude not configured"}
-                                                >
+                                                <div className="flex items-center gap-1 text-[#D97706] font-semibold bg-[#FEF9ED] px-2 py-0.5 rounded border border-[#FDE68A]">
                                                     <AlertTriangle size={11} />
-                                                    <span>{!r.city && !r.addressLine1 ? "No Address / Coords" : "Missing Coordinates"}</span>
+                                                    <span>Missing Location</span>
                                                 </div>
                                             )}
 
-                                            <div className="flex items-center gap-1.5">
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleOpenEditModal(r);
-                                                    }}
-                                                    className="px-2 py-0.5 rounded text-[10px] font-bold text-[#795548] hover:text-[#FE5102] hover:bg-[#FFF3EB] border border-transparent hover:border-[#FED7AA] transition"
-                                                    title="Configure Restaurant Location"
-                                                >
-                                                    📍 Edit
-                                                </button>
+                                            <div className="flex items-center gap-2">
                                                 {r.hasValidLocation && (
                                                     <span className="text-[#FE5102] font-bold hover:underline">
                                                         Show &rarr;
@@ -1248,157 +991,6 @@ export default function SuperAdminRestaurantMap() {
                     </div>
                 </div>
             </div>
-
-            {/* Location Configuration Modal */}
-            {editingRestaurant && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-                    <div className="bg-[#FFFBF7] border border-[#E8D8CC] rounded-3xl max-w-lg w-full p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
-                        <div className="flex items-start justify-between gap-3 pb-3 border-b border-[#E8D8CC] mb-4">
-                            <div>
-                                <h3 className="text-base font-black text-[#2B1710]">Configure Restaurant Location</h3>
-                                <p className="text-xs text-[#795548]">
-                                    {editingRestaurant.name} &bull; /{editingRestaurant.slug}
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setEditingRestaurant(null)}
-                                className="text-[#795548] hover:text-[#2B1710] p-1.5 rounded-xl hover:bg-[#FFF3EB] transition"
-                            >
-                                <X size={18} />
-                            </button>
-                        </div>
-
-                        {modalError && (
-                            <div className="mb-4 rounded-xl bg-[#FEF2F2] border border-[#FCA5A5] p-3 text-[#991B1B] text-xs flex items-center gap-2">
-                                <AlertTriangle size={15} className="text-[#DC2626] shrink-0" />
-                                <span>{modalError}</span>
-                            </div>
-                        )}
-
-                        {modalSuccess && (
-                            <div className="mb-4 rounded-xl bg-[#ECFDF5] border border-[#A7F3D0] p-3 text-[#065F46] text-xs flex items-center gap-2">
-                                <Check size={15} className="text-[#059669] shrink-0" />
-                                <span>{modalSuccess}</span>
-                            </div>
-                        )}
-
-                        <form onSubmit={handleSaveLocation} className="space-y-3.5 text-xs">
-                            <div>
-                                <label className="block font-bold text-[#795548] mb-1">Street Address</label>
-                                <input
-                                    type="text"
-                                    value={editForm.addressLine1}
-                                    onChange={(e) => setEditForm({ ...editForm, addressLine1: e.target.value })}
-                                    placeholder="e.g. 123 MG Road, Floor 2"
-                                    className="w-full rounded-xl bg-white border border-[#E8D8CC] px-3 py-2 text-xs text-[#2B1710] outline-none focus:border-[#FE5102]"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2.5">
-                                <div>
-                                    <label className="block font-bold text-[#795548] mb-1">City</label>
-                                    <input
-                                        type="text"
-                                        value={editForm.city}
-                                        onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
-                                        placeholder="e.g. Bangalore"
-                                        className="w-full rounded-xl bg-white border border-[#E8D8CC] px-3 py-2 text-xs text-[#2B1710] outline-none focus:border-[#FE5102]"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block font-bold text-[#795548] mb-1">State</label>
-                                    <input
-                                        type="text"
-                                        value={editForm.state}
-                                        onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
-                                        placeholder="e.g. Karnataka"
-                                        className="w-full rounded-xl bg-white border border-[#E8D8CC] px-3 py-2 text-xs text-[#2B1710] outline-none focus:border-[#FE5102]"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2.5">
-                                <div>
-                                    <label className="block font-bold text-[#795548] mb-1">Postal Code</label>
-                                    <input
-                                        type="text"
-                                        value={editForm.pincode}
-                                        onChange={(e) => setEditForm({ ...editForm, pincode: e.target.value })}
-                                        placeholder="e.g. 560001"
-                                        className="w-full rounded-xl bg-white border border-[#E8D8CC] px-3 py-2 text-xs text-[#2B1710] outline-none focus:border-[#FE5102]"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block font-bold text-[#795548] mb-1">Delivery Radius (km)</label>
-                                    <input
-                                        type="number"
-                                        step="0.5"
-                                        min="0.5"
-                                        max="50"
-                                        value={editForm.deliveryRadiusKm}
-                                        onChange={(e) => setEditForm({ ...editForm, deliveryRadiusKm: e.target.value })}
-                                        className="w-full rounded-xl bg-white border border-[#E8D8CC] px-3 py-2 text-xs text-[#2B1710] outline-none focus:border-[#FE5102]"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Geocode helper action */}
-                            <div className="pt-1">
-                                <button
-                                    type="button"
-                                    onClick={handleGeocodeInModal}
-                                    disabled={modalLoading || (!editForm.city && !editForm.addressLine1)}
-                                    className="w-full py-2 px-3 rounded-xl bg-[#FFF3EB] hover:bg-[#FFE8D6] text-[#FE5102] border border-[#FED7AA] font-bold text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50"
-                                >
-                                    <Compass size={14} className={modalLoading ? "animate-spin" : ""} />
-                                    <span>Geocode Address via OpenStreetMap Nominatim</span>
-                                </button>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2.5 pt-1">
-                                <div>
-                                    <label className="block font-bold text-[#795548] mb-1">Latitude (-90 to 90)</label>
-                                    <input
-                                        type="text"
-                                        value={editForm.latitude}
-                                        onChange={(e) => setEditForm({ ...editForm, latitude: e.target.value })}
-                                        placeholder="e.g. 12.9750"
-                                        className="w-full rounded-xl bg-white border border-[#E8D8CC] px-3 py-2 text-xs font-mono text-[#2B1710] outline-none focus:border-[#FE5102]"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block font-bold text-[#795548] mb-1">Longitude (-180 to 180)</label>
-                                    <input
-                                        type="text"
-                                        value={editForm.longitude}
-                                        onChange={(e) => setEditForm({ ...editForm, longitude: e.target.value })}
-                                        placeholder="e.g. 77.5900"
-                                        className="w-full rounded-xl bg-white border border-[#E8D8CC] px-3 py-2 text-xs font-mono text-[#2B1710] outline-none focus:border-[#FE5102]"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="pt-3 border-t border-[#E8D8CC] flex items-center justify-end gap-2.5">
-                                <button
-                                    type="button"
-                                    onClick={() => setEditingRestaurant(null)}
-                                    className="px-4 py-2 rounded-xl border border-[#E8D8CC] text-[#795548] hover:bg-gray-100 font-bold transition"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={modalLoading}
-                                    className="px-5 py-2 rounded-xl bg-[#FE5102] hover:bg-[#E04600] text-white font-bold transition shadow-md shadow-orange-500/20 disabled:opacity-50"
-                                >
-                                    {modalLoading ? "Saving..." : "Save Location"}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

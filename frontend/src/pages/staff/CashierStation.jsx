@@ -729,20 +729,20 @@ export default function CashierStation() {
                     {currentShift ? (
                         <div
                             onClick={() => setStationView("shift")}
-                            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs font-bold cursor-pointer hover:bg-emerald-900/40 transition"
+                            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold cursor-pointer hover:bg-emerald-100 transition"
                             title="Shift is OPEN. Click to inspect cash drawer"
                         >
-                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                             <span>DRAWER OPEN</span>
-                            <span className="text-white font-black">₹{currentShift.expectedCash}</span>
+                            <span className="text-[#171717] font-black">₹{currentShift.expectedCash}</span>
                         </div>
                     ) : (
                         <button
                             type="button"
                             onClick={() => setShowOpenShiftModal(true)}
-                            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold hover:bg-amber-500/30 transition"
+                            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-800 text-xs font-bold hover:bg-amber-100 transition"
                         >
-                            <Unlock className="w-3.5 h-3.5 text-amber-400" />
+                            <Unlock className="w-3.5 h-3.5 text-amber-600" />
                             <span>OPEN SHIFT</span>
                         </button>
                     )}
@@ -752,11 +752,11 @@ export default function CashierStation() {
                         <button
                             type="button"
                             onClick={() => handlePrintReceipt(lastSettledOrder)}
-                            className="p-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 transition min-h-[44px] min-w-[44px] flex items-center justify-center border border-neutral-700"
+                            className="p-2.5 rounded-xl bg-white hover:bg-[#FFF7ED] text-[#171717] transition min-h-[40px] min-w-[40px] flex items-center justify-center border border-[#E7E5E4]"
                             title="Reprint last thermal receipt"
                             aria-label="Reprint receipt"
                         >
-                            <Printer className="w-4 h-4 text-orange-400" />
+                            <Printer className="w-4 h-4 text-[#EA580C]" />
                         </button>
                     )}
 
@@ -764,7 +764,7 @@ export default function CashierStation() {
                     <button
                         type="button"
                         onClick={refreshAll}
-                        className="p-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 transition min-h-[44px] min-w-[44px] flex items-center justify-center border border-neutral-700"
+                        className="p-2.5 rounded-xl bg-white hover:bg-[#FFF7ED] text-[#171717] transition min-h-[40px] min-w-[40px] flex items-center justify-center border border-[#E7E5E4]"
                         title="Refresh bills and table state"
                         aria-label="Refresh workstation"
                     >
@@ -777,23 +777,23 @@ export default function CashierStation() {
             {stationView === "terminal" && (
                 <div className="space-y-4">
                     {/* TOP STATUS BAR: Connection, Drawer Quick Status, Summary Counter */}
-                    <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div className="bg-white border border-[#E7E5E4] rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs">
                         <div className="flex items-center gap-4 flex-wrap">
                             {/* Online / Realtime Status */}
                             <div className="flex items-center gap-1.5 font-bold">
-                                <span className={`w-2.5 h-2.5 rounded-full ${isConnected ? "bg-emerald-400 shadow-sm shadow-emerald-500" : "bg-rose-500 shadow-sm shadow-rose-500"}`} />
-                                <span className={isConnected ? "text-emerald-400 font-extrabold uppercase tracking-wider" : "text-rose-400 font-extrabold uppercase tracking-wider"}>
+                                <span className={`w-2.5 h-2.5 rounded-full ${isConnected ? "bg-emerald-500 shadow-xs" : "bg-rose-500 shadow-xs"}`} />
+                                <span className={isConnected ? "text-emerald-700 font-extrabold uppercase tracking-wider" : "text-rose-700 font-extrabold uppercase tracking-wider"}>
                                     {isConnected ? "ONLINE • REALTIME POS" : "OFFLINE • SYNC PENDING"}
                                 </span>
                             </div>
 
-                            <span className="text-neutral-700 hidden sm:inline">|</span>
+                            <span className="text-stone-300 hidden sm:inline">|</span>
 
                             {/* Active Metrics */}
-                            <div className="flex items-center gap-3 text-neutral-300">
-                                <span>Unpaid Bills: <strong className="text-white font-extrabold">{orders.length}</strong></span>
-                                <span>Total Pending: <strong className="text-orange-400 font-extrabold">₹{orders.reduce((sum, o) => sum + getAuthoritativeTotal(o), 0)}</strong></span>
-                                <span className="hidden md:inline">Occupied Tables: <strong className="text-white font-bold">{occupiedCount}</strong></span>
+                            <div className="flex items-center gap-3 text-[#57534E]">
+                                <span>Unpaid Bills: <strong className="text-[#171717] font-extrabold">{orders.length}</strong></span>
+                                <span>Total Pending: <strong className="text-[#EA580C] font-extrabold">₹{orders.reduce((sum, o) => sum + getAuthoritativeTotal(o), 0)}</strong></span>
+                                <span className="hidden md:inline">Occupied Tables: <strong className="text-[#171717] font-bold">{occupiedCount}</strong></span>
                             </div>
                         </div>
 
@@ -807,9 +807,9 @@ export default function CashierStation() {
                                             setCashMovementType("CASH_IN");
                                             setShowCashMovementModal(true);
                                         }}
-                                        className="px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 font-semibold flex items-center gap-1 transition border border-neutral-700"
+                                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-[#FFF7ED] text-[#171717] font-semibold flex items-center gap-1 transition border border-[#E7E5E4]"
                                     >
-                                        <PlusCircle className="w-3.5 h-3.5 text-emerald-400" />
+                                        <PlusCircle className="w-3.5 h-3.5 text-emerald-600" />
                                         <span>+ Cash In</span>
                                     </button>
                                     <button
@@ -818,9 +818,9 @@ export default function CashierStation() {
                                             setCashMovementType("CASH_OUT");
                                             setShowCashMovementModal(true);
                                         }}
-                                        className="px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 font-semibold flex items-center gap-1 transition border border-neutral-700"
+                                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-[#FFF7ED] text-[#171717] font-semibold flex items-center gap-1 transition border border-[#E7E5E4]"
                                     >
-                                        <MinusCircle className="w-3.5 h-3.5 text-rose-400" />
+                                        <MinusCircle className="w-3.5 h-3.5 text-rose-600" />
                                         <span>- Cash Out</span>
                                     </button>
                                 </>
@@ -828,7 +828,7 @@ export default function CashierStation() {
                                 <button
                                     type="button"
                                     onClick={() => setShowOpenShiftModal(true)}
-                                    className="px-3 py-1 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold flex items-center gap-1 transition"
+                                    className="px-3 py-1 rounded-lg bg-[#F97316] hover:bg-[#EA580C] text-white font-bold flex items-center gap-1 transition shadow-xs"
                                 >
                                     <Unlock className="w-3.5 h-3.5" />
                                     <span>Open Shift</span>
@@ -839,13 +839,13 @@ export default function CashierStation() {
 
                     {/* MAIN TWO-COLUMN POS WORKSPACE */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-                        {/* LEFT COLUMN: Table Strip & Active Bills Queue (5 cols on wide, 6 on regular) */}
+                        {/* LEFT COLUMN: Table Strip & Active Bills Queue */}
                         <div className={`lg:col-span-5 xl:col-span-5 space-y-3 ${selectedOrder ? "hidden lg:block" : "block"}`}>
                             {/* FLOOR / TABLE STATUS STRIP */}
-                            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3 space-y-2.5">
+                            <div className="bg-white border border-[#E7E5E4] rounded-xl p-3 space-y-2.5 shadow-xs">
                                 <div className="flex items-center justify-between text-xs">
-                                    <span className="font-extrabold text-white uppercase tracking-wider flex items-center gap-1.5">
-                                        <Layers className="w-3.5 h-3.5 text-orange-400" />
+                                    <span className="font-extrabold text-[#171717] uppercase tracking-wider flex items-center gap-1.5">
+                                        <Layers className="w-3.5 h-3.5 text-[#EA580C]" />
                                         Table Floor Map ({tableStripData.length})
                                     </span>
                                     {/* Table Filters */}
@@ -862,8 +862,8 @@ export default function CashierStation() {
                                                 onClick={() => setTableFilter(tf.id)}
                                                 className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition ${
                                                     tableFilter === tf.id
-                                                        ? "bg-orange-600 text-white"
-                                                        : "text-neutral-400 hover:text-white hover:bg-neutral-800"
+                                                        ? "bg-[#F97316] text-white shadow-xs"
+                                                        : "text-[#57534E] hover:text-[#171717] hover:bg-stone-100"
                                                 }`}
                                             >
                                                 {tf.label}
@@ -875,7 +875,7 @@ export default function CashierStation() {
                                 {/* Horizontal Scrollable Table Badges */}
                                 <div className="flex gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin">
                                     {filteredTables.length === 0 ? (
-                                        <div className="py-2 text-xs text-neutral-400 italic">No tables match filter</div>
+                                        <div className="py-2 text-xs text-[#78716C] italic">No tables match filter</div>
                                     ) : (
                                         filteredTables.map((t) => {
                                             const hasActiveOrder = Boolean(t.activeOrder);
@@ -899,20 +899,20 @@ export default function CashierStation() {
                                                     }}
                                                     className={`px-2.5 py-1.5 rounded-xl border text-left shrink-0 transition flex flex-col justify-between min-w-[76px] ${
                                                         isSelected
-                                                            ? "bg-orange-600 border-orange-400 text-white shadow-md shadow-orange-900/30"
+                                                            ? "bg-[#F97316] border-[#EA580C] text-white shadow-xs"
                                                             : isBilling
-                                                            ? "bg-amber-950/70 border-amber-500/60 text-amber-200 animate-pulse"
+                                                            ? "bg-amber-50 border-amber-300 text-amber-900 animate-pulse"
                                                             : hasActiveOrder
-                                                            ? "bg-neutral-800/90 border-neutral-700 text-neutral-100 hover:border-neutral-600"
+                                                            ? "bg-[#FFF7ED] border-orange-200 text-[#171717] hover:border-orange-300"
                                                             : t.isOccupied
-                                                            ? "bg-neutral-900 border-neutral-800 text-neutral-300"
-                                                            : "bg-neutral-950/80 border-neutral-800/60 text-neutral-400 hover:border-neutral-700"
+                                                            ? "bg-sky-50 border-sky-200 text-sky-900"
+                                                            : "bg-stone-50 border-[#E7E5E4] text-[#57534E] hover:border-stone-300"
                                                     }`}
                                                 >
                                                     <div className="flex items-center justify-between gap-1">
                                                         <span className="font-black text-xs">T-{t.tableNo || "?"}</span>
                                                         <span className={`w-2 h-2 rounded-full ${
-                                                            isBilling ? "bg-amber-400" : hasActiveOrder ? "bg-orange-400" : t.isOccupied ? "bg-sky-400" : "bg-emerald-500"
+                                                            isBilling ? "bg-amber-500" : hasActiveOrder ? "bg-[#F97316]" : t.isOccupied ? "bg-sky-500" : "bg-emerald-500"
                                                         }`} />
                                                     </div>
                                                     <div className="text-[10px] font-bold mt-1">
@@ -926,28 +926,23 @@ export default function CashierStation() {
                             </div>
 
                             {/* UNPAID BILLS QUEUE */}
-                            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3 space-y-3">
+                            <div className="bg-white border border-[#E7E5E4] rounded-xl p-3 space-y-3 shadow-xs">
                                 {/* Search and Filter Tabs */}
                                 <div className="space-y-2">
                                     <div className="relative w-full">
-                                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#78716C]" />
                                         <input
-                                            id="cashier-unpaid-bills-search"
-                                            name="cashierBillsSearch"
-                                            aria-label="Search table, bill #, phone, customer"
                                             type="text"
                                             placeholder="Search table, bill #, phone, customer..."
                                             value={searchQuery}
                                             onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-orange-500 min-h-[40px]"
+                                            className="w-full bg-white border border-[#E7E5E4] rounded-xl pl-9 pr-8 py-2 text-xs text-[#171717] placeholder-[#78716C] focus:outline-hidden focus:border-[#F97316] min-h-[40px]"
                                         />
                                         {searchQuery && (
                                             <button
                                                 type="button"
                                                 onClick={() => setSearchQuery("")}
-                                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white cursor-pointer"
-                                                title="Clear search"
-                                                aria-label="Clear search"
+                                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#78716C] hover:text-[#171717]"
                                             >
                                                 <X className="w-3.5 h-3.5" />
                                             </button>
@@ -969,8 +964,8 @@ export default function CashierStation() {
                                                 onClick={() => setOrderFilter(f.id)}
                                                 className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition ${
                                                     orderFilter === f.id
-                                                        ? "bg-orange-600 text-white shadow-sm"
-                                                        : "bg-neutral-950 text-neutral-300 hover:bg-neutral-800 border border-neutral-800/80"
+                                                        ? "bg-[#F97316] text-white shadow-xs"
+                                                        : "bg-stone-100 text-[#57534E] hover:bg-stone-200 border border-[#E7E5E4]"
                                                 }`}
                                             >
                                                 {f.label}
@@ -982,12 +977,12 @@ export default function CashierStation() {
                                 {/* Active Orders List */}
                                 <div className="space-y-2 max-h-[calc(100vh-320px)] overflow-y-auto pr-1 scrollbar-thin">
                                     {loadingOrders ? (
-                                        <div className="py-12 text-center text-xs text-neutral-400">Loading active bills...</div>
+                                        <div className="py-12 text-center text-xs text-[#78716C]">Loading active bills...</div>
                                     ) : filteredOrders.length === 0 ? (
-                                        <div className="py-12 text-center bg-neutral-950/60 rounded-xl border border-neutral-800/80 p-4">
-                                            <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2 opacity-80" />
-                                            <p className="text-xs font-bold text-neutral-200">No Unpaid Bills Found</p>
-                                            <p className="text-[11px] text-neutral-400 mt-0.5">All tables and takeaway orders are currently settled.</p>
+                                        <div className="py-12 text-center bg-[#FFF7ED]/50 rounded-xl border border-[#E7E5E4] p-4">
+                                            <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto mb-2 opacity-80" />
+                                            <p className="text-xs font-bold text-[#171717]">No Unpaid Bills Found</p>
+                                            <p className="text-[11px] text-[#57534E] mt-0.5">All tables and takeaway orders are currently settled.</p>
                                         </div>
                                     ) : (
                                         filteredOrders.map((o) => {
@@ -1005,16 +1000,16 @@ export default function CashierStation() {
                                                     tabIndex={0}
                                                     className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
                                                         isSelected
-                                                            ? "bg-neutral-800/90 border-orange-500 shadow-md ring-1 ring-orange-500"
-                                                            : "bg-neutral-950/90 border-neutral-800 hover:border-neutral-700 hover:bg-neutral-900"
+                                                            ? "bg-[#FFF7ED] border-[#F97316] shadow-xs ring-1 ring-[#F97316]"
+                                                            : "bg-white border-[#E7E5E4] hover:border-stone-300 hover:bg-stone-50/60"
                                                     }`}
                                                 >
                                                     <div className="flex items-start justify-between gap-2">
                                                         <div className="flex items-center gap-2">
                                                             <span className={`px-2 py-0.5 rounded-lg text-xs font-black ${
                                                                 isSelected
-                                                                    ? "bg-orange-600 text-white"
-                                                                    : "bg-neutral-800 text-orange-400 border border-neutral-700"
+                                                                    ? "bg-[#F97316] text-white"
+                                                                    : "bg-stone-100 text-[#EA580C] border border-[#E7E5E4]"
                                                             }`}>
                                                                 {orderType === "TAKEAWAY"
                                                                     ? `Takeaway #${o.orderNo || o.id}`
@@ -1022,34 +1017,34 @@ export default function CashierStation() {
                                                             </span>
 
                                                             {isBillReq && (
-                                                                <span className="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
+                                                                <span className="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-50 text-amber-800 border border-amber-300 animate-pulse">
                                                                     BILL REQUESTED
                                                                 </span>
                                                             )}
                                                         </div>
 
                                                         <div className="text-right">
-                                                            <span className="text-base font-black text-white">₹{total}</span>
+                                                            <span className="text-base font-black text-[#171717]">₹{total}</span>
                                                         </div>
                                                     </div>
 
                                                     {/* Middle Info: Bill ID, Customer, Server */}
-                                                    <div className="flex items-center justify-between text-[11px] text-neutral-400 mt-2">
+                                                    <div className="flex items-center justify-between text-[11px] text-[#57534E] mt-2">
                                                         <div className="truncate max-w-[200px]">
-                                                            <span className="text-neutral-300 font-semibold">Bill #{o.orderNo || o.id}</span>
+                                                            <span className="text-[#171717] font-semibold">Bill #{o.orderNo || o.id}</span>
                                                             {o.customer?.name && (
-                                                                <span className="ml-1.5 text-neutral-400">• {o.customer.name}</span>
+                                                                <span className="ml-1.5 text-[#57534E]">• {o.customer.name}</span>
                                                             )}
                                                         </div>
-                                                        <div className="text-neutral-400 flex items-center gap-1">
-                                                            <Clock className="w-3 h-3 text-neutral-400" />
+                                                        <div className="text-[#57534E] flex items-center gap-1">
+                                                            <Clock className="w-3 h-3 text-[#78716C]" />
                                                             <span>{o.createdAt ? new Date(o.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</span>
                                                         </div>
                                                     </div>
 
                                                     {/* Items Summary Snippet */}
                                                     {Array.isArray(o.items) && o.items.length > 0 && (
-                                                        <div className="mt-2 text-[11px] text-neutral-300 line-clamp-1 bg-neutral-900/60 px-2 py-1 rounded-md border border-neutral-800/60">
+                                                        <div className="mt-2 text-[11px] text-[#57534E] line-clamp-1 bg-stone-100 px-2 py-1 rounded-md border border-[#E7E5E4]">
                                                             {o.items.map((it) => `${it.qty || it.quantity || 1}x ${it.name || it.itemName}`).join(", ")}
                                                         </div>
                                                     )}
@@ -1064,44 +1059,44 @@ export default function CashierStation() {
                         {/* RIGHT COLUMN: Selected Bill Workstation & Checkout Pane (7 cols on wide) */}
                         <div className={`lg:col-span-7 xl:col-span-7 ${!selectedOrder ? "hidden lg:block" : "block"}`}>
                             {selectedOrder ? (
-                                <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
+                                <div className="bg-white border border-[#E7E5E4] rounded-xl p-4 sm:p-5 shadow-xs space-y-4">
                                     {/* Mobile Back to Bills Queue Button */}
                                     <button
                                         type="button"
                                         onClick={() => setSelectedOrder(null)}
-                                        className="lg:hidden inline-flex items-center gap-1.5 text-xs font-bold text-orange-400 hover:text-orange-300 py-1.5 px-3 rounded-xl bg-neutral-800 border border-neutral-700 min-h-[44px] transition mb-1"
+                                        className="lg:hidden inline-flex items-center gap-1.5 text-xs font-bold text-[#EA580C] hover:text-[#C2410C] py-1.5 px-3 rounded-xl bg-white border border-[#E7E5E4] min-h-[40px] transition mb-1"
                                     >
                                         <ArrowLeft className="w-4 h-4" />
                                         <span>← Back to Bills Queue</span>
                                     </button>
 
                                     {/* BILL HEADER & FAST ACTIONS */}
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800 pb-3">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E7E5E4] pb-3">
                                         <div>
                                             <div className="flex items-center gap-2">
-                                                <span className="px-3 py-1 rounded-xl bg-orange-600 text-white font-black text-sm">
+                                                <span className="px-3 py-1 rounded-xl bg-[#F97316] text-white font-black text-sm">
                                                     Table {selectedOrder.tableNo || "T-?"}
                                                 </span>
-                                                <h2 className="font-black text-white text-lg">
+                                                <h2 className="font-black text-[#171717] text-lg">
                                                     Bill #{selectedOrder.orderNo || selectedOrder.id}
                                                 </h2>
-                                                <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-neutral-800 text-neutral-300 border border-neutral-700">
+                                                <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-stone-100 text-[#57534E] border border-[#E7E5E4]">
                                                     {selectedOrder.orderType || selectedOrder.type || "DINE_IN"}
                                                 </span>
                                             </div>
 
-                                            <div className="text-xs text-neutral-300 mt-1.5 flex items-center gap-2 flex-wrap">
-                                                <span>Customer: <strong className="text-white">{selectedOrder.customer?.name || "Walk-in Guest"}</strong></span>
+                                            <div className="text-xs text-[#57534E] mt-1.5 flex items-center gap-2 flex-wrap">
+                                                <span>Customer: <strong className="text-[#171717]">{selectedOrder.customer?.name || "Walk-in Guest"}</strong></span>
                                                 {selectedOrder.customer?.phone && (
                                                     <>
-                                                        <span className="text-neutral-600">•</span>
+                                                        <span className="text-stone-300">•</span>
                                                         <span>{selectedOrder.customer.phone}</span>
                                                     </>
                                                 )}
                                                 {selectedOrder.serverName && (
                                                     <>
-                                                        <span className="text-neutral-600">•</span>
-                                                        <span>Server: <strong className="text-white">{selectedOrder.serverName}</strong></span>
+                                                        <span className="text-stone-300">•</span>
+                                                        <span>Server: <strong className="text-[#171717]">{selectedOrder.serverName}</strong></span>
                                                     </>
                                                 )}
                                             </div>
@@ -1113,10 +1108,10 @@ export default function CashierStation() {
                                             <button
                                                 type="button"
                                                 onClick={() => handlePrintEstimate(selectedOrder)}
-                                                className="px-2.5 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-bold flex items-center gap-1.5 transition border border-neutral-700 min-h-[38px]"
+                                                className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-[#FFF7ED] text-[#171717] text-xs font-bold flex items-center gap-1.5 transition border border-[#E7E5E4] min-h-[38px]"
                                                 title="Print Pre-Bill estimate slip for guest presentation"
                                             >
-                                                <Printer className="w-3.5 h-3.5 text-neutral-300" />
+                                                <Printer className="w-3.5 h-3.5 text-[#57534E]" />
                                                 <span>Pre-Bill</span>
                                             </button>
 
@@ -1125,10 +1120,10 @@ export default function CashierStation() {
                                                 type="button"
                                                 data-testid="open-split-modal-btn"
                                                 onClick={() => setShowSplitModal(true)}
-                                                className="px-2.5 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-bold flex items-center gap-1.5 transition border border-neutral-700 min-h-[38px]"
+                                                className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-[#FFF7ED] text-[#171717] text-xs font-bold flex items-center gap-1.5 transition border border-[#E7E5E4] min-h-[38px]"
                                                 title="Open Split Billing Modal"
                                             >
-                                                <Layers className="w-3.5 h-3.5 text-sky-400" />
+                                                <Layers className="w-3.5 h-3.5 text-sky-600" />
                                                 <span>Split</span>
                                             </button>
 
@@ -1137,17 +1132,17 @@ export default function CashierStation() {
                                                 type="button"
                                                 data-testid="request-discount-btn"
                                                 onClick={() => setShowDiscountModal(true)}
-                                                className="px-2.5 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-bold flex items-center gap-1.5 transition border border-neutral-700 min-h-[38px]"
+                                                className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-[#FFF7ED] text-[#171717] text-xs font-bold flex items-center gap-1.5 transition border border-[#E7E5E4] min-h-[38px]"
                                             >
-                                                <Percent className="w-3.5 h-3.5 text-orange-400" />
+                                                <Percent className="w-3.5 h-3.5 text-[#EA580C]" />
                                                 <span>Discount</span>
                                             </button>
                                         </div>
                                     </div>
 
                                     {/* ITEMIZED BILL LEDGER */}
-                                    <div className="bg-neutral-950 rounded-xl p-3 border border-neutral-800 space-y-2">
-                                        <div className="flex justify-between items-center text-[11px] font-extrabold text-neutral-400 uppercase tracking-wider pb-1.5 border-b border-neutral-800/80">
+                                    <div className="bg-stone-50 rounded-xl p-3 border border-[#E7E5E4] space-y-2">
+                                        <div className="flex justify-between items-center text-[11px] font-extrabold text-[#57534E] uppercase tracking-wider pb-1.5 border-b border-[#E7E5E4]">
                                             <span>Item & Details</span>
                                             <div className="flex items-center gap-8">
                                                 <span>Qty x Price</span>
@@ -1155,7 +1150,7 @@ export default function CashierStation() {
                                             </div>
                                         </div>
 
-                                        <div className="divide-y divide-neutral-900/80 max-h-44 overflow-y-auto pr-1 scrollbar-thin">
+                                        <div className="divide-y divide-[#E7E5E4] max-h-44 overflow-y-auto pr-1 scrollbar-thin">
                                             {(selectedOrder.items || []).map((item, idx) => {
                                                 const qty = item.qty || item.quantity || 1;
                                                 const unitPrice = Number(item.price || 0);
@@ -1164,21 +1159,21 @@ export default function CashierStation() {
                                                 return (
                                                     <div key={idx} className="py-2 flex items-center justify-between text-xs">
                                                         <div className="pr-2">
-                                                            <div className="font-bold text-white text-xs">
+                                                            <div className="font-bold text-[#171717] text-xs">
                                                                 {item.name || item.itemName}
                                                             </div>
                                                             {item.notes && (
-                                                                <div className="text-[10px] text-orange-400 italic">
+                                                                <div className="text-[10px] text-[#EA580C] italic">
                                                                     Note: {item.notes}
                                                                 </div>
                                                             )}
                                                         </div>
 
                                                         <div className="flex items-center gap-8 shrink-0">
-                                                            <span className="text-neutral-400 text-xs">
+                                                            <span className="text-[#57534E] text-xs">
                                                                 {qty} × ₹{unitPrice}
                                                             </span>
-                                                            <span className="font-extrabold text-white text-xs w-16 text-right">
+                                                            <span className="font-extrabold text-[#171717] text-xs w-16 text-right">
                                                                 ₹{lineTotal}
                                                             </span>
                                                         </div>
@@ -1188,37 +1183,37 @@ export default function CashierStation() {
                                         </div>
 
                                         {/* FINANCIAL TOTALS LEDGER */}
-                                        <div className="border-t border-neutral-800 pt-2.5 space-y-1.5 text-xs">
-                                            <div className="flex justify-between text-neutral-300">
+                                        <div className="border-t border-[#E7E5E4] pt-2.5 space-y-1.5 text-xs">
+                                            <div className="flex justify-between text-[#57534E]">
                                                 <span>Subtotal</span>
-                                                <span className="font-semibold text-white">₹{selectedOrder.subtotal || billTotal}</span>
+                                                <span className="font-semibold text-[#171717]">₹{selectedOrder.subtotal || billTotal}</span>
                                             </div>
 
                                             {Number(selectedOrder.discountAmount || 0) > 0 && (
-                                                <div className="flex justify-between text-emerald-400 font-bold">
+                                                <div className="flex justify-between text-emerald-700 font-bold">
                                                     <span>Manager Approved Discount</span>
                                                     <span>-₹{selectedOrder.discountAmount}</span>
                                                 </div>
                                             )}
 
                                             {Number(selectedOrder.taxAmount || 0) > 0 && (
-                                                <div className="flex justify-between text-neutral-300">
+                                                <div className="flex justify-between text-[#57534E]">
                                                     <span>Taxes (GST/CGST/SGST)</span>
                                                     <span>₹{selectedOrder.taxAmount}</span>
                                                 </div>
                                             )}
 
                                             {Number(selectedOrder.serviceChargeAmount || 0) > 0 && (
-                                                <div className="flex justify-between text-neutral-300">
+                                                <div className="flex justify-between text-[#57534E]">
                                                     <span>Service Charge</span>
                                                     <span>₹{selectedOrder.serviceChargeAmount}</span>
                                                 </div>
                                             )}
 
                                             {/* AUTHORITATIVE GRAND TOTAL */}
-                                            <div className="flex justify-between items-center text-lg font-black text-white pt-2 border-t border-neutral-800 bg-neutral-900/60 p-2.5 rounded-xl">
-                                                <span className="text-xs uppercase tracking-wider text-neutral-400">Total Authoritative Due</span>
-                                                <span data-testid="authoritative-grand-total" className="text-2xl font-black text-orange-400">
+                                            <div className="flex justify-between items-center text-lg font-black text-[#171717] pt-2 border-t border-[#E7E5E4] bg-[#FFF7ED] p-2.5 rounded-xl border border-orange-200">
+                                                <span className="text-xs uppercase tracking-wider text-[#57534E]">Total Authoritative Due</span>
+                                                <span data-testid="authoritative-grand-total" className="text-2xl font-black text-[#EA580C]">
                                                     ₹{billTotal}
                                                 </span>
                                             </div>
@@ -1227,7 +1222,7 @@ export default function CashierStation() {
 
                                     {/* PAYMENT WORKFLOW TARGETS */}
                                     <div className="space-y-3">
-                                        <label className="text-xs font-black text-neutral-400 uppercase tracking-wider block">
+                                        <label className="text-xs font-black text-[#57534E] uppercase tracking-wider block">
                                             Select Settlement Method
                                         </label>
 
@@ -1254,13 +1249,13 @@ export default function CashierStation() {
                                                         }}
                                                         className={`p-3 rounded-xl border flex flex-col items-center justify-center text-center transition min-h-[64px] ${
                                                             isSelected
-                                                                ? "bg-orange-600 text-white border-orange-400 shadow-md shadow-orange-950/40"
-                                                                : "bg-neutral-950 text-neutral-300 border-neutral-800 hover:border-neutral-700 hover:bg-neutral-800/80"
+                                                                ? "bg-[#F97316] text-white border-[#EA580C] shadow-xs"
+                                                                : "bg-white text-[#171717] border-[#E7E5E4] hover:bg-[#FFF7ED]"
                                                         }`}
                                                     >
                                                         <Icon className="w-5 h-5 mb-1" />
                                                         <span className="text-xs font-black">{m.label}</span>
-                                                        <span className="text-[10px] opacity-70">{m.sub}</span>
+                                                        <span className="text-[10px] opacity-75">{m.sub}</span>
                                                     </button>
                                                 );
                                             })}
@@ -1269,18 +1264,18 @@ export default function CashierStation() {
 
                                     {/* CASH CHANGE CALCULATOR (When CASH is chosen) */}
                                     {paymentMethod === "CASH" && (
-                                        <div className="bg-neutral-950 p-3.5 rounded-xl border border-neutral-800 space-y-3">
+                                        <div className="bg-stone-50 p-3.5 rounded-xl border border-[#E7E5E4] space-y-3">
                                             {/* Quick preset buttons */}
                                             <div>
-                                                <div className="text-[11px] font-bold text-neutral-400 mb-1.5 flex items-center justify-between">
+                                                <div className="text-[11px] font-bold text-[#57534E] mb-1.5 flex items-center justify-between">
                                                     <span>Fast Cash Presets</span>
-                                                    <span className="text-[10px] text-neutral-500">Tap to auto-fill tendered</span>
+                                                    <span className="text-[10px] text-[#78716C]">Tap to auto-fill tendered</span>
                                                 </div>
                                                 <div className="flex gap-1.5 flex-wrap">
                                                     <button
                                                         type="button"
                                                         onClick={() => handleQuickCashPreset(billTotal)}
-                                                        className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-bold border border-neutral-700 transition"
+                                                        className="px-3 py-1.5 rounded-lg bg-white hover:bg-[#FFF7ED] text-[#171717] text-xs font-bold border border-[#E7E5E4] transition shadow-xs"
                                                     >
                                                         Exact (₹{billTotal})
                                                     </button>
@@ -1291,7 +1286,7 @@ export default function CashierStation() {
                                                                 key={add}
                                                                 type="button"
                                                                 onClick={() => handleQuickCashPreset(presetVal)}
-                                                                className="px-2.5 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-200 text-xs font-semibold border border-neutral-800 transition"
+                                                                className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-[#FFF7ED] text-[#171717] text-xs font-semibold border border-[#E7E5E4] transition"
                                                             >
                                                                 +₹{add} (₹{presetVal})
                                                             </button>
@@ -1300,14 +1295,14 @@ export default function CashierStation() {
                                                     <button
                                                         type="button"
                                                         onClick={() => handleQuickCashPreset(500)}
-                                                        className="px-2.5 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-200 text-xs font-semibold border border-neutral-800 transition"
+                                                        className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-[#FFF7ED] text-[#171717] text-xs font-semibold border border-[#E7E5E4] transition"
                                                     >
                                                         ₹500
                                                     </button>
                                                     <button
                                                         type="button"
                                                         onClick={() => handleQuickCashPreset(2000)}
-                                                        className="px-2.5 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-200 text-xs font-semibold border border-neutral-800 transition"
+                                                        className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-[#FFF7ED] text-[#171717] text-xs font-semibold border border-[#E7E5E4] transition"
                                                     >
                                                         ₹2000
                                                     </button>
@@ -1317,27 +1312,25 @@ export default function CashierStation() {
                                             {/* Cash Tendered Input & Change Output */}
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                                                 <div>
-                                                    <label htmlFor="cashier-cash-tendered" className="text-xs text-neutral-400 block mb-1 font-semibold">Cash Tendered (₹)</label>
+                                                    <label className="text-xs text-[#57534E] block mb-1 font-semibold">Cash Tendered (₹)</label>
                                                     <input
-                                                        id="cashier-cash-tendered"
-                                                        name="cashTendered"
                                                         type="number"
                                                         value={cashTendered}
                                                         onChange={(e) => setCashTendered(e.target.value)}
                                                         placeholder={`e.g. ${billTotal}`}
-                                                        className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2 text-white font-extrabold text-lg focus:outline-none focus:border-orange-500 min-h-[46px]"
+                                                        className="w-full bg-white border border-[#E7E5E4] rounded-xl px-3 py-2 text-[#171717] font-extrabold text-lg focus:outline-hidden focus:border-[#F97316] min-h-[46px]"
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="text-xs text-neutral-400 block mb-1 font-semibold">
+                                                    <label className="text-xs text-[#57534E] block mb-1 font-semibold">
                                                         {shortDue > 0 ? "Under-Tendered Due (₹)" : "Change to Return (₹)"}
                                                     </label>
                                                     <div className={`w-full rounded-xl px-3 py-2 font-black text-xl flex items-center min-h-[46px] border ${
                                                         shortDue > 0
-                                                            ? "bg-amber-950/40 text-amber-300 border-amber-800/40"
+                                                            ? "bg-amber-50 text-amber-800 border-amber-300"
                                                             : changeDue > 0
-                                                            ? "bg-emerald-950/50 text-emerald-400 border-emerald-500/40"
-                                                            : "bg-neutral-900/60 text-neutral-400 border-neutral-800"
+                                                            ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                                                            : "bg-stone-100 text-[#57534E] border-[#E7E5E4]"
                                                     }`}>
                                                         {shortDue > 0 ? `-₹${shortDue.toFixed(2)}` : `₹${changeDue.toFixed(2)}`}
                                                     </div>
@@ -1348,19 +1341,17 @@ export default function CashierStation() {
 
                                     {/* UPI / Card Reference Input */}
                                     {(paymentMethod === "UPI" || paymentMethod === "CARD") && (
-                                        <div className="bg-neutral-950 p-3 rounded-xl border border-neutral-800 flex items-center gap-3">
+                                        <div className="bg-stone-50 p-3 rounded-xl border border-[#E7E5E4] flex items-center gap-3">
                                             <div className="flex-1">
-                                                <label htmlFor="cashier-payment-reference" className="text-[11px] text-neutral-400 block mb-1 font-semibold">
+                                                <label className="text-[11px] text-[#57534E] block mb-1 font-semibold">
                                                     {paymentMethod === "UPI" ? "UPI UTR / Reference No. (Optional)" : "Card Approval / Transaction Slip No."}
                                                 </label>
                                                 <input
-                                                    id="cashier-payment-reference"
-                                                    name="referenceNo"
                                                     type="text"
                                                     value={referenceNoInput}
                                                     onChange={(e) => setReferenceNoInput(e.target.value)}
                                                     placeholder="Enter reference / UTR for payment audit"
-                                                    className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-orange-500 min-h-[40px]"
+                                                    className="w-full bg-white border border-[#E7E5E4] rounded-xl px-3 py-2 text-[#171717] text-xs focus:outline-hidden focus:border-[#F97316] min-h-[40px]"
                                                 />
                                             </div>
                                         </div>
@@ -1372,12 +1363,12 @@ export default function CashierStation() {
                                         data-testid="settle-payment-btn"
                                         onClick={handleCollectPayment}
                                         disabled={processingPayment || !currentShift || !isOnline || (paymentMethod === "CASH" && shortDue > 0)}
-                                        className={`w-full py-4 rounded-2xl font-black text-base transition flex items-center justify-center gap-2 shadow-lg min-h-[52px] disabled:opacity-50 ${
+                                        className={`w-full py-4 rounded-xl font-black text-base transition flex items-center justify-center gap-2 shadow-xs min-h-[50px] disabled:opacity-50 ${
                                             !isOnline
-                                                ? "bg-neutral-800 text-neutral-400 cursor-not-allowed border border-neutral-700"
+                                                ? "bg-stone-200 text-[#78716C] cursor-not-allowed border border-[#E7E5E4]"
                                                 : paymentMethod === "CASH" && shortDue > 0
-                                                ? "bg-amber-800/80 hover:bg-amber-800 text-amber-200 cursor-not-allowed border border-amber-700/60"
-                                                : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/40"
+                                                ? "bg-amber-100 hover:bg-amber-200 text-amber-900 cursor-not-allowed border border-amber-300"
+                                                : "bg-[#059669] hover:bg-emerald-700 text-white"
                                         }`}
                                     >
                                         <CheckCircle2 className="w-5 h-5" />
@@ -1394,32 +1385,32 @@ export default function CashierStation() {
                                 </div>
                             ) : (
                                 /* COMPACT EMPTY STATE (No bill selected) */
-                                <div className="p-8 sm:p-12 text-center bg-neutral-900/40 border border-neutral-800 rounded-2xl space-y-4">
-                                    <div className="w-14 h-14 rounded-2xl bg-neutral-800/80 border border-neutral-700/60 flex items-center justify-center mx-auto text-orange-400">
+                                <div className="p-8 sm:p-12 text-center bg-white border border-[#E7E5E4] rounded-xl space-y-4 shadow-xs">
+                                    <div className="w-14 h-14 rounded-2xl bg-[#FFF7ED] border border-orange-200 flex items-center justify-center mx-auto text-[#F97316]">
                                         <Receipt className="w-7 h-7" />
                                     </div>
                                     <div>
-                                        <h3 className="text-base font-extrabold text-white">Select a Bill to Begin Checkout</h3>
-                                        <p className="text-xs text-neutral-400 mt-1 max-w-sm mx-auto">
+                                        <h3 className="text-base font-extrabold text-[#171717]">Select a Bill to Begin Checkout</h3>
+                                        <p className="text-xs text-[#57534E] mt-1 max-w-sm mx-auto">
                                             Choose an unpaid table bill or takeaway order from the queue on the left to review items and collect payment.
                                         </p>
                                     </div>
 
                                     {/* Quick metrics overview in empty state */}
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-w-md mx-auto pt-2">
-                                        <div className="p-3 bg-neutral-950/80 rounded-xl border border-neutral-800/80 text-left">
-                                            <span className="text-[10px] text-neutral-400 uppercase font-bold block">Pending Bills</span>
-                                            <span className="text-lg font-black text-white">{orders.length}</span>
+                                        <div className="p-3 bg-stone-50 rounded-xl border border-[#E7E5E4] text-left">
+                                            <span className="text-[10px] text-[#57534E] uppercase font-bold block">Pending Bills</span>
+                                            <span className="text-lg font-black text-[#171717]">{orders.length}</span>
                                         </div>
-                                        <div className="p-3 bg-neutral-950/80 rounded-xl border border-neutral-800/80 text-left">
-                                            <span className="text-[10px] text-neutral-400 uppercase font-bold block">Outstanding</span>
-                                            <span className="text-lg font-black text-orange-400">
+                                        <div className="p-3 bg-stone-50 rounded-xl border border-[#E7E5E4] text-left">
+                                            <span className="text-[10px] text-[#57534E] uppercase font-bold block">Outstanding</span>
+                                            <span className="text-lg font-black text-[#EA580C]">
                                                 ₹{orders.reduce((sum, o) => sum + getAuthoritativeTotal(o), 0)}
                                             </span>
                                         </div>
-                                        <div className="p-3 bg-neutral-950/80 rounded-xl border border-neutral-800/80 text-left col-span-2 sm:col-span-1">
-                                            <span className="text-[10px] text-neutral-400 uppercase font-bold block">Drawer Float</span>
-                                            <span className="text-lg font-black text-emerald-400">
+                                        <div className="p-3 bg-stone-50 rounded-xl border border-[#E7E5E4] text-left col-span-2 sm:col-span-1">
+                                            <span className="text-[10px] text-[#57534E] uppercase font-bold block">Drawer Float</span>
+                                            <span className="text-lg font-black text-emerald-700">
                                                 ₹{currentShift?.expectedCash ?? "0"}
                                             </span>
                                         </div>
@@ -1433,39 +1424,35 @@ export default function CashierStation() {
 
             {/* VIEW 2: RECENT TRANSACTIONS & RECEIPT REPRINT */}
             {stationView === "transactions" && (
-                <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800 pb-4">
+                <div className="bg-white border border-[#E7E5E4] rounded-xl p-4 sm:p-6 shadow-xs space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E7E5E4] pb-4">
                         <div>
-                            <h2 className="text-lg font-black text-white flex items-center gap-2">
-                                <History className="w-5 h-5 text-orange-400" />
+                            <h2 className="text-lg font-black text-[#171717] flex items-center gap-2">
+                                <History className="w-5 h-5 text-[#EA580C]" />
                                 Recent Settle Transactions ({transactions.length})
                             </h2>
-                            <p className="text-xs text-neutral-400 mt-0.5">
+                            <p className="text-xs text-[#57534E] mt-0.5">
                                 Search, audit, and reprint thermal receipts for today's settled orders.
                             </p>
                         </div>
 
                         <div className="flex items-center gap-2">
                             <div className="relative w-full sm:w-64">
-                                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#78716C]" />
                                 <input
-                                    id="cashier-transactions-search"
-                                    name="txSearchQuery"
-                                    aria-label="Search bill #, customer, phone"
                                     type="text"
                                     placeholder="Search bill #, customer, phone..."
                                     value={txSearchQuery}
                                     onChange={(e) => setTxSearchQuery(e.target.value)}
-                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-orange-500 min-h-[40px]"
+                                    className="w-full bg-white border border-[#E7E5E4] rounded-xl pl-9 pr-3 py-2 text-xs text-[#171717] placeholder-[#78716C] focus:outline-hidden focus:border-[#F97316] min-h-[40px]"
                                 />
                             </div>
 
                             <button
                                 type="button"
                                 onClick={fetchTransactions}
-                                className="p-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 transition border border-neutral-700"
+                                className="p-2.5 rounded-xl bg-white hover:bg-[#FFF7ED] text-[#171717] transition border border-[#E7E5E4]"
                                 title="Refresh transactions"
-                                aria-label="Refresh transactions"
                             >
                                 <RefreshCw className="w-4 h-4" />
                             </button>
@@ -1481,8 +1468,8 @@ export default function CashierStation() {
                                 onClick={() => setTxFilter(f)}
                                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                                     txFilter === f
-                                        ? "bg-orange-600 text-white shadow-sm"
-                                        : "bg-neutral-950 text-neutral-400 hover:text-white border border-neutral-800"
+                                        ? "bg-[#F97316] text-white shadow-xs"
+                                        : "bg-stone-100 text-[#57534E] hover:text-[#171717] border border-[#E7E5E4]"
                                 }`}
                             >
                                 {f}
@@ -1492,9 +1479,9 @@ export default function CashierStation() {
 
                     {/* Transactions Table */}
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs text-neutral-300 border-collapse">
+                        <table className="w-full text-left text-xs text-[#171717] border-collapse">
                             <thead>
-                                <tr className="border-b border-neutral-800 text-neutral-400 uppercase text-[10px] tracking-wider">
+                                <tr className="border-b border-[#E7E5E4] text-[#57534E] uppercase text-[10px] tracking-wider bg-stone-50">
                                     <th className="py-2.5 px-3">Bill / Invoice #</th>
                                     <th className="py-2.5 px-3">Customer</th>
                                     <th className="py-2.5 px-3">Method</th>
@@ -1504,40 +1491,40 @@ export default function CashierStation() {
                                     <th className="py-2.5 px-3 text-right">Action</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-neutral-800/60">
+                            <tbody className="divide-y divide-[#E7E5E4]">
                                 {loadingTransactions ? (
                                     <tr>
-                                        <td colSpan="7" className="py-8 text-center text-neutral-400">Loading transactions...</td>
+                                        <td colSpan="7" className="py-8 text-center text-[#78716C]">Loading transactions...</td>
                                     </tr>
                                 ) : filteredTransactions.length === 0 ? (
                                     <tr>
-                                        <td colSpan="7" className="py-8 text-center text-neutral-400">No transactions found</td>
+                                        <td colSpan="7" className="py-8 text-center text-[#78716C]">No transactions found</td>
                                     </tr>
                                 ) : (
                                     filteredTransactions.map((tx) => (
-                                        <tr key={tx.id} className="hover:bg-neutral-950/60 transition">
-                                            <td className="py-2.5 px-3 font-bold text-white">
+                                        <tr key={tx.id} className="hover:bg-stone-50 transition">
+                                            <td className="py-2.5 px-3 font-bold text-[#171717]">
                                                 #{tx.orderNo || tx.id}
-                                                {tx.invoiceNo && <span className="block text-[10px] text-neutral-500 font-normal">{tx.invoiceNo}</span>}
+                                                {tx.invoiceNo && <span className="block text-[10px] text-[#78716C] font-normal">{tx.invoiceNo}</span>}
                                             </td>
                                             <td className="py-2.5 px-3">
-                                                <span className="font-semibold text-neutral-200">{tx.customerName || "Walk-in Guest"}</span>
-                                                {tx.phone && <span className="block text-[10px] text-neutral-500">{tx.phone}</span>}
+                                                <span className="font-semibold text-[#171717]">{tx.customerName || "Walk-in Guest"}</span>
+                                                {tx.phone && <span className="block text-[10px] text-[#78716C]">{tx.phone}</span>}
                                             </td>
                                             <td className="py-2.5 px-3">
-                                                <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-neutral-800 text-neutral-200 border border-neutral-700">
+                                                <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-stone-100 text-[#171717] border border-[#E7E5E4]">
                                                     {tx.paymentMode || "CASH"}
                                                 </span>
                                             </td>
-                                            <td className="py-2.5 px-3 font-extrabold text-white text-sm">
+                                            <td className="py-2.5 px-3 font-extrabold text-[#171717] text-sm">
                                                 ₹{tx.total}
                                             </td>
                                             <td className="py-2.5 px-3">
-                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                                     {tx.paymentStatus || "SUCCESS"}
                                                 </span>
                                             </td>
-                                            <td className="py-2.5 px-3 text-neutral-400 text-[11px]">
+                                            <td className="py-2.5 px-3 text-[#57534E] text-[11px]">
                                                 {tx.createdAt ? new Date(tx.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}
                                             </td>
                                             <td className="py-2.5 px-3 text-right">
@@ -1545,9 +1532,9 @@ export default function CashierStation() {
                                                     type="button"
                                                     data-testid={`reprint-tx-${tx.id}`}
                                                     onClick={() => handlePrintReceipt(tx)}
-                                                    className="px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 font-bold text-xs inline-flex items-center gap-1 transition border border-neutral-700"
+                                                    className="px-2.5 py-1 rounded-lg bg-white hover:bg-[#FFF7ED] text-[#171717] font-bold text-xs inline-flex items-center gap-1 transition border border-[#E7E5E4]"
                                                 >
-                                                    <Printer className="w-3.5 h-3.5 text-orange-400" />
+                                                    <Printer className="w-3.5 h-3.5 text-[#EA580C]" />
                                                     <span>Reprint</span>
                                                 </button>
                                             </td>
@@ -1562,24 +1549,24 @@ export default function CashierStation() {
 
             {/* VIEW 3: CASH DRAWER & SHIFT RECONCILIATION */}
             {stationView === "shift" && (
-                <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-6 max-w-4xl mx-auto">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800 pb-4">
+                <div className="bg-white border border-[#E7E5E4] rounded-xl p-4 sm:p-6 shadow-xs space-y-6 w-full max-w-none">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E7E5E4] pb-4">
                         <div>
                             <div className="flex items-center gap-2">
-                                <h2 className="font-black text-white text-lg flex items-center gap-2">
-                                    <DollarSign className="w-5 h-5 text-orange-400" />
+                                <h2 className="font-black text-[#171717] text-lg flex items-center gap-2">
+                                    <DollarSign className="w-5 h-5 text-[#EA580C]" />
                                     Cash Drawer Shift Management
                                 </h2>
                                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-black ${
                                     currentShift?.status === "OPEN"
-                                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
-                                        : "bg-rose-500/20 text-rose-400 border border-rose-500/40"
+                                        ? "bg-emerald-50 text-emerald-800 border border-emerald-300"
+                                        : "bg-rose-50 text-rose-800 border border-rose-300"
                                 }`}>
                                     {currentShift?.status || "CLOSED"}
                                 </span>
                             </div>
-                            <p className="text-xs text-neutral-400 mt-1">
-                                Terminal: <strong className="text-white">{currentShift?.terminalId || "MAIN"}</strong> • Cashier: <strong className="text-white">{user?.name || "Staff"}</strong> • Duration: <strong className="text-white">{shiftStats?.durationStr || "0m"}</strong>
+                            <p className="text-xs text-[#57534E] mt-1">
+                                Terminal: <strong className="text-[#171717]">{currentShift?.terminalId || "MAIN"}</strong> • Cashier: <strong className="text-[#171717]">{user?.name || "Staff"}</strong> • Duration: <strong className="text-[#171717]">{shiftStats?.durationStr || "0m"}</strong>
                             </p>
                         </div>
 
@@ -1589,7 +1576,7 @@ export default function CashierStation() {
                                     type="button"
                                     data-testid="close-shift-btn"
                                     onClick={() => setShowCloseShiftModal(true)}
-                                    className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-md"
+                                    className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-xs"
                                 >
                                     <Lock className="w-4 h-4" />
                                     <span>Close Shift & Reconcile</span>
@@ -1599,7 +1586,7 @@ export default function CashierStation() {
                                     type="button"
                                     data-testid="open-shift-btn"
                                     onClick={() => setShowOpenShiftModal(true)}
-                                    className="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-md"
+                                    className="px-4 py-2 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white font-bold text-xs transition flex items-center gap-1.5 shadow-xs"
                                 >
                                     <Unlock className="w-4 h-4" />
                                     <span>Open Shift</span>
@@ -1612,35 +1599,35 @@ export default function CashierStation() {
                         <div className="space-y-6">
                             {/* Summary Metric Cards */}
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                <div className="p-3.5 bg-neutral-950 rounded-xl border border-neutral-800">
-                                    <span className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Opening Cash Float</span>
-                                    <span className="text-lg font-black text-white">₹{shiftStats?.openingCash || 0}</span>
+                                <div className="p-3.5 bg-stone-50 rounded-xl border border-[#E7E5E4]">
+                                    <span className="text-[10px] text-[#57534E] uppercase font-bold block mb-1">Opening Cash Float</span>
+                                    <span className="text-lg font-black text-[#171717]">₹{shiftStats?.openingCash || 0}</span>
                                 </div>
-                                <div className="p-3.5 bg-neutral-950 rounded-xl border border-neutral-800">
-                                    <span className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Cash Sales Collected</span>
-                                    <span className="text-lg font-black text-emerald-400">₹{shiftStats?.cashSales || 0}</span>
+                                <div className="p-3.5 bg-stone-50 rounded-xl border border-[#E7E5E4]">
+                                    <span className="text-[10px] text-[#57534E] uppercase font-bold block mb-1">Cash Sales Collected</span>
+                                    <span className="text-lg font-black text-emerald-700">₹{shiftStats?.cashSales || 0}</span>
                                 </div>
-                                <div className="p-3.5 bg-neutral-950 rounded-xl border border-neutral-800">
-                                    <span className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Cash In (Float Additions)</span>
-                                    <span className="text-lg font-black text-sky-400">+₹{shiftStats?.cashIn || 0}</span>
+                                <div className="p-3.5 bg-stone-50 rounded-xl border border-[#E7E5E4]">
+                                    <span className="text-[10px] text-[#57534E] uppercase font-bold block mb-1">Cash In (Float Additions)</span>
+                                    <span className="text-lg font-black text-sky-700">+₹{shiftStats?.cashIn || 0}</span>
                                 </div>
-                                <div className="p-3.5 bg-neutral-950 rounded-xl border border-neutral-800">
-                                    <span className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Cash Out (Drops / Payouts)</span>
-                                    <span className="text-lg font-black text-rose-400">-₹{shiftStats?.cashOut || 0}</span>
+                                <div className="p-3.5 bg-stone-50 rounded-xl border border-[#E7E5E4]">
+                                    <span className="text-[10px] text-[#57534E] uppercase font-bold block mb-1">Cash Out (Drops / Payouts)</span>
+                                    <span className="text-lg font-black text-rose-700">-₹{shiftStats?.cashOut || 0}</span>
                                 </div>
                             </div>
 
                             {/* Authoritative Expected Cash in Drawer */}
-                            <div className="p-4 bg-neutral-950 rounded-2xl border border-orange-500/40 flex items-center justify-between">
+                            <div className="p-4 bg-[#FFF7ED] rounded-xl border border-orange-200 flex items-center justify-between">
                                 <div>
-                                    <span className="text-xs uppercase font-extrabold text-neutral-400 tracking-wider block">
+                                    <span className="text-xs uppercase font-extrabold text-[#57534E] tracking-wider block">
                                         Authoritative Expected Cash In Drawer
                                     </span>
-                                    <span className="text-xs text-neutral-500">
+                                    <span className="text-xs text-[#78716C]">
                                         Formula: Opening Float + Cash Sales + Cash In - Cash Out - Refunds
                                     </span>
                                 </div>
-                                <span className="text-3xl font-black text-orange-400">
+                                <span className="text-3xl font-black text-[#EA580C]">
                                     ₹{shiftStats?.expectedCash || 0}
                                 </span>
                             </div>
@@ -1648,7 +1635,7 @@ export default function CashierStation() {
                             {/* Cash Movement Ledger */}
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
-                                    <h3 className="font-extrabold text-white text-sm">
+                                    <h3 className="font-extrabold text-[#171717] text-sm">
                                         Cash Movement Audit Trail ({currentShift.cashMovements?.length || 0})
                                     </h3>
                                     <div className="flex items-center gap-2">
@@ -1659,9 +1646,9 @@ export default function CashierStation() {
                                                 setCashMovementType("CASH_IN");
                                                 setShowCashMovementModal(true);
                                             }}
-                                            className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-semibold flex items-center gap-1 border border-neutral-700"
+                                            className="px-3 py-1.5 rounded-lg bg-white hover:bg-[#FFF7ED] text-[#171717] text-xs font-semibold flex items-center gap-1 border border-[#E7E5E4]"
                                         >
-                                            <PlusCircle className="w-3.5 h-3.5 text-emerald-400" />
+                                            <PlusCircle className="w-3.5 h-3.5 text-emerald-600" />
                                             <span>+ Cash In</span>
                                         </button>
                                         <button
@@ -1671,17 +1658,17 @@ export default function CashierStation() {
                                                 setCashMovementType("CASH_OUT");
                                                 setShowCashMovementModal(true);
                                             }}
-                                            className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-semibold flex items-center gap-1 border border-neutral-700"
+                                            className="px-3 py-1.5 rounded-lg bg-white hover:bg-[#FFF7ED] text-[#171717] text-xs font-semibold flex items-center gap-1 border border-[#E7E5E4]"
                                         >
-                                            <MinusCircle className="w-3.5 h-3.5 text-rose-400" />
+                                            <MinusCircle className="w-3.5 h-3.5 text-rose-600" />
                                             <span>- Cash Out</span>
                                         </button>
                                     </div>
                                 </div>
 
-                                <div className="bg-neutral-950 rounded-xl border border-neutral-800 divide-y divide-neutral-900 max-h-64 overflow-y-auto">
+                                <div className="bg-stone-50 rounded-xl border border-[#E7E5E4] divide-y divide-[#E7E5E4] max-h-64 overflow-y-auto">
                                     {(currentShift.cashMovements || []).length === 0 ? (
-                                        <div className="py-6 text-center text-xs text-neutral-500">No cash movements recorded yet</div>
+                                        <div className="py-6 text-center text-xs text-[#78716C]">No cash movements recorded yet</div>
                                     ) : (
                                         currentShift.cashMovements.map((m) => {
                                             const isPositive = ["OPENING_CASH", "CASH_SALE", "CASH_IN"].includes(m.type);
@@ -1691,23 +1678,23 @@ export default function CashierStation() {
                                                         <div className="flex items-center gap-2">
                                                             <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
                                                                 m.type === "CASH_SALE"
-                                                                    ? "bg-emerald-500/20 text-emerald-300"
+                                                                    ? "bg-emerald-50 text-emerald-800"
                                                                     : m.type === "CASH_IN"
-                                                                    ? "bg-sky-500/20 text-sky-300"
+                                                                    ? "bg-sky-50 text-sky-800"
                                                                     : m.type === "CASH_OUT"
-                                                                    ? "bg-rose-500/20 text-rose-300"
-                                                                    : "bg-neutral-800 text-neutral-300"
+                                                                    ? "bg-rose-50 text-rose-800"
+                                                                    : "bg-stone-200 text-[#171717]"
                                                             }`}>
                                                                 {m.type}
                                                             </span>
-                                                            <span className="text-white font-semibold">{m.reason || "Shift Transaction"}</span>
+                                                            <span className="text-[#171717] font-semibold">{m.reason || "Shift Transaction"}</span>
                                                         </div>
-                                                        <span className="text-[10px] text-neutral-500 mt-0.5 block">
+                                                        <span className="text-[10px] text-[#78716C] mt-0.5 block">
                                                             {m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}
                                                         </span>
                                                     </div>
 
-                                                    <span className={`font-black text-sm ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
+                                                    <span className={`font-black text-sm ${isPositive ? "text-emerald-700" : "text-rose-700"}`}>
                                                         {isPositive ? `+₹${m.amount}` : `-₹${m.amount}`}
                                                     </span>
                                                 </div>
@@ -1718,16 +1705,16 @@ export default function CashierStation() {
                             </div>
                         </div>
                     ) : (
-                        <div className="py-12 text-center bg-neutral-950/60 rounded-xl border border-neutral-800 p-6 space-y-3">
-                            <Lock className="w-10 h-10 text-neutral-600 mx-auto" />
-                            <h3 className="font-extrabold text-white text-base">Cashier Shift is Currently Closed</h3>
-                            <p className="text-xs text-neutral-400 max-w-sm mx-auto">
+                        <div className="py-12 text-center bg-stone-50 rounded-xl border border-[#E7E5E4] p-6 space-y-3">
+                            <Lock className="w-10 h-10 text-[#78716C] mx-auto" />
+                            <h3 className="font-extrabold text-[#171717] text-base">Cashier Shift is Currently Closed</h3>
+                            <p className="text-xs text-[#57534E] max-w-sm mx-auto">
                                 Open your shift with an initial opening float to start collecting bills and tracking cash movements.
                             </p>
                             <button
                                 type="button"
                                 onClick={() => setShowOpenShiftModal(true)}
-                                className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs transition shadow-md"
+                                className="px-5 py-2.5 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white font-bold text-xs transition shadow-xs"
                             >
                                 Open Shift (Enter Float)
                             </button>
@@ -1738,57 +1725,53 @@ export default function CashierStation() {
 
             {/* MODAL 1: OPEN SHIFT */}
             {showOpenShiftModal && (
-                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-neutral-900 border border-neutral-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-                        <h3 className="font-black text-white text-lg flex items-center gap-2">
-                            <Unlock className="w-5 h-5 text-orange-400" />
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+                    <div className="bg-white border border-[#E7E5E4] rounded-xl max-w-md w-full p-6 shadow-xl space-y-4">
+                        <h3 className="font-black text-[#171717] text-lg flex items-center gap-2">
+                            <Unlock className="w-5 h-5 text-[#EA580C]" />
                             Open Cash Drawer Shift
                         </h3>
-                        <p className="text-xs text-neutral-400">
+                        <p className="text-xs text-[#57534E]">
                             Enter the initial physical cash float counted in the drawer at the start of your shift.
                         </p>
                         <form onSubmit={handleOpenShift} className="space-y-4">
                             <div>
-                                <label htmlFor="cashier-opening-cash" className="text-xs font-bold text-neutral-300 block mb-1">
+                                <label className="text-xs font-bold text-[#57534E] block mb-1">
                                     Opening Cash Amount (₹)
                                 </label>
                                 <input
-                                    id="cashier-opening-cash"
-                                    name="openingCash"
                                     type="number"
                                     value={openingCashInput}
                                     onChange={(e) => setOpeningCashInput(e.target.value)}
                                     placeholder="e.g. 2000"
-                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2.5 text-white font-black text-lg focus:outline-none focus:border-orange-500 min-h-[46px]"
+                                    className="w-full bg-white border border-[#E7E5E4] rounded-xl px-3 py-2.5 text-[#171717] font-black text-lg focus:outline-hidden focus:border-[#F97316] min-h-[46px]"
                                     required
                                     min="0"
                                 />
                             </div>
                             <div>
-                                <label htmlFor="cashier-shift-notes" className="text-xs font-bold text-neutral-300 block mb-1">
+                                <label className="text-xs font-bold text-[#57534E] block mb-1">
                                     Shift Notes / Station
                                 </label>
                                 <input
-                                    id="cashier-shift-notes"
-                                    name="shiftNotes"
                                     type="text"
                                     value={shiftNotesInput}
                                     onChange={(e) => setShiftNotesInput(e.target.value)}
                                     placeholder="e.g. Terminal 1 morning shift"
-                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-orange-500 min-h-[40px]"
+                                    className="w-full bg-white border border-[#E7E5E4] rounded-xl px-3 py-2 text-[#171717] text-xs focus:outline-hidden focus:border-[#F97316] min-h-[40px]"
                                 />
                             </div>
                             <div className="flex justify-end gap-2 pt-2">
                                 <button
                                     type="button"
                                     onClick={() => setShowOpenShiftModal(false)}
-                                    className="px-4 py-2 rounded-xl bg-neutral-800 text-neutral-300 text-xs font-semibold hover:bg-neutral-700"
+                                    className="px-4 py-2 rounded-xl bg-stone-100 text-[#171717] text-xs font-semibold hover:bg-stone-200 border border-[#E7E5E4]"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-5 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold shadow-md"
+                                    className="px-5 py-2 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white text-xs font-bold shadow-xs"
                                 >
                                     Confirm Open Shift
                                 </button>
@@ -1800,36 +1783,32 @@ export default function CashierStation() {
 
             {/* MODAL 2: CASH MOVEMENT (IN / OUT) */}
             {showCashMovementModal && (
-                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-neutral-900 border border-neutral-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-                        <h3 className="font-black text-white text-lg">
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+                    <div className="bg-white border border-[#E7E5E4] rounded-xl max-w-md w-full p-6 shadow-xl space-y-4">
+                        <h3 className="font-black text-[#171717] text-lg">
                             {cashMovementType === "CASH_IN" ? "Record Cash In (Float Addition)" : "Record Cash Out (Drop / Payout)"}
                         </h3>
                         <form onSubmit={handleCashMovement} className="space-y-4">
                             <div>
-                                <label htmlFor="cashier-movement-amount" className="text-xs font-bold text-neutral-300 block mb-1">Amount (₹)</label>
+                                <label className="text-xs font-bold text-[#57534E] block mb-1">Amount (₹)</label>
                                 <input
-                                    id="cashier-movement-amount"
-                                    name="movementAmount"
                                     type="number"
                                     value={movementAmountInput}
                                     onChange={(e) => setMovementAmountInput(e.target.value)}
                                     placeholder="e.g. 500"
-                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2.5 text-white font-black text-lg focus:outline-none focus:border-orange-500 min-h-[46px]"
+                                    className="w-full bg-white border border-[#E7E5E4] rounded-xl px-3 py-2.5 text-[#171717] font-black text-lg focus:outline-hidden focus:border-[#F97316] min-h-[46px]"
                                     required
                                     min="1"
                                 />
                             </div>
                             <div>
-                                <label htmlFor="cashier-movement-reason" className="text-xs font-bold text-neutral-300 block mb-1">Reason / Notes</label>
+                                <label className="text-xs font-bold text-[#57534E] block mb-1">Reason / Notes</label>
                                 <input
-                                    id="cashier-movement-reason"
-                                    name="movementReason"
                                     type="text"
                                     value={movementReasonInput}
                                     onChange={(e) => setMovementReasonInput(e.target.value)}
                                     placeholder="e.g. Petty cash drop or extra float from safe"
-                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-orange-500 min-h-[42px]"
+                                    className="w-full bg-white border border-[#E7E5E4] rounded-xl px-3 py-2 text-[#171717] text-xs focus:outline-hidden focus:border-[#F97316] min-h-[42px]"
                                     required
                                 />
                             </div>
@@ -1837,13 +1816,13 @@ export default function CashierStation() {
                                 <button
                                     type="button"
                                     onClick={() => setShowCashMovementModal(false)}
-                                    className="px-4 py-2 rounded-xl bg-neutral-800 text-neutral-300 text-xs font-semibold hover:bg-neutral-700"
+                                    className="px-4 py-2 rounded-xl bg-stone-100 text-[#171717] text-xs font-semibold hover:bg-stone-200 border border-[#E7E5E4]"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-5 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold shadow-md"
+                                    className="px-5 py-2 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white text-xs font-bold shadow-xs"
                                 >
                                     Record Movement
                                 </button>
@@ -1855,39 +1834,37 @@ export default function CashierStation() {
 
             {/* MODAL 3: CLOSE SHIFT & CASH RECONCILIATION */}
             {showCloseShiftModal && (
-                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-neutral-900 border border-neutral-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-                        <h3 className="font-black text-white text-lg flex items-center gap-2">
-                            <Lock className="w-5 h-5 text-rose-400" />
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+                    <div className="bg-white border border-[#E7E5E4] rounded-xl max-w-md w-full p-6 shadow-xl space-y-4">
+                        <h3 className="font-black text-[#171717] text-lg flex items-center gap-2">
+                            <Lock className="w-5 h-5 text-rose-600" />
                             Close & Reconcile Cashier Shift
                         </h3>
-                        <p className="text-xs text-neutral-400">
+                        <p className="text-xs text-[#57534E]">
                             Count physical currency in the cash drawer. The system compares physical cash with expected sales and float movements.
                         </p>
 
                         <form data-testid="close-shift-form" onSubmit={handleCloseShift} className="space-y-4">
                             {/* Expected Cash Box */}
-                            <div className="p-3.5 bg-neutral-950 rounded-xl border border-neutral-800 flex justify-between items-center text-xs">
+                            <div className="p-3.5 bg-stone-50 rounded-xl border border-[#E7E5E4] flex justify-between items-center text-xs">
                                 <div>
-                                    <span className="text-neutral-400 block font-semibold">Authoritative Expected Cash</span>
-                                    <span className="text-[10px] text-neutral-500">System calculated</span>
+                                    <span className="text-[#57534E] block font-semibold">Authoritative Expected Cash</span>
+                                    <span className="text-[10px] text-[#78716C]">System calculated</span>
                                 </div>
-                                <span className="font-black text-white text-lg">₹{currentShift?.expectedCash || 0}</span>
+                                <span className="font-black text-[#171717] text-lg">₹{currentShift?.expectedCash || 0}</span>
                             </div>
 
                             {/* Actual Counted Input */}
                             <div>
-                                <label htmlFor="cashier-actual-cash" className="text-xs font-bold text-neutral-300 block mb-1">
+                                <label className="text-xs font-bold text-[#57534E] block mb-1">
                                     Actual Physical Cash Counted (₹)
                                 </label>
                                 <input
-                                    id="cashier-actual-cash"
-                                    name="actualCash"
                                     type="number"
                                     value={actualCashInput}
                                     onChange={(e) => setActualCashInput(e.target.value)}
                                     placeholder="Enter physical cash count"
-                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2.5 text-white font-black text-lg focus:outline-none focus:border-orange-500 min-h-[46px]"
+                                    className="w-full bg-white border border-[#E7E5E4] rounded-xl px-3 py-2.5 text-[#171717] font-black text-lg focus:outline-hidden focus:border-[#F97316] min-h-[46px]"
                                     required
                                     min="0"
                                 />
@@ -1897,10 +1874,10 @@ export default function CashierStation() {
                             {actualCashInput !== "" && (
                                 <div className={`p-3 rounded-xl border text-xs flex items-center justify-between font-bold ${
                                     Math.abs(closeShiftVariance) < 0.01
-                                        ? "bg-emerald-950/60 text-emerald-300 border-emerald-500/40"
+                                        ? "bg-emerald-50 text-emerald-800 border-emerald-300"
                                         : closeShiftVariance > 0
-                                        ? "bg-amber-950/60 text-amber-300 border-amber-500/40"
-                                        : "bg-rose-950/60 text-rose-300 border-rose-500/40"
+                                        ? "bg-amber-50 text-amber-800 border-amber-300"
+                                        : "bg-rose-50 text-rose-800 border-rose-300"
                                 }`}>
                                     <span>
                                         {Math.abs(closeShiftVariance) < 0.01
@@ -1918,17 +1895,15 @@ export default function CashierStation() {
                             {/* Variance Explanation Note (Mandatory if variance != 0) */}
                             {Math.abs(closeShiftVariance) > 0.01 && actualCashInput !== "" && (
                                 <div>
-                                    <label htmlFor="cashier-variance-reason" className="text-xs font-bold text-amber-300 block mb-1">
+                                    <label className="text-xs font-bold text-amber-800 block mb-1">
                                         Discrepancy Explanation (Required)
                                     </label>
                                     <input
-                                        id="cashier-variance-reason"
-                                        name="varianceReason"
                                         type="text"
                                         value={varianceReasonInput}
                                         onChange={(e) => setVarianceReasonInput(e.target.value)}
                                         placeholder="Explain reason for shortage or surplus..."
-                                        className="w-full bg-neutral-950 border border-amber-500/40 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-amber-500 min-h-[42px]"
+                                        className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-[#171717] text-xs focus:outline-hidden focus:border-amber-500 min-h-[42px]"
                                         required
                                     />
                                 </div>
@@ -1938,13 +1913,13 @@ export default function CashierStation() {
                                 <button
                                     type="button"
                                     onClick={() => setShowCloseShiftModal(false)}
-                                    className="px-4 py-2 rounded-xl bg-neutral-800 text-neutral-300 text-xs font-semibold hover:bg-neutral-700"
+                                    className="px-4 py-2 rounded-xl bg-stone-100 text-[#171717] text-xs font-semibold hover:bg-stone-200 border border-[#E7E5E4]"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black shadow-md"
+                                    className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black shadow-xs"
                                 >
                                     Confirm Settle & Close Shift
                                 </button>
@@ -1956,49 +1931,45 @@ export default function CashierStation() {
 
             {/* MODAL 4: REQUEST MANAGER DISCOUNT APPROVAL */}
             {showDiscountModal && selectedOrder && (
-                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-neutral-900 border border-neutral-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-                        <h3 className="font-black text-white text-lg flex items-center gap-2">
-                            <Percent className="w-5 h-5 text-orange-400" />
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+                    <div className="bg-white border border-[#E7E5E4] rounded-xl max-w-md w-full p-6 shadow-xl space-y-4">
+                        <h3 className="font-black text-[#171717] text-lg flex items-center gap-2">
+                            <Percent className="w-5 h-5 text-[#EA580C]" />
                             Request Manager Discount Approval
                         </h3>
-                        <p className="text-xs text-neutral-400">
+                        <p className="text-xs text-[#57534E]">
                             Cashiers cannot apply manual discounts autonomously. An approval request will be dispatched to the Duty Manager in realtime.
                         </p>
                         <form onSubmit={handleRequestDiscount} className="space-y-4">
                             <div>
-                                <label htmlFor="cashier-discount-amount" className="text-xs font-bold text-neutral-300 block mb-1">
+                                <label className="text-xs font-bold text-[#57534E] block mb-1">
                                     Discount Amount (₹)
                                 </label>
                                 <input
-                                    id="cashier-discount-amount"
-                                    name="discountAmount"
                                     type="number"
                                     value={discountAmountInput}
                                     onChange={(e) => setDiscountAmountInput(e.target.value)}
                                     placeholder="e.g. 100"
-                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2.5 text-white font-black text-lg focus:outline-none focus:border-orange-500 min-h-[46px]"
+                                    className="w-full bg-white border border-[#E7E5E4] rounded-xl px-3 py-2.5 text-[#171717] font-black text-lg focus:outline-hidden focus:border-[#F97316] min-h-[46px]"
                                     required
                                     min="1"
                                     max={getAuthoritativeTotal(selectedOrder)}
                                 />
                             </div>
                             <div>
-                                <label htmlFor="cashier-discount-reason" className="text-xs font-bold text-neutral-300 block mb-1">Reason</label>
+                                <label className="text-xs font-bold text-[#57534E] block mb-1">Reason</label>
                                 <input
-                                    id="cashier-discount-reason"
-                                    name="discountReason"
                                     type="text"
                                     value={discountReasonInput}
                                     onChange={(e) => setDiscountReasonInput(e.target.value)}
                                     placeholder="e.g. VIP guest concession / Special promo"
-                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-orange-500 min-h-[42px]"
+                                    className="w-full bg-white border border-[#E7E5E4] rounded-xl px-3 py-2 text-[#171717] text-xs focus:outline-hidden focus:border-[#F97316] min-h-[42px]"
                                     required
                                 />
                             </div>
 
                             {discountWaiting && (
-                                <div className="p-3 bg-amber-950/40 border border-amber-800/40 rounded-xl text-amber-300 text-xs flex items-center gap-2 animate-pulse">
+                                <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-800 text-xs flex items-center gap-2 animate-pulse">
                                     <Clock className="w-4 h-4 shrink-0" />
                                     <span>Waiting for Duty Manager to review and approve...</span>
                                 </div>
@@ -2009,14 +1980,14 @@ export default function CashierStation() {
                                     type="button"
                                     onClick={() => setShowDiscountModal(false)}
                                     disabled={discountWaiting}
-                                    className="px-4 py-2 rounded-xl bg-neutral-800 text-neutral-300 text-xs font-semibold hover:bg-neutral-700"
+                                    className="px-4 py-2 rounded-xl bg-stone-100 text-[#171717] text-xs font-semibold hover:bg-stone-200 border border-[#E7E5E4]"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={discountWaiting}
-                                    className="px-5 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold disabled:opacity-50 shadow-md"
+                                    className="px-5 py-2 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white text-xs font-bold disabled:opacity-50 shadow-xs"
                                 >
                                     Send to Manager
                                 </button>

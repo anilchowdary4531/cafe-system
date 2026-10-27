@@ -34,13 +34,9 @@ vi.mock("../utils/apiClient", () => ({
     },
 }));
 
-vi.mock("../utils/soundPlayer", async (importOriginal) => {
-    const actual = await importOriginal();
-    return {
-        ...actual,
-        playNotificationSound: vi.fn(),
-    };
-});
+vi.mock("../utils/soundPlayer", () => ({
+    playNotificationSound: vi.fn(),
+}));
 
 vi.mock("../utils/toast", () => ({
     showToast: vi.fn(),

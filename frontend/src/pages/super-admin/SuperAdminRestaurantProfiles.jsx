@@ -319,25 +319,6 @@ export default function SuperAdminRestaurantProfiles() {
                                                     <div><span className="text-gray-400">GST Number:</span> <span className="text-white font-mono">{restaurant.gstNumber || "N/A"}</span></div>
                                                     <div><span className="text-gray-400">Pincode:</span> <span className="text-white font-mono">{restaurant.pincode || "N/A"}</span></div>
                                                     <div><span className="text-gray-400">Tax & Prefix:</span> <span className="text-white font-semibold">{restaurant.invoicePrefix || "INV"} ({restaurant.defaultTaxPercent || 5}%)</span></div>
-                                                    <div className="col-span-2 flex items-center justify-between pt-1">
-                                                        <span className="text-gray-400">
-                                                            Map Location:{" "}
-                                                            {restaurant.hasValidLocation ? (
-                                                                <span className="text-emerald-400 font-mono font-bold">
-                                                                    📍 {Number(restaurant.latitude).toFixed(4)}, {Number(restaurant.longitude).toFixed(4)} ({restaurant.deliveryRadiusKm || 5} km radius)
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-amber-400 font-semibold">⚠️ Location not configured</span>
-                                                            )}
-                                                        </span>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => navigate("/super-admin/restaurant-map")}
-                                                            className="text-xs font-bold text-orange-400 hover:text-orange-300 hover:underline inline-flex items-center gap-1"
-                                                        >
-                                                            <span>Map</span> &rarr;
-                                                        </button>
-                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

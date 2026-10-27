@@ -19,7 +19,6 @@ import {
   Calendar,
   Search,
   X,
-  Settings,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useStaffSocket } from "../context/StaffSocketContext";
@@ -444,38 +443,38 @@ export default function KitchenChefDetail() {
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans">
       {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-3 sm:px-4 py-2 sm:py-2.5">
+      <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <div className="flex items-center gap-3">
             {isPrivileged && (
               <Link
                 to="/kitchen"
-                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0"
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
                 title="Back to Senior Chef Command Center"
               >
                 <ArrowLeft size={16} />
               </Link>
             )}
 
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                <ChefHat className="text-orange-500 shrink-0" size={18} />
-                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-orange-500 text-white shadow-xs">
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <ChefHat className="text-orange-500" size={20} />
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-orange-500 text-white shadow-xs">
                   CHEF STATION
                 </span>
-                <h1 className="text-sm sm:text-base font-black tracking-tight text-slate-900 dark:text-slate-100 truncate">
+                <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-slate-100">
                   {chefInfo?.name || "Chef"}
                 </h1>
-                <span className="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                   Station #{chefId}
                 </span>
                 {kitchenConfig.mode === "SELF_PICK" && (
-                  <span className="text-[9px] sm:text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 animate-pulse">
-                    SELF-PICK ({kitchenConfig.scope})
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 animate-pulse">
+                    SELF-PICK ACTIVE ({kitchenConfig.scope})
                   </span>
                 )}
               </div>
-              <div className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                 {viewMode === "HISTORY" ? (
                   <span>Chef History • Completed Items • Station #{chefId}</span>
                 ) : (
@@ -485,17 +484,7 @@ export default function KitchenChefDetail() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <Link
-              to={`/kitchen/chef/${chefId}/settings`}
-              data-testid="chef-settings-btn"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-xs cursor-pointer"
-              title="Chef Settings"
-            >
-              <Settings size={13} className="text-slate-600 dark:text-slate-400" />
-              <span className="hidden min-[420px]:inline">Settings</span>
-            </Link>
-
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => {
@@ -503,17 +492,17 @@ export default function KitchenChefDetail() {
                 loadHistoryData(1, false);
               }}
               disabled={loading || loadingHistory}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-xs cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-xs"
             >
               <RefreshCw size={13} className={loading || loadingHistory ? "animate-spin text-orange-500" : ""} />
-              <span className="hidden min-[420px]:inline">Refresh</span>
+              Refresh
             </button>
           </div>
         </div>
       </header>
 
       {/* Main Container */}
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3.5 space-y-3 sm:space-y-3.5">
+      <main className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
         {/* WORKSPACE NAVIGATION TABS (MY ASSIGNED ITEMS vs HISTORY) */}
         <StaffWorkHistoryTabs
           designation="CHEF"
@@ -535,58 +524,57 @@ export default function KitchenChefDetail() {
           historyIcon={History}
           assignedTestId="tab-assigned-items"
           historyTestId="tab-chef-history"
-          className="pb-2"
         />
 
         {/* ========================================================= */}
         {/* VIEW 1: MY ASSIGNED ITEMS QUEUE */}
         {/* ========================================================= */}
         {viewMode === "QUEUE" && (
-          <div className="space-y-3 sm:space-y-3.5">
-            {/* Metric Badges - Compact KDS Toolbar */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
-              <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200/80 dark:border-slate-800/80 px-2.5 sm:px-3 py-1.5 sm:py-2 shadow-xs">
-                <div className="text-[10px] sm:text-[11px] text-slate-500 font-bold uppercase tracking-wider mb-0.5">My Assigned Total</div>
-                <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-100 leading-tight">{assignedItems.length}</div>
+          <div className="space-y-6">
+            {/* Metric Badges */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-3 shadow-xs">
+                <div className="text-[11px] text-slate-500 font-semibold mb-1">My Assigned Total</div>
+                <div className="text-xl font-extrabold text-slate-900 dark:text-slate-100">{assignedItems.length}</div>
               </div>
 
-              <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200/80 dark:border-slate-800/80 px-2.5 sm:px-3 py-1.5 sm:py-2 shadow-xs">
-                <div className="text-[10px] sm:text-[11px] text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wider mb-0.5 flex items-center gap-1">
-                  <Clock size={11} />
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-3 shadow-xs">
+                <div className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold mb-1 flex items-center gap-1">
+                  <Clock size={12} />
                   My Pending
                 </div>
-                <div className="text-lg sm:text-xl font-black text-amber-600 dark:text-amber-400 leading-tight">{pendingItems.length}</div>
+                <div className="text-xl font-extrabold text-amber-600 dark:text-amber-400">{pendingItems.length}</div>
               </div>
 
-              <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200/80 dark:border-slate-800/80 px-2.5 sm:px-3 py-1.5 sm:py-2 shadow-xs">
-                <div className="text-[10px] sm:text-[11px] text-orange-600 dark:text-orange-400 font-bold uppercase tracking-wider mb-0.5 flex items-center gap-1">
-                  <Flame size={11} />
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-3 shadow-xs">
+                <div className="text-[11px] text-orange-600 dark:text-orange-400 font-semibold mb-1 flex items-center gap-1">
+                  <Flame size={12} />
                   My Preparing
                 </div>
-                <div className="text-lg sm:text-xl font-black text-orange-600 dark:text-orange-400 leading-tight">{prepItems.length}</div>
+                <div className="text-xl font-extrabold text-orange-600 dark:text-orange-400">{prepItems.length}</div>
               </div>
 
-              <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200/80 dark:border-slate-800/80 px-2.5 sm:px-3 py-1.5 sm:py-2 shadow-xs">
-                <div className="text-[10px] sm:text-[11px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider mb-0.5 flex items-center gap-1">
-                  <CheckCircle2 size={11} />
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-3 shadow-xs">
+                <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mb-1 flex items-center gap-1">
+                  <CheckCircle2 size={12} />
                   My Ready
                 </div>
-                <div className="text-lg sm:text-xl font-black text-emerald-600 dark:text-emerald-400 leading-tight">{readyItems.length}</div>
+                <div className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400">{readyItems.length}</div>
               </div>
             </div>
 
             {/* SECTION 1: MY ASSIGNED ITEMS */}
-            <div className="space-y-2 sm:space-y-2.5">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 <div className="flex items-center gap-2">
-                  <ChefHat size={15} className="text-orange-500 shrink-0" />
-                  <h2 className="text-xs sm:text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                  <ChefHat size={16} className="text-orange-500" />
+                  <h2 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
                     My Assigned Items ({displayedItems.length})
                   </h2>
                 </div>
 
-                {/* Filter Tabs - Streamlined without bulky outer card container */}
-                <div className="inline-flex items-center gap-1 bg-slate-200/60 dark:bg-slate-800/80 p-0.5 rounded-lg text-xs font-bold overflow-x-auto max-w-full scrollbar-none">
+                {/* Filter Tabs */}
+                <div className="inline-flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold overflow-x-auto max-w-full scrollbar-none">
                   {[
                     { id: "ALL", label: `All (${assignedItems.length})` },
                     { id: "PENDING", label: `Pending (${pendingItems.length})` },
@@ -597,10 +585,10 @@ export default function KitchenChefDetail() {
                       key={tab.id}
                       type="button"
                       onClick={() => setStatusFilter(tab.id)}
-                      className={`px-2.5 py-1 rounded-md text-[11px] sm:text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                      className={`px-3 py-1.5 rounded-md whitespace-nowrap min-h-[36px] transition ${
                         statusFilter === tab.id
                           ? "bg-orange-500 text-white shadow-xs"
-                          : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-700/50"
+                          : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
                       }`}
                     >
                       {tab.label}
@@ -611,14 +599,14 @@ export default function KitchenChefDetail() {
 
               {/* Items Grid */}
               {loading && !assignedItems.length ? (
-                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-8 text-center text-xs text-slate-500">
-                  <RefreshCw size={20} className="animate-spin text-orange-500 mx-auto mb-2" />
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-12 text-center text-xs text-slate-500">
+                  <RefreshCw size={24} className="animate-spin text-orange-500 mx-auto mb-3" />
                   Loading assigned items...
                 </div>
               ) : !displayedItems.length ? (
-                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-8 text-center shadow-xs">
-                  <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-xl flex items-center justify-center mx-auto mb-2">
-                    <Inbox size={20} />
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-12 text-center shadow-xs">
+                  <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-xl flex items-center justify-center mx-auto mb-3">
+                    <Inbox size={24} />
                   </div>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-1">
                     No items in this queue
@@ -630,30 +618,30 @@ export default function KitchenChefDetail() {
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5 sm:gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {displayedItems.map((item) => (
                     <div
                       key={item.id}
-                      className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/90 dark:border-slate-800/90 p-3 sm:p-3.5 shadow-xs flex flex-col justify-between transition hover:border-slate-300 dark:hover:border-slate-700"
+                      className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs flex flex-col justify-between"
                     >
                       <div>
                         {/* Top KOT and Table row */}
-                        <div className="flex items-center justify-between text-xs mb-1.5">
+                        <div className="flex items-center justify-between text-xs mb-2">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+                            <span className="font-bold text-slate-900 dark:text-slate-100">
                               #{item.kotNumber || item.kotId}
                             </span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold">
                               Table: {item.tableNo || "N/A"}
                             </span>
                             {item.priority === "URGENT" && (
-                              <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 uppercase">
+                              <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
                                 URGENT
                               </span>
                             )}
                           </div>
                           <span
-                            className={`text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded shrink-0 ${
+                            className={`text-[10px] font-black uppercase px-2 py-0.5 rounded shrink-0 ${
                               item.status === "READY"
                                 ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300"
                                 : item.status === "PREPARING"
@@ -666,36 +654,28 @@ export default function KitchenChefDetail() {
                         </div>
 
                         {/* Item Name and Quantity */}
-                        <div className="flex items-start justify-between gap-2 mb-1.5">
-                          <div className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="text-sm font-bold text-slate-900 dark:text-slate-100">
                             {item.name}
                           </div>
-                          <span className="text-xs font-black px-2 py-0.5 rounded-md bg-orange-100 dark:bg-orange-950 text-orange-800 dark:text-orange-300 shrink-0 border border-orange-200/50 dark:border-orange-900/40">
+                          <span className="text-xs font-black px-2 py-0.5 rounded bg-orange-100 dark:bg-orange-950 text-orange-800 dark:text-orange-300 shrink-0">
                             {item.quantity}x
                           </span>
                         </div>
 
                         {/* Variant / Modifiers / Notes */}
                         {item.variant && (
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mb-1">
-                            Variant: {item.variant}
-                          </div>
+                          <div className="text-[11px] text-slate-500 mb-1">Variant: {item.variant}</div>
                         )}
                         {item.notes && (
-                          <div className="text-[11px] italic text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 rounded px-2 py-1 mb-1.5 border border-amber-200/40 dark:border-amber-900/40">
+                          <div className="text-[11px] italic text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 rounded px-2 py-1 mb-2">
                             Note: {item.notes}
                           </div>
                         )}
 
-                        {/* Waiting Time & Source - Compact metadata */}
-                        <div className="text-[10px] text-slate-400 dark:text-slate-500 mb-2 flex items-center justify-between font-medium">
-                          <span className="flex items-center gap-1">
-                            <Clock size={10} className="text-slate-400" />
-                            Waiting: {item.elapsedMinutes || 0}m
-                          </span>
-                          <span className="uppercase text-[9px] tracking-wider font-semibold text-slate-400">
-                            {item.assignmentSource === "SELF_PICKED" ? "Self-Picked" : "Dispatched"}
-                          </span>
+                        <div className="text-[10px] text-slate-400 mb-3 flex items-center justify-between">
+                          <span>Waiting: {item.elapsedMinutes || 0}m</span>
+                          <span>{item.assignmentSource === "SELF_PICKED" ? "Self-Picked" : "Dispatched"}</span>
                         </div>
                       </div>
 
@@ -706,9 +686,9 @@ export default function KitchenChefDetail() {
                             type="button"
                             onClick={() => handleStartPreparing(item)}
                             disabled={Boolean(actionInProgress[item.id])}
-                            className="w-full min-h-[38px] sm:min-h-[40px] py-2 bg-orange-500 hover:bg-orange-600 active:scale-[0.98] disabled:opacity-50 text-white rounded-lg text-xs font-black transition flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+                            className="w-full min-h-[44px] py-2.5 bg-orange-500 hover:bg-orange-600 active:scale-[0.98] disabled:opacity-50 text-white rounded-lg text-xs font-black transition flex items-center justify-center gap-2 shadow-xs"
                           >
-                            <Play size={14} />
+                            <Play size={15} />
                             START PREPARING
                           </button>
                         ) : item.status === "PREPARING" ? (
@@ -716,14 +696,14 @@ export default function KitchenChefDetail() {
                             type="button"
                             onClick={() => handleMarkReady(item)}
                             disabled={Boolean(actionInProgress[item.id])}
-                            className="w-full min-h-[38px] sm:min-h-[40px] py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] disabled:opacity-50 text-white rounded-lg text-xs font-black transition flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+                            className="w-full min-h-[44px] py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] disabled:opacity-50 text-white rounded-lg text-xs font-black transition flex items-center justify-center gap-2 shadow-xs"
                           >
-                            <CheckCircle2 size={14} />
+                            <CheckCircle2 size={15} />
                             MARK READY
                           </button>
                         ) : item.status === "READY" ? (
-                          <div className="min-h-[38px] sm:min-h-[40px] py-2 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 rounded-lg text-xs font-bold text-center flex items-center justify-center gap-1.5 border border-emerald-200 dark:border-emerald-900/60">
-                            <CheckCircle2 size={14} />
+                          <div className="min-h-[44px] py-2.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 rounded-lg text-xs font-bold text-center flex items-center justify-center gap-1.5 border border-emerald-200 dark:border-emerald-900/60">
+                            <CheckCircle2 size={15} />
                             Ready for Waiter Pickup
                           </div>
                         ) : null}
@@ -736,15 +716,15 @@ export default function KitchenChefDetail() {
 
             {/* SECTION 2: AVAILABLE WORK (SELF-PICK MODE ONLY) */}
             {kitchenConfig.mode === "SELF_PICK" && (
-              <div className="space-y-3 pt-3 border-t border-slate-200/80 dark:border-slate-800/80">
+              <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-800">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Sparkles size={15} className="text-emerald-500" />
-                    <h2 className="text-xs sm:text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                    <Sparkles size={16} className="text-emerald-500" />
+                    <h2 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
                       Available Work to Claim (Self-Pick)
                     </h2>
                   </div>
-                  <span className="text-[11px] text-slate-500">
+                  <span className="text-xs text-slate-500">
                     Scope: <strong>{kitchenConfig.scope}</strong>
                   </span>
                 </div>
@@ -753,32 +733,32 @@ export default function KitchenChefDetail() {
                 {(kitchenConfig.scope === "KOTS" || kitchenConfig.scope === "BOTH") && (
                   <div className="space-y-2">
                     <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                      <Layers size={13} className="text-emerald-500" />
+                      <Layers size={14} className="text-emerald-500" />
                       Available KOTs ({availableWork.availableKots?.length || 0})
                     </h3>
 
                     {!availableWork.availableKots?.length ? (
-                      <div className="rounded-lg border border-dashed border-slate-200 dark:border-slate-800 p-3 text-center text-xs text-slate-400">
+                      <div className="rounded-lg border border-dashed border-slate-200 dark:border-slate-800 p-4 text-center text-xs text-slate-400">
                         No unassigned KOTs currently available.
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                         {availableWork.availableKots.map((k) => (
                           <div
                             key={k.id}
-                            className="bg-white dark:bg-slate-900 rounded-xl border border-emerald-200/80 dark:border-emerald-900/60 p-3 sm:p-3.5 shadow-xs flex flex-col justify-between"
+                            className="bg-white dark:bg-slate-900 rounded-xl border border-emerald-200/80 dark:border-emerald-900/60 p-4 shadow-xs flex flex-col justify-between"
                           >
                             <div>
-                              <div className="flex items-center justify-between text-xs mb-1.5">
+                              <div className="flex items-center justify-between text-xs mb-2">
                                 <span className="font-bold text-slate-900 dark:text-slate-100">
                                   KOT #{k.kotNumber || k.id}
                                 </span>
-                                <span className="text-slate-500 text-[11px]">Table: {k.tableNo || "N/A"}</span>
+                                <span className="text-slate-500">Table: {k.tableNo || "N/A"}</span>
                               </div>
 
-                              <div className="text-xs text-slate-600 dark:text-slate-400 space-y-0.5 mb-2">
+                              <div className="text-xs text-slate-600 dark:text-slate-400 space-y-1 mb-3">
                                 <div>Unassigned Items: <strong>{k.unassignedCount} of {k.totalItems}</strong></div>
-                                <div className="text-[10px] text-slate-400">Waiting: {k.elapsedMinutes || 0}m</div>
+                                <div className="text-[11px] text-slate-500">Waiting: {k.elapsedMinutes || 0}m</div>
                               </div>
                             </div>
 
@@ -786,7 +766,7 @@ export default function KitchenChefDetail() {
                               type="button"
                               onClick={() => handleClaimKot(k)}
                               disabled={Boolean(actionInProgress[`claim_kot_${k.id}`])}
-                              className="w-full min-h-[36px] py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                              className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs"
                             >
                               <Check size={14} />
                               CLAIM ORDER ({k.unassignedCount} items)
@@ -800,29 +780,29 @@ export default function KitchenChefDetail() {
 
                 {/* Available Items */}
                 {(kitchenConfig.scope === "ITEMS" || kitchenConfig.scope === "BOTH") && (
-                  <div className="space-y-2 pt-1.5">
+                  <div className="space-y-2 pt-2">
                     <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                      <UtensilsCrossed size={13} className="text-emerald-500" />
+                      <UtensilsCrossed size={14} className="text-emerald-500" />
                       Available Individual Items ({availableWork.availableItems?.length || 0})
                     </h3>
 
                     {!availableWork.availableItems?.length ? (
-                      <div className="rounded-lg border border-dashed border-slate-200 dark:border-slate-800 p-3 text-center text-xs text-slate-400">
+                      <div className="rounded-lg border border-dashed border-slate-200 dark:border-slate-800 p-4 text-center text-xs text-slate-400">
                         No unassigned items currently available.
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                         {availableWork.availableItems.map((it) => (
                           <div
                             key={it.id}
-                            className="bg-white dark:bg-slate-900 rounded-xl border border-emerald-200/80 dark:border-emerald-900/60 p-3 sm:p-3.5 shadow-xs flex flex-col justify-between"
+                            className="bg-white dark:bg-slate-900 rounded-xl border border-emerald-200/80 dark:border-emerald-900/60 p-4 shadow-xs flex flex-col justify-between"
                           >
                             <div>
                               <div className="flex items-center justify-between text-xs mb-1.5">
                                 <span className="font-bold text-slate-900 dark:text-slate-100">
                                   KOT #{it.kotNumber || it.kotId}
                                 </span>
-                                <span className="text-slate-500 text-[11px]">Table: {it.tableNo || "N/A"}</span>
+                                <span className="text-slate-500">Table: {it.tableNo || "N/A"}</span>
                               </div>
 
                               <div className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-1 flex items-center gap-1.5">
@@ -836,7 +816,7 @@ export default function KitchenChefDetail() {
                                 <div className="text-[11px] text-slate-500 mb-1">Variant: {it.variant}</div>
                               )}
 
-                              <div className="text-[10px] text-slate-400 mb-2">
+                              <div className="text-[10px] text-slate-400 mb-3">
                                 Waiting: {it.elapsedMinutes || 0}m
                               </div>
                             </div>
@@ -845,7 +825,7 @@ export default function KitchenChefDetail() {
                               type="button"
                               onClick={() => handleClaimItem(it)}
                               disabled={Boolean(actionInProgress[`claim_item_${it.id}`])}
-                              className="w-full min-h-[36px] py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                              className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs"
                             >
                               <Check size={14} />
                               CLAIM ITEM
@@ -865,36 +845,36 @@ export default function KitchenChefDetail() {
         {/* VIEW 2: CHEF HISTORY (DATE-WISE COMPLETED ITEMS) */}
         {/* ========================================================= */}
         {viewMode === "HISTORY" && (
-          <div className="space-y-3 sm:space-y-4" data-testid="chef-history-container">
+          <div className="space-y-6" data-testid="chef-history-container">
             {/* History Header & Summary Banner */}
-            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800/80 p-3 sm:p-3.5 shadow-xs">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5">
-                    <History className="text-emerald-600 dark:text-emerald-400" size={18} />
-                    <h2 className="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-slate-100">
+                  <div className="flex items-center gap-2 mb-1">
+                    <History className="text-emerald-600 dark:text-emerald-400" size={20} />
+                    <h2 className="text-lg font-black tracking-tight text-slate-900 dark:text-slate-100">
                       Chef History
                     </h2>
-                    <span className="text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                       Completed Items
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     Authoritative preparation records for <strong>{chefInfo?.name || "Chef"}</strong> (Station #{chefId}). Grouped by calendar date with completion timestamps.
                   </p>
                 </div>
 
                 {/* Lifetime/Total summary badge */}
-                <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-                  <div className="px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-right">
-                    <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Total Completed</div>
-                    <div className="text-base sm:text-lg font-black text-emerald-600 dark:text-emerald-400 leading-tight">
+                <div className="flex items-center gap-3">
+                  <div className="px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-right">
+                    <div className="text-[10px] font-semibold text-slate-500 uppercase">Total Completed</div>
+                    <div className="text-lg font-black text-emerald-600 dark:text-emerald-400">
                       {historyError ? "—" : historyPagination.totalCount}
                     </div>
                   </div>
-                  <div className="px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-right">
-                    <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Showing</div>
-                    <div className="text-base sm:text-lg font-black text-slate-900 dark:text-slate-100 leading-tight">
+                  <div className="px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-right">
+                    <div className="text-[10px] font-semibold text-slate-500 uppercase">Showing</div>
+                    <div className="text-lg font-black text-slate-900 dark:text-slate-100">
                       {historyError ? 0 : historyItems.length}
                     </div>
                   </div>
@@ -902,7 +882,7 @@ export default function KitchenChefDetail() {
               </div>
 
               {/* Filters Bar: Date Presets, Custom Date, and Search */}
-              <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5">
+              <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
                 {/* Date Filter Buttons */}
                 <div className="flex flex-wrap items-center gap-1.5">
                   {[
@@ -917,7 +897,7 @@ export default function KitchenChefDetail() {
                       type="button"
                       data-testid={`filter-${filter.id}`}
                       onClick={() => handleDateFilterChange(filter.id)}
-                      className={`px-2.5 py-1 rounded-md text-[11px] sm:text-xs font-bold transition cursor-pointer ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
                         historyDateRange === filter.id
                           ? "bg-emerald-600 text-white shadow-xs"
                           : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
@@ -933,30 +913,30 @@ export default function KitchenChefDetail() {
                       data-testid="custom-date-input"
                       value={customDate}
                       onChange={(e) => handleCustomDateChange(e.target.value)}
-                      className="px-2 py-0.5 text-xs rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
+                      className="px-2.5 py-1 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
                     />
                   )}
                 </div>
 
                 {/* Search Input */}
                 <div className="relative w-full md:w-64">
-                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
                     data-testid="history-search-input"
                     placeholder="Search item, KOT #, or table..."
                     value={historySearchInput}
                     onChange={(e) => handleSearchChange(e.target.value)}
-                    className="w-full pl-8 pr-7 py-1 text-xs rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
+                    className="w-full pl-9 pr-8 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
                   />
                   {historySearchInput && (
                     <button
                       type="button"
                       onClick={handleClearSearch}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                       title="Clear search"
                     >
-                      <X size={12} />
+                      <X size={13} />
                     </button>
                   )}
                 </div>
@@ -965,33 +945,33 @@ export default function KitchenChefDetail() {
 
             {/* Date-wise Grouped History Display */}
             {loadingHistory && !historyItems.length ? (
-              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-8 text-center text-xs text-slate-500">
-                <RefreshCw size={20} className="animate-spin text-emerald-600 mx-auto mb-2" />
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-12 text-center text-xs text-slate-500">
+                <RefreshCw size={24} className="animate-spin text-emerald-600 mx-auto mb-3" />
                 Loading history...
               </div>
             ) : historyError && !historyItems.length ? (
-              <div className="bg-white dark:bg-slate-900 rounded-xl border border-red-200 dark:border-red-900/40 p-8 text-center shadow-xs">
-                <div className="w-12 h-12 bg-red-100 dark:bg-red-950/60 text-red-500 rounded-xl flex items-center justify-center mx-auto mb-2">
-                  <AlertTriangle size={24} />
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-red-200 dark:border-red-900/40 p-12 text-center shadow-xs">
+                <div className="w-14 h-14 bg-red-100 dark:bg-red-950/60 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                  <AlertTriangle size={28} />
                 </div>
                 <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 mb-1">
                   Unable to load history.
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-3">
+                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-4">
                   {historyError}
                 </p>
                 <button
                   type="button"
                   onClick={() => loadHistoryData(1, false)}
-                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
                 >
                   Retry
                 </button>
               </div>
             ) : groupedHistory.length === 0 ? (
-              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-8 text-center shadow-xs">
-                <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-xl flex items-center justify-center mx-auto mb-2">
-                  <Inbox size={24} />
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-12 text-center shadow-xs">
+                <div className="w-14 h-14 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                  <Inbox size={28} />
                 </div>
                 <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 mb-1">
                   {historySearch.trim()
@@ -1011,24 +991,24 @@ export default function KitchenChefDetail() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-3.5 sm:space-y-4">
+              <div className="space-y-6">
                 {groupedHistory.map((group) => (
-                  <div key={group.dateKey} className="space-y-2 sm:space-y-2.5" data-testid={`history-group-${group.dateKey}`}>
+                  <div key={group.dateKey} className="space-y-3" data-testid={`history-group-${group.dateKey}`}>
                     {/* Group Header */}
-                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-200 dark:border-slate-800">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar size={13} className="text-emerald-600 dark:text-emerald-400" />
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <Calendar size={14} className="text-emerald-600 dark:text-emerald-400" />
                         <span className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-200">
                           {group.dateHeading}
                         </span>
                       </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200/60 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-200/60 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                         {group.items.length} {group.items.length === 1 ? "item" : "items"}
                       </span>
                     </div>
 
                     {/* Group Items Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                       {group.items.map((item) => (
                         <div
                           key={item.orderItemId ? `chef-history-orderItem-${item.orderItemId}` : `chef-history-item-${item.id}`}
@@ -1038,25 +1018,25 @@ export default function KitchenChefDetail() {
                           data-kot-item-id={item.kotItemId || item.id}
                           data-menu-item-id={item.menuItemId}
                           data-order-id={item.orderId}
-                          className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/90 dark:border-slate-800/90 p-3 sm:p-3.5 shadow-xs flex flex-col justify-between transition hover:border-slate-300 dark:hover:border-slate-700"
+                          className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs flex flex-col justify-between transition hover:border-slate-300 dark:hover:border-slate-700"
                         >
                           <div>
                             {/* Card Top Row: KOT #, Table, Priority, Completed Badge */}
-                            <div className="flex items-center justify-between gap-2 mb-1.5">
+                            <div className="flex items-center justify-between gap-2 mb-2">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="text-xs font-black text-slate-900 dark:text-slate-100 tracking-tight">
                                   #{item.kotNumber || item.kotId}
                                 </span>
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                                   {item.tableNo}
                                 </span>
                                 {item.priority === "URGENT" || item.priority === "HIGH" ? (
-                                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 uppercase">
+                                  <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
                                     {item.priority}
                                   </span>
                                 ) : null}
                               </div>
-                              <span className="text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+                              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
                                 <CheckCircle2 size={11} />
                                 COMPLETED
                               </span>
@@ -1079,22 +1059,22 @@ export default function KitchenChefDetail() {
                               </div>
                             )}
                             {item.notes && (
-                              <div className="text-[11px] italic text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 rounded px-2 py-1 mb-1.5 border border-amber-200/50 dark:border-amber-900/40">
+                              <div className="text-[11px] italic text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 rounded px-2 py-1 mb-2 border border-amber-200/50 dark:border-amber-900/40">
                                 Note: {item.notes}
                               </div>
                             )}
                           </div>
 
                           {/* Card Footer: Authoritative Timestamps and Assignment Source */}
-                          <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 mt-1.5">
+                          <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 mt-2">
                             <div className="flex items-center gap-1.5">
-                              <Clock size={11} className="text-emerald-600 dark:text-emerald-400" />
+                              <Clock size={12} className="text-emerald-600 dark:text-emerald-400" />
                               <span>Completed <strong>{item.completedTime}</strong></span>
                               {typeof item.prepTimeMinutes === "number" && (
-                                <span className="text-[9px] text-slate-400">({item.prepTimeMinutes}m prep)</span>
+                                <span className="text-[10px] text-slate-400">({item.prepTimeMinutes}m prep)</span>
                               )}
                             </div>
-                            <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">
+                            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                               {item.assignmentSource === "SELF_PICKED" ? "Self-Picked" : "Dispatched"}
                             </div>
                           </div>

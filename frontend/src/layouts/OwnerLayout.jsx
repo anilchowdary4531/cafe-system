@@ -56,7 +56,7 @@ import { resolveRestaurantName, resolveAuthoritativeRestaurantId } from "../util
 import BrandLogo from "../components/BrandLogo";
 import Footer from "../components/Footer";
 import { useAuth } from "../context/AuthContext";
-import { resolveEffectiveStaffRole, isServerStaff } from "../utils/staffRole";
+import { resolveEffectiveStaffRole } from "../utils/staffRole";
 import { showToast } from "../utils/toast";
 import tiffzyLogo from "../assets/tiffzy-logo.png";
 import NewOrderPopup from "../components/NewOrderPopup";
@@ -421,9 +421,9 @@ const buildReceiptPrintMarkup = ({
 `;
 };
 
-const normalizeTableRows = (rows) => {
-    const list = Array.isArray(rows) ? rows : (rows && Array.isArray(rows.tables) ? rows.tables : []);
-    return list.map((table, index) => {
+const normalizeTableRows = (rows) =>
+    (Array.isArray(rows) ? rows : [])
+        .map((table, index) => {
             const rawActiveOrders = Array.isArray(table?.activeOrders)
                 ? table.activeOrders.map((order) => ({
                       id: order?.id,
@@ -451,21 +451,14 @@ const normalizeTableRows = (rows) => {
                 table?.activeSession?.status !== "CLOSED" &&
                 table?.activeSession?.status !== "CANCELLED"
             );
-            const isDirty = table?.cleaningStatus === "DIRTY" || table?.status === "DIRTY";
-            const isExplicitlyFree =
-                !isDirty && (
-                table?.isOccupied === false ||
-                table?.status === "AVAILABLE" ||
-                table?.activeSession?.status === "CLOSED" ||
-                table?.activeSession?.status === "CANCELLED");
-            const isOccupied = !isExplicitlyFree && !isDirty && Boolean(table?.isOccupied || hasActiveOrders || hasActiveSession);
+            const isExplicitlyFree = table?.isOccupied === false || table?.status === "AVAILABLE" || table?.activeSession?.status === "CLOSED" || table?.activeSession?.status === "CANCELLED";
+            const isOccupied = !isExplicitlyFree && Boolean(table?.isOccupied || hasActiveOrders || hasActiveSession);
             const activeOrders = isOccupied ? rawActiveOrders : [];
 
             return {
                 ...table,
                 tableNo: String(table?.tableNo || "").trim(),
-                cleaningStatus: isDirty ? "DIRTY" : (table?.cleaningStatus || "CLEAN"),
-                status: isDirty ? "DIRTY" : (isExplicitlyFree ? "AVAILABLE" : (table?.status || (isOccupied ? "OCCUPIED" : "AVAILABLE"))),
+                status: isExplicitlyFree ? "AVAILABLE" : (table?.status || (isOccupied ? "OCCUPIED" : "AVAILABLE")),
                 assignedWaiterId: table?.assignedWaiterId || (isOccupied ? table?.activeSession?.waiterId : null) || null,
                 assignedWaiterName: table?.assignedWaiterName || (isOccupied ? table?.activeSession?.waiterName : null) || null,
                 assignedServer: table?.assignedServer || table?.assignedWaiterName || (isOccupied ? table?.activeSession?.waiterName : null) || null,
@@ -495,11 +488,9 @@ const normalizeTableRows = (rows) => {
                 sensitivity: "base",
             })
         );
-};
 
 const TABLE_STATE_KEYS = {
     BLANK: "BLANK_TABLE",
-    CLEANING: "CLEANING_TABLE",
     RESERVED: "RESERVED_TABLE",
     RUNNING: "RUNNING_TABLE",
     PRINTED: "PRINTED_TABLE",
@@ -512,7 +503,6 @@ const TABLE_STATE_KEYS = {
 
 const TABLE_STATE_LABELS = {
     [TABLE_STATE_KEYS.BLANK]: "Blank Table",
-    [TABLE_STATE_KEYS.CLEANING]: "Cleaning Needed",
     [TABLE_STATE_KEYS.RESERVED]: "Reserved Table",
     [TABLE_STATE_KEYS.RUNNING]: "Running Table",
     [TABLE_STATE_KEYS.PRINTED]: "Printed Table",
@@ -525,7 +515,6 @@ const TABLE_STATE_LABELS = {
 
 const TABLE_STATE_LEGEND = [
     TABLE_STATE_KEYS.BLANK,
-    TABLE_STATE_KEYS.CLEANING,
     TABLE_STATE_KEYS.RESERVED,
     TABLE_STATE_KEYS.RUNNING,
     TABLE_STATE_KEYS.PRINTED,
@@ -541,11 +530,6 @@ const toTableStateClassToken = (stateKey) =>
     String(stateKey || TABLE_STATE_KEYS.BLANK).toLowerCase().replace(/_/g, "-");
 
 const resolveTableState = (table, printedTableKeys = new Set()) => {
-    const isDirty = table?.cleaningStatus === "DIRTY" || table?.status === "DIRTY";
-    if (isDirty) {
-        return TABLE_STATE_KEYS.CLEANING;
-    }
-
     const activeOrders = Array.isArray(table?.activeOrders) ? table.activeOrders : [];
     if (activeOrders.length > 0) {
         const assignmentKey = String(table?.assignmentKey || table?.key || "");
@@ -593,14 +577,6 @@ const resolveTableState = (table, printedTableKeys = new Set()) => {
 };
 
 const resolveTableCardBadge = (table, tableStateKey, printedTableKeys) => {
-    const isDirty = table?.cleaningStatus === "DIRTY" || table?.status === "DIRTY";
-    if (isDirty) {
-        return {
-            label: "Cleaning",
-            className: "bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/40 animate-pulse",
-        };
-    }
-
     const activeOrders = Array.isArray(table?.activeOrders) ? table.activeOrders : [];
     const isOccupied = table?.isOccupied || activeOrders.length > 0;
 
@@ -1175,51 +1151,17 @@ export default function OwnerLayout() {
             if (!payload || typeof payload !== "object") return;
             const targetId = payload.tableId || payload.id;
             const targetNo = payload.tableNo;
-            const isDirty = payload.cleaningStatus === "DIRTY" || payload.status === "DIRTY";
 
-            if (isDirty) {
+            if (payload.status === "AVAILABLE" || payload.isOccupied === false) {
                 setTableOverview((prev) => {
                     const updatedTables = (prev.tables || []).map((t) => {
                         const match =
                             (targetId && String(t.id) === String(targetId)) ||
-                            (!targetId && targetNo && String(t.tableNo).trim().toLowerCase() === String(targetNo).trim().toLowerCase());
-                        if (match) {
-                            return {
-                                ...t,
-                                status: "DIRTY",
-                                cleaningStatus: "DIRTY",
-                                isOccupied: false,
-                                activeOrderCount: 0,
-                                activeItemCount: 0,
-                                activeOrders: [],
-                                activeOrderStatus: null,
-                                paymentStatus: null,
-                                lastOrderStatus: null,
-                                lastPaymentStatus: null,
-                                session: { status: "CLOSED" },
-                                activeSession: null,
-                                occupiedSince: null,
-                            };
-                        }
-                        return t;
-                    });
-                    return {
-                        ...prev,
-                        occupied: updatedTables.filter((t) => t.isOccupied).length,
-                        tables: updatedTables,
-                    };
-                });
-            } else if (payload.status === "AVAILABLE" || payload.isOccupied === false) {
-                setTableOverview((prev) => {
-                    const updatedTables = (prev.tables || []).map((t) => {
-                        const match =
-                            (targetId && String(t.id) === String(targetId)) ||
-                            (!targetId && targetNo && String(t.tableNo).trim().toLowerCase() === String(targetNo).trim().toLowerCase());
+                            (targetNo && String(t.tableNo).toLowerCase() === String(targetNo).toLowerCase());
                         if (match) {
                             return {
                                 ...t,
                                 status: "AVAILABLE",
-                                cleaningStatus: "CLEAN",
                                 isOccupied: false,
                                 activeOrderCount: 0,
                                 activeItemCount: 0,
@@ -1263,7 +1205,7 @@ export default function OwnerLayout() {
                     const updatedTables = (prev.tables || []).map((t) => {
                         const match =
                             (targetId && String(t.id) === String(targetId)) ||
-                            (!targetId && targetNo && String(t.tableNo).trim().toLowerCase() === String(targetNo).trim().toLowerCase());
+                            (targetNo && String(t.tableNo).toLowerCase() === String(targetNo).toLowerCase());
                         if (match) {
                             return {
                                 ...t,
@@ -1306,12 +1248,11 @@ export default function OwnerLayout() {
                     const updatedTables = (prev.tables || []).map((t) => {
                         const match =
                             (targetId && String(t.id) === String(targetId)) ||
-                            (!targetId && targetNo && String(t.tableNo).trim().toLowerCase() === String(targetNo).trim().toLowerCase());
+                            (targetNo && String(t.tableNo).toLowerCase() === String(targetNo).toLowerCase());
                         if (match) {
                             return {
                                 ...t,
-                                status: "DIRTY",
-                                cleaningStatus: "DIRTY",
+                                status: "AVAILABLE",
                                 isOccupied: false,
                                 activeOrderCount: 0,
                                 activeItemCount: 0,
@@ -1363,10 +1304,6 @@ export default function OwnerLayout() {
         socket.on("table:session_updated", handleSessionUpdated);
         socket.on("table:waiter_assigned", handleTableUpdated);
         socket.on("table:layout_updated", loadTableOverview);
-        socket.on("cleaner:table_dirty", loadTableOverview);
-        socket.on("cleaner:table_cleaned", loadTableOverview);
-        socket.on("cleaner:task_completed", loadTableOverview);
-        socket.on("cleaner:task_created", loadTableOverview);
 
         return () => {
             socket.off("order:created", handleNewOrder);
@@ -1380,10 +1317,6 @@ export default function OwnerLayout() {
             socket.off("table:session_updated", handleSessionUpdated);
             socket.off("table:waiter_assigned", loadTableOverview);
             socket.off("table:layout_updated", loadTableOverview);
-            socket.off("cleaner:table_dirty", loadTableOverview);
-            socket.off("cleaner:table_cleaned", loadTableOverview);
-            socket.off("cleaner:task_completed", loadTableOverview);
-            socket.off("cleaner:task_created", loadTableOverview);
         };
     }, [loadTableOverview, socket]);
 
@@ -1476,10 +1409,6 @@ export default function OwnerLayout() {
             map.set(String(staffUser.id), staffUser);
         });
         return map;
-    }, [staffOverview.users]);
-
-    const eligibleServers = useMemo(() => {
-        return (staffOverview.users || []).filter((staffUser) => isServerStaff(staffUser));
     }, [staffOverview.users]);
 
     const tableOccupiedByKey = useMemo(() => {
@@ -1656,14 +1585,6 @@ export default function OwnerLayout() {
         if (!normalizedStaffId) return;
 
         const staffMember = staffById.get(normalizedStaffId);
-        if (staffMember && !isServerStaff(staffMember)) {
-            showToast({
-                title: "Invalid Server",
-                message: "Only staff with Server designation can be assigned to a table",
-                variant: "error",
-            });
-            return;
-        }
         const staffName = staffMember ? (staffMember.name || staffMember.userName || "Server") : "Server";
 
         const prevAssignments = { ...(tableAssignments || {}) };
@@ -2075,10 +1996,7 @@ export default function OwnerLayout() {
     const reservedTables = tableOverview.tables.filter(
         (t) => resolveTableState(t, printedTableKeys) === TABLE_STATE_KEYS.RESERVED
     ).length;
-    const cleaningTables = tableOverview.tables.filter(
-        (t) => resolveTableState(t, printedTableKeys) === TABLE_STATE_KEYS.CLEANING
-    ).length;
-    const freeTables = Math.max(0, tableOverview.total - tableOverview.occupied - reservedTables - cleaningTables);
+    const freeTables = Math.max(0, tableOverview.total - tableOverview.occupied - reservedTables);
 
     useEffect(() => {
         if (!restaurantId) return;
@@ -2502,11 +2420,6 @@ export default function OwnerLayout() {
                                         {reservedTables > 0 && (
                                             <span className="inline-flex items-center gap-1.5 font-bold text-purple-600 dark:text-purple-400">
                                                 Reserved: {reservedTables}
-                                            </span>
-                                        )}
-                                        {cleaningTables > 0 && (
-                                            <span className="inline-flex items-center gap-1.5 font-bold text-amber-600 dark:text-amber-400">
-                                                Cleaning: {cleaningTables}
                                             </span>
                                         )}
                                         <span className="inline-flex items-center gap-1.5 font-bold theme-muted">
@@ -3201,13 +3114,13 @@ export default function OwnerLayout() {
                                                                     <p className="theme-muted mt-1">
                                                                         Loading staff...
                                                                     </p>
-                                                                ) : eligibleServers.length === 0 ? (
+                                                                ) : staffOverview.users.length === 0 ? (
                                                                     <p className="theme-muted mt-1">
-                                                                        No servers available
+                                                                        No active staff found.
                                                                     </p>
                                                                 ) : (
                                                                     <div className="mt-1.5 flex flex-wrap gap-1.5">
-                                                                        {eligibleServers.map(
+                                                                        {staffOverview.users.map(
                                                                             (staffUser) => {
                                                                                 const staffId = String(
                                                                                     staffUser.id || ""

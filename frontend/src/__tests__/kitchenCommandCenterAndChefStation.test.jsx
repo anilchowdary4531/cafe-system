@@ -246,7 +246,7 @@ describe("Senior Chef Command Center & Individual Chef Station Suite", () => {
   });
 
   // 3. Chef Workload Panel & Unassigned Queue Filter
-  it("renders Chef Workload Panel and filters KDS to unassigned items", async () => {
+  it("renders Chef Workload Panel collapsed by default and filters KDS to unassigned items when expanded", async () => {
     render(
       <MemoryRouter initialEntries={["/kitchen"]}>
         <Kitchen />
@@ -255,7 +255,16 @@ describe("Senior Chef Command Center & Individual Chef Station Suite", () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Senior Chef Command Center/i)).toBeInTheDocument();
-      expect(screen.getAllByText("Chef Ravi").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText(/Chef Stations & Workload/i)).toBeInTheDocument();
+      // Workload panel should be collapsed by default
+      expect(screen.queryByText("Chef Suresh")).not.toBeInTheDocument();
+      expect(screen.queryByText(/Unassigned Queue/i)).not.toBeInTheDocument();
+    });
+
+    // Expand the Chef Stations & Workload section
+    fireEvent.click(screen.getByText(/Chef Stations & Workload/i));
+
+    await waitFor(() => {
       expect(screen.getByText("Chef Suresh")).toBeInTheDocument();
       expect(screen.getByText(/Unassigned Queue/i)).toBeInTheDocument();
     });

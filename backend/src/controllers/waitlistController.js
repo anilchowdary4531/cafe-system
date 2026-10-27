@@ -25,7 +25,7 @@ async function calculateEstimatedWait(restaurantId, guestCount, preferredSection
 
     // Check tables matching capacity/section
     const whereTable = { restaurantId: rid, isActive: true, isBlocked: false };
-    if (preferredSection && preferredSection !== "ALL" && preferredSection !== "ANY" && preferredSection !== "Any Area" && preferredSection !== "Main Floor") {
+    if (preferredSection && preferredSection !== "ALL" && preferredSection !== "Main Floor") {
         whereTable.section = preferredSection;
     }
 
@@ -151,7 +151,7 @@ export async function createWaitlistController(req, reply) {
                 customerName: cleanName,
                 customerPhone: cleanPhone,
                 guestCount: count,
-                preferredSection: (preferredSection && preferredSection !== "ANY" && preferredSection !== "Any Area" && preferredSection !== "Main Floor") ? preferredSection : null,
+                preferredSection: preferredSection || "Main Floor",
                 notes: notes ? String(notes).trim() : null,
                 estimatedWaitMinutes,
                 createdById: req.user?.id || null,
