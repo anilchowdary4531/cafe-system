@@ -2,6 +2,8 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import defaultPrisma from "../prisma.js";
 import { buildReadableOrderNo, createOrderByStaff, updateOrderStatus } from "../services/orderService.js";
+import { createAndDispatchNotification } from "../services/notificationService.js";
+import { NOTIFICATION_TYPES, RECIPIENT_TYPES } from "../constants/notificationTypes.js";
 import { resolveRestaurantBillingConfig } from "../services/billingService.js";
 import { buildUploadController } from "../controllers/uploadController.js";
 import { deleteAssetByKey, uploadRestaurantAsset } from "../services/storageService.js";
@@ -437,6 +439,51 @@ export default async function ownerRoutes(app, deps = {}) {
         console.warn("Socket broadcast error on order creation:", e?.message);
       }
 
+      // Dispatch Server Notification when order/KOT sent to Kitchen
+      try {
+        let waiterId = order.tableSession?.waiterId || null;
+        if (!waiterId && order.tableSessionId) {
+          const sess = await prisma.tableSession.findUnique({
+            where: { id: order.tableSessionId },
+            select: { waiterId: true },
+          });
+          waiterId = sess?.waiterId || null;
+        }
+        if (!waiterId && order.tableNo) {
+          const dt = await prisma.diningTable.findFirst({
+            where: { restaurantId, tableNo: String(order.tableNo).trim() },
+            select: { assignedWaiterId: true },
+          });
+          waiterId = dt?.assignedWaiterId || null;
+        }
+        if (!waiterId && req.user?.role === "WAITER") {
+          waiterId = req.user.id;
+        }
+
+        if (waiterId) {
+          const tableDisplay = order.tableNo ? `Table ${order.tableNo}` : "Table";
+          await createAndDispatchNotification({
+            restaurantId,
+            recipientType: RECIPIENT_TYPES.USER,
+            recipientId: waiterId,
+            notificationType: NOTIFICATION_TYPES.KOT_SENT || "KOT_SENT",
+            title: `🍳 Order Sent to Kitchen — ${tableDisplay}`,
+            message: `Order #${order.orderNo || order.id} sent to kitchen for ${tableDisplay}`,
+            data: {
+              orderId: order.id,
+              orderNo: order.orderNo,
+              tableId: order.tableId || null,
+              tableSessionId: order.tableSessionId || null,
+              tableNo: order.tableNo,
+              action: "KOT_SENT",
+            },
+            idempotencyKey: `kot_sent_${order.id}_${waiterId}`,
+          });
+        }
+      } catch (notifErr) {
+        console.warn("Server notification dispatch error:", notifErr?.message);
+      }
+
       return reply.code(201).send({
         success: true,
         message: "Order placed successfully",
@@ -760,6 +807,11 @@ export default async function ownerRoutes(app, deps = {}) {
             orderNo: true,
             createdAt: true,
             updatedAt: true,
+            tableSession: {
+              select: {
+                tableId: true,
+              },
+            },
           },
           orderBy: { createdAt: "desc" },
         }),
@@ -797,10 +849,11 @@ export default async function ownerRoutes(app, deps = {}) {
       for (const session of activeSessions) {
         if (session.tableId) {
           activeSessionsByTableId.set(Number(session.tableId), session);
-        }
-        for (const k of getTableKeys(session.tableNo)) {
-          if (!activeSessionsByTable[k]) {
-            activeSessionsByTable[k] = session;
+        } else {
+          for (const k of getTableKeys(session.tableNo)) {
+            if (!activeSessionsByTable[k]) {
+              activeSessionsByTable[k] = session;
+            }
           }
         }
       }
@@ -852,21 +905,29 @@ export default async function ownerRoutes(app, deps = {}) {
             activeOrdersByTableId.set(targetTableId, []);
           }
           activeOrdersByTableId.get(targetTableId).push(formattedOrder);
-        }
-
-        for (const k of getTableKeys(order.tableNo)) {
-          if (!activeOrdersByTable[k]) activeOrdersByTable[k] = [];
-          if (!activeOrdersByTable[k].some((o) => o.id === formattedOrder.id)) {
-            activeOrdersByTable[k].push(formattedOrder);
+        } else {
+          for (const k of getTableKeys(order.tableNo)) {
+            if (!activeOrdersByTable[k]) activeOrdersByTable[k] = [];
+            if (!activeOrdersByTable[k].some((o) => o.id === formattedOrder.id)) {
+              activeOrdersByTable[k].push(formattedOrder);
+            }
           }
         }
       }
 
+      const latestOrderByTableId = new Map();
       const latestOrderByTable = {};
       for (const order of latestTableOrders) {
-        for (const k of getTableKeys(order.tableNo)) {
-          if (!latestOrderByTable[k]) {
-            latestOrderByTable[k] = order;
+        const ordTableId = order.tableSession?.tableId ? Number(order.tableSession.tableId) : null;
+        if (ordTableId) {
+          if (!latestOrderByTableId.has(ordTableId)) {
+            latestOrderByTableId.set(ordTableId, order);
+          }
+        } else {
+          for (const k of getTableKeys(order.tableNo)) {
+            if (!latestOrderByTable[k]) {
+              latestOrderByTable[k] = order;
+            }
           }
         }
       }
@@ -910,11 +971,13 @@ export default async function ownerRoutes(app, deps = {}) {
             }
           }
 
-          let latestOrder = null;
-          for (const k of getTableKeys(table.tableNo)) {
-            if (latestOrderByTable[k]) {
-              latestOrder = latestOrderByTable[k];
-              break;
+          let latestOrder = latestOrderByTableId.get(tid) || null;
+          if (!latestOrder) {
+            for (const k of getTableKeys(table.tableNo)) {
+              if (latestOrderByTable[k]) {
+                latestOrder = latestOrderByTable[k];
+                break;
+              }
             }
           }
 
