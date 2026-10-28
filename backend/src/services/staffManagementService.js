@@ -1,7 +1,7 @@
 import { logAuditEvent } from "./auditLogService.js";
 import { createAndDispatchNotification } from "./notificationService.js";
 import { NOTIFICATION_TYPES, RECIPIENT_TYPES } from "../constants/notificationTypes.js";
-import { inferRoleFromDesignation } from "./staffSessionService.js";
+import { inferRoleFromDesignation, isServerStaff } from "./staffSessionService.js";
 
 /**
  * Unassign Waiter from Table & TableSession
@@ -181,11 +181,15 @@ export const assignWaiterToTable = async ({
                 { role: "SUPER_ADMIN" },
             ],
         },
-        select: { id: true, name: true, role: true },
+        select: { id: true, name: true, role: true, designation: true, isActive: true },
     });
 
     if (!waiter) {
         throw new Error("Active waiter not found for this restaurant");
+    }
+
+    if (!isServerStaff(waiter)) {
+        throw new Error("Only active staff with Server designation can be assigned to a table");
     }
 
     const isReassignment = Boolean(table.assignedWaiterId && table.assignedWaiterId !== wid);

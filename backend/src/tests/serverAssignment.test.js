@@ -452,7 +452,7 @@ test("Server Assignment, Table Mapping & Connection Audit — Backend Test Suite
         });
 
         const notifAfter = await prisma.notification.findFirst({
-            where: { recipientId: serverA1.id, restaurantId: restaurantA.id },
+            where: { recipientId: serverA1.id, restaurantId: restaurantA.id, notificationType: NOTIFICATION_TYPES.TABLE_ASSIGNMENT },
             orderBy: { createdAt: "desc" },
         });
 
@@ -558,5 +558,73 @@ test("Server Assignment, Table Mapping & Connection Audit — Backend Test Suite
         const freedTable = await prisma.diningTable.findUnique({ where: { id: tableA2.id } });
         assert.equal(freedTable.assignedWaiterId, null, "DiningTable assignedWaiterId must be set to null upon session payment completion");
         assert.equal(freedTable.assignedWaiterName, null);
+    });
+
+    await t.test("13. Backend strictly rejects assigning non-server staff (Cashier, Chef, Owner) to a table", async () => {
+        // Create Cashier staff in Restaurant A
+        const cashier = await prisma.user.create({
+            data: {
+                name: `Cashier Charlie ${ts}`,
+                email: `cashier-${ts}@example.com`,
+                password: "hashedpassword123",
+                role: "CASHIER",
+                designation: "Cashier",
+                restaurantId: restaurantA.id,
+                isActive: true,
+            },
+        });
+
+        // 1. Direct service call should reject Cashier
+        await assert.rejects(
+            async () => {
+                await assignWaiterToTable({
+                    prisma,
+                    restaurantId: restaurantA.id,
+                    tableId: tableA2.id,
+                    waiterId: cashier.id,
+                    actor: { userId: ownerA.id, role: "OWNER" },
+                });
+            },
+            (err) => {
+                assert.ok(err.message.includes("Server designation"), "Error must state that only staff with Server designation can be assigned");
+                return true;
+            }
+        );
+
+        // 2. Direct service call should reject Owner (non-server)
+        await assert.rejects(
+            async () => {
+                await assignWaiterToTable({
+                    prisma,
+                    restaurantId: restaurantA.id,
+                    tableId: tableA2.id,
+                    waiterId: ownerA.id,
+                    actor: { userId: ownerA.id, role: "OWNER" },
+                });
+            },
+            (err) => {
+                assert.ok(err.message.includes("Server designation"), "Error must state that only staff with Server designation can be assigned");
+                return true;
+            }
+        );
+
+        // 3. HTTP endpoint should return 400 when attempting to assign a non-server
+        const ownerToken = app.jwt.sign({
+            userId: ownerA.id,
+            email: ownerA.email,
+            role: "OWNER",
+            restaurantId: restaurantA.id,
+        });
+
+        const res = await app.inject({
+            method: "POST",
+            url: `/owner/${restaurantA.id}/tables/${tableA2.id}/assign-waiter`,
+            headers: { authorization: `Bearer ${ownerToken}` },
+            payload: { waiterId: cashier.id },
+        });
+
+        assert.equal(res.statusCode, 400, "API must return HTTP 400 for non-server assignment");
+        const body = JSON.parse(res.payload);
+        assert.ok(body.message.includes("Server designation"), "Response message must state Server designation is required");
     });
 });

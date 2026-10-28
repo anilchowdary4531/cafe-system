@@ -4,8 +4,33 @@ import axios from "axios";
 import { useAuth } from "./AuthContext";
 import { useStaffSocket } from "./StaffSocketContext";
 import { setCacheEntry } from "../utils/localCache";
+import {
+    resolveTableGroup,
+    getStoredTableGroups,
+    getStoredGroupCatalog,
+    toTitleCase,
+    TABLE_GROUPS_SYNC_EVENT,
+} from "../utils/tableGrouping";
 
 export const TableStateContext = createContext(null);
+
+/**
+ * Resolves the authoritative canonical section/location string for any table.
+ * Adheres strictly to zero fake location fallbacks: never defaults to "Main Floor" or "Main Hall".
+ * Uses Owner Panel grouping reference logic. If unconfigured, returns "Location not configured".
+ */
+export function resolveCanonicalSection(raw, tableGroups = {}, catalog = []) {
+    if (!raw) return "Location not configured";
+    const resolvedGroup = resolveTableGroup(raw, tableGroups, catalog);
+    if (resolvedGroup && resolvedGroup !== "Ungrouped") {
+        return resolvedGroup;
+    }
+    const rawSection = String(raw.section || "").trim();
+    if (rawSection && rawSection.toLowerCase() !== "main floor") {
+        return toTitleCase(rawSection);
+    }
+    return "Location not configured";
+}
 
 /**
  * Canonical Table Identity helper (Step 3)
@@ -20,31 +45,38 @@ export function getCanonicalTableKey({ restaurantId, tableId, id }) {
 /**
  * Normalizes any incoming table record into the strict canonical schema (Step 2)
  */
-export function normalizeCanonicalTable(raw, defaultRestaurantId = null) {
+export function normalizeCanonicalTable(raw, defaultRestaurantId = null, tableGroups = null, groupCatalog = null) {
     if (!raw || typeof raw !== "object") return null;
 
     const tid = Number(raw.id || raw.tableId || 0);
     const rid = Number(raw.restaurantId || defaultRestaurantId || 0);
     const tableNo = String(raw.tableNo || raw.label || "").trim();
 
+    const resolvedTableGroups = tableGroups || (rid ? getStoredTableGroups(rid) : {});
+    const resolvedCatalog = groupCatalog || (rid ? getStoredGroupCatalog(rid) : []);
+    const resolvedSection = resolveCanonicalSection(raw, resolvedTableGroups, resolvedCatalog);
+
     const hasStatus = raw.status !== undefined && raw.status !== null;
     const hasOccupancy = raw.isOccupied !== undefined && raw.isOccupied !== null;
 
+    const isDirty = raw.cleaningStatus === "DIRTY" || raw.status === "DIRTY";
+    const cleaningStatus = isDirty ? "DIRTY" : (raw.cleaningStatus || "CLEAN");
+
     const isExplicitlyFree =
+        !isDirty && (
         raw.status === "AVAILABLE" ||
         raw.isOccupied === false ||
         raw.session?.status === "CLOSED" ||
         raw.activeSession?.status === "CLOSED" ||
-        raw.sessionStatus === "CLOSED";
+        raw.sessionStatus === "CLOSED");
 
     const isBlocked = Boolean(raw.isBlocked);
     const isReserved = !isBlocked && !raw.isOccupied && Boolean(raw.activeReservation || raw.isReserved);
-    const cleaningStatus = raw.cleaningStatus || (raw.status === "DIRTY" ? "DIRTY" : "CLEAN");
 
     let canonicalStatus = hasStatus ? String(raw.status).toUpperCase() : undefined;
     if (isBlocked) {
         canonicalStatus = "BLOCKED";
-    } else if (cleaningStatus === "DIRTY" && !raw.isOccupied) {
+    } else if (isDirty && !raw.isOccupied) {
         canonicalStatus = "DIRTY";
     } else if (canonicalStatus === undefined && isExplicitlyFree) {
         canonicalStatus = isReserved ? "RESERVED" : "AVAILABLE";
@@ -84,6 +116,7 @@ export function normalizeCanonicalTable(raw, defaultRestaurantId = null) {
         tableId: tid,
         restaurantId: rid,
         tableNo,
+        displayName: raw.displayName || (tableNo ? `Table ${tableNo}` : `Table ${tid}`),
         isBlocked,
         isReserved,
         cleaningStatus,
@@ -92,8 +125,11 @@ export function normalizeCanonicalTable(raw, defaultRestaurantId = null) {
         blockedByName: raw.blockedByName || null,
         total: Number(raw.total || raw.payableAmount || 0),
         payableAmount: Number(raw.payableAmount || raw.total || 0),
-        section: raw.section || "Main Floor",
-        seats: Number(raw.seats || 4),
+        section: resolvedSection,
+        floor: raw.floor !== undefined ? raw.floor : null,
+        area: raw.area !== undefined ? raw.area : null,
+        seats: Number(raw.seats || raw.capacity || 4),
+        capacity: Number(raw.seats || raw.capacity || 4),
         version,
         updatedAt,
     };
@@ -158,10 +194,32 @@ export function reconcileTable(current, incoming) {
             incoming.sessionStatus === "CLOSED"
         );
 
+    // Preserve authoritative metadata from current when incoming lacks it
+    const resolvedTableNo = incoming.tableNo || current.tableNo;
+    const resolvedDisplayName = incoming.displayName || current.displayName || (resolvedTableNo ? `Table ${resolvedTableNo}` : null);
+    const resolvedSection = (incoming.section && incoming.section !== "Location not configured")
+        ? incoming.section
+        : (current.section || incoming.section || "Location not configured");
+    const resolvedSeats = incoming.seats !== undefined && incoming.seats !== null
+        ? Number(incoming.seats)
+        : (current.seats !== undefined ? Number(current.seats) : 4);
+    const resolvedCapacity = incoming.capacity !== undefined && incoming.capacity !== null
+        ? Number(incoming.capacity)
+        : (current.capacity !== undefined ? Number(current.capacity) : resolvedSeats);
+    const resolvedFloor = incoming.floor !== undefined ? incoming.floor : current.floor;
+    const resolvedArea = incoming.area !== undefined ? incoming.area : current.area;
+
     if (isExplicitRelease) {
         return {
             ...current,
             ...incoming,
+            tableNo: resolvedTableNo,
+            displayName: resolvedDisplayName,
+            section: resolvedSection,
+            seats: resolvedSeats,
+            capacity: resolvedCapacity,
+            floor: resolvedFloor,
+            area: resolvedArea,
             status: "AVAILABLE",
             isOccupied: false,
             isReserved: Boolean(incoming.isReserved),
@@ -192,6 +250,13 @@ export function reconcileTable(current, incoming) {
     return {
         ...current,
         ...incoming,
+        tableNo: resolvedTableNo,
+        displayName: resolvedDisplayName,
+        section: resolvedSection,
+        seats: resolvedSeats,
+        capacity: resolvedCapacity,
+        floor: resolvedFloor,
+        area: resolvedArea,
         status: incoming.status !== undefined ? incoming.status : current.status,
         isOccupied: incoming.isOccupied !== undefined ? incoming.isOccupied : current.isOccupied,
         assignedWaiterId: resolvedWaiterId,
@@ -212,10 +277,51 @@ export function TableStateProvider({ children }) {
         return Number(user?.restaurantId || user?.restaurant?.id || 0) || null;
     }, [user]);
 
+    // Authoritative table groups and catalog state synchronized with Owner Panel
+    const [tableGroups, setTableGroups] = useState(() => getStoredTableGroups(restaurantId));
+    const [groupCatalog, setGroupCatalog] = useState(() => getStoredGroupCatalog(restaurantId));
+
+    useEffect(() => {
+        setTableGroups(getStoredTableGroups(restaurantId));
+        setGroupCatalog(getStoredGroupCatalog(restaurantId));
+    }, [restaurantId]);
+
+    useEffect(() => {
+        const handleSync = () => {
+            if (restaurantId) {
+                setTableGroups(getStoredTableGroups(restaurantId));
+                setGroupCatalog(getStoredGroupCatalog(restaurantId));
+            }
+        };
+        window.addEventListener(TABLE_GROUPS_SYNC_EVENT, handleSync);
+        window.addEventListener("storage", handleSync);
+        return () => {
+            window.removeEventListener(TABLE_GROUPS_SYNC_EVENT, handleSync);
+            window.removeEventListener("storage", handleSync);
+        };
+    }, [restaurantId]);
+
     // Canonical Map: tableId -> canonical Table object
     const [tablesMap, setTablesMap] = useState(() => new Map());
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+
+    // Dynamic section re-evaluation when groups change
+    useEffect(() => {
+        setTablesMap((prev) => {
+            if (!prev.size) return prev;
+            let changed = false;
+            const next = new Map(prev);
+            for (const [tid, tbl] of prev.entries()) {
+                const newSection = resolveCanonicalSection(tbl, tableGroups, groupCatalog);
+                if (tbl.section !== newSection) {
+                    changed = true;
+                    next.set(tid, { ...tbl, section: newSection });
+                }
+            }
+            return changed ? next : prev;
+        });
+    }, [tableGroups, groupCatalog]);
 
     // Track active fetch request IDs to prevent out-of-order race conditions
     const fetchSeqRef = useRef(0);
@@ -266,12 +372,12 @@ export function TableStateProvider({ children }) {
         setTablesMap((prev) => {
             const next = new Map(prev);
             const existing = next.get(tid);
-            const normalized = normalizeCanonicalTable(tableOrPatch, restaurantId);
+            const normalized = normalizeCanonicalTable(tableOrPatch, restaurantId, tableGroups, groupCatalog);
             const reconciled = reconcileTable(existing, normalized);
             next.set(tid, reconciled);
             return next;
         });
-    }, [restaurantId]);
+    }, [restaurantId, tableGroups, groupCatalog]);
 
     // Bulk reconcile an array of tables from HTTP response (Step 10: Race Protection)
     const reconcileIncomingTables = useCallback((incomingList, responseTimestamp = Date.now()) => {
@@ -280,7 +386,12 @@ export function TableStateProvider({ children }) {
         setTablesMap((prev) => {
             const next = new Map(prev);
             incomingList.forEach((raw) => {
-                const normalized = normalizeCanonicalTable({ ...raw, version: raw.version || responseTimestamp }, restaurantId);
+                const normalized = normalizeCanonicalTable(
+                    { ...raw, version: raw.version || responseTimestamp },
+                    restaurantId,
+                    tableGroups,
+                    groupCatalog
+                );
                 if (!normalized || !normalized.id) return;
                 const existing = next.get(normalized.id);
                 const reconciled = reconcileTable(existing, normalized);
@@ -288,7 +399,7 @@ export function TableStateProvider({ children }) {
             });
             return next;
         });
-    }, [restaurantId]);
+    }, [restaurantId, tableGroups, groupCatalog]);
 
     // Authoritative Fetch / Rehydrate from Backend (Step 11)
     const refreshTables = useCallback(async ({ force = false } = {}) => {
