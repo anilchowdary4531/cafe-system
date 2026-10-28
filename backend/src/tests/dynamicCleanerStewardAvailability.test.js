@@ -476,6 +476,84 @@ test("Tiffzy Dynamic Cleaner & Steward Availability Based On Owner Staff Designa
     assert.equal(stewardAvailable, false);
   });
 
+  await t.test("20. Direct table sanitation via POST /api/v1/staff/tables/:tableId/clean marks table CLEAN and completes cleaning tasks", async () => {
+    // Create a dirty dining table
+    const dirtyTable = await prisma.diningTable.create({
+      data: {
+        tableNo: `T-DIRTY-${randSuffix}`,
+        restaurantId,
+        cleaningStatus: "DIRTY",
+        seats: 4,
+      },
+    });
+
+    // Create an associated cleaning task
+    const cleaningTask = await prisma.staffTask.create({
+      data: {
+        restaurantId,
+        tableId: dirtyTable.id,
+        title: `Clean Table ${dirtyTable.tableNo}`,
+        category: "CLEANING",
+        taskType: "TABLE_BUS_AND_SANITIZE",
+        roleTarget: "CLEANER",
+        status: "PENDING",
+      },
+    });
+
+    // Create a staff user to act as cleaner
+    const cleanerUser = await prisma.user.create({
+      data: {
+        name: `Cleaner Bob ${randSuffix}`,
+        email: `cleaner_bob_${randSuffix}@test.com`,
+        phone: `+91993${randSuffix}`,
+        role: "STAFF",
+        designation: "Cleaner",
+        restaurantId,
+        password: bcrypt.hashSync("CleanerPass123!", 10),
+        sessionVersion: 1,
+      },
+    });
+
+    const cleanerToken = app.jwt.sign({
+      id: cleanerUser.id,
+      userId: cleanerUser.id,
+      role: "STAFF",
+      designation: "Cleaner",
+      restaurantId,
+      sessionVersion: 1,
+    });
+
+    // Direct sanitation call
+    const cleanRes = await app.inject({
+      method: "POST",
+      url: `/api/v1/staff/tables/${dirtyTable.id}/clean`,
+      headers: { authorization: `Bearer ${cleanerToken}` },
+      payload: { restaurantId },
+    });
+
+    assert.equal(cleanRes.statusCode, 200);
+    const body = JSON.parse(cleanRes.payload);
+    assert.equal(body.success, true);
+
+    // Verify table is CLEAN in database
+    const refreshedTable = await prisma.diningTable.findUnique({ where: { id: dirtyTable.id } });
+    assert.equal(refreshedTable.cleaningStatus, "CLEAN");
+
+    // Verify associated task is COMPLETED
+    const refreshedTask = await prisma.staffTask.findUnique({ where: { id: cleaningTask.id } });
+    assert.equal(refreshedTask.status, "COMPLETED");
+    assert.equal(refreshedTask.isCompleted, true);
+
+    // Clean non-existent table returns 404
+    const notFoundRes = await app.inject({
+      method: "POST",
+      url: `/api/v1/staff/tables/999999/clean`,
+      headers: { authorization: `Bearer ${cleanerToken}` },
+      payload: { restaurantId },
+    });
+    assert.equal(notFoundRes.statusCode, 404);
+  });
+
   // Cleanup test artifacts
   await prisma.staffTask.deleteMany({ where: { restaurantId } }).catch(() => {});
   await prisma.tableSession.deleteMany({ where: { restaurantId } }).catch(() => {});

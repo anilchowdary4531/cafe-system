@@ -262,6 +262,7 @@ export function AuthProvider({ children }) {
             value={{
                 user,
                 staffToken,
+                token: staffToken,
                 customer,
                 customerToken,
                 login,

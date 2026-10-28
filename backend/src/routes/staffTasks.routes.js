@@ -477,6 +477,141 @@ export default async function staffTaskRoutes(app, deps = {}) {
   });
 
   /**
+   * POST /api/v1/staff/tables/:tableId/clean
+   * Direct table sanitation endpoint for Cleaner Station.
+   * Marks table CLEAN, completes any pending cleaning tasks, and emits realtime events.
+   */
+  const handleCleanTableDirect = async (req, reply) => {
+    try {
+      const tableId = Number(req.params.tableId);
+      if (!tableId) return reply.code(400).send({ message: "Invalid tableId" });
+
+      const restaurantId = getEffectiveRid(req);
+      const staffId = req.staffActor?.id || req.staffActor?.userId;
+
+      const table = await prisma.diningTable.findUnique({
+        where: { id: tableId },
+      });
+      if (!table) return reply.code(404).send({ message: "Table not found" });
+
+      if (restaurantId && table.restaurantId !== restaurantId) {
+        return reply.code(403).send({ message: "Forbidden: Table belongs to another restaurant" });
+      }
+
+      // Mark Table CLEAN
+      const updatedTable = await prisma.diningTable.update({
+        where: { id: tableId },
+        data: {
+          cleaningStatus: "CLEAN",
+          assignedWaiterId: null,
+          assignedWaiterName: null,
+        },
+      });
+
+      // Complete any pending cleaning tasks for this table
+      await prisma.staffTask.updateMany({
+        where: {
+          restaurantId: table.restaurantId,
+          tableId,
+          category: "CLEANING",
+          isCompleted: false,
+        },
+        data: {
+          status: "COMPLETED",
+          isCompleted: true,
+          completedAt: new Date(),
+          completedBy: staffId ? Number(staffId) : null,
+        },
+      });
+
+      const effectiveRid = table.restaurantId;
+      const io = realtime?.io || null;
+      const staff = realtime?.staff || null;
+      const nowTimestamp = Date.now();
+      const nowIso = new Date(nowTimestamp).toISOString();
+
+      const tableClearPayload = {
+        type: "TABLE_UPDATED",
+        restaurantId: effectiveRid,
+        tableId: table.id,
+        id: table.id,
+        tableNo: table.tableNo,
+        status: "AVAILABLE",
+        cleaningStatus: "CLEAN",
+        isOccupied: false,
+        activeOrderCount: 0,
+        activeOrders: [],
+        activeOrderStatus: null,
+        paymentStatus: null,
+        occupiedSince: null,
+        assignedServer: null,
+        assignedServerId: null,
+        assignedServerName: null,
+        assignedWaiterId: null,
+        assignedWaiterName: null,
+        session: { status: "CLOSED" },
+        activeSession: null,
+        version: nowTimestamp,
+        updatedAt: nowIso,
+      };
+
+      if (io) {
+        io.to(`restaurant_${effectiveRid}`).emit("table:updated", tableClearPayload);
+        io.to(`restaurant:${effectiveRid}`).emit("table:updated", tableClearPayload);
+        io.to(`restaurant_${effectiveRid}`).emit("table:layout_updated", { restaurantId: effectiveRid });
+        io.to(`restaurant:${effectiveRid}`).emit("table:layout_updated", { restaurantId: effectiveRid });
+      }
+      if (staff) {
+        staff.to(`restaurant_${effectiveRid}`).emit("table:updated", tableClearPayload);
+        staff.to(`restaurant:${effectiveRid}`).emit("table:updated", tableClearPayload);
+        staff.to(`restaurant_${effectiveRid}`).emit("cleaner:table_cleaned", {
+          tableId: table.id,
+          tableNo: table.tableNo,
+          cleanedBy: req.staffActor?.name || "Cleaner",
+          timestamp: nowIso,
+        });
+        staff.to(`restaurant:${effectiveRid}`).emit("cleaner:table_cleaned", {
+          tableId: table.id,
+          tableNo: table.tableNo,
+          cleanedBy: req.staffActor?.name || "Cleaner",
+          timestamp: nowIso,
+        });
+        staff.to(`restaurant_${effectiveRid}`).emit("cleaner:task_completed", {
+          tableId: table.id,
+          tableNo: table.tableNo,
+        });
+        staff.to(`restaurant:${effectiveRid}`).emit("cleaner:task_completed", {
+          tableId: table.id,
+          tableNo: table.tableNo,
+        });
+      }
+
+      await logAuditEvent({
+        prisma,
+        restaurantId: effectiveRid,
+        actor: { id: staffId, name: req.staffActor?.name, role: req.staffActor?.role },
+        action: "TABLE_SANITIZED_AND_CLEANED",
+        entity: "DINING_TABLE",
+        entityId: tableId,
+        details: { tableNo: table.tableNo },
+        req,
+      });
+
+      return reply.send({
+        success: true,
+        message: `Table ${table.tableNo} marked clean and available`,
+        table: updatedTable,
+      });
+    } catch (err) {
+      req.log?.error?.(err, "Failed to clean table");
+      return reply.code(500).send({ message: err.message || "Failed to clean table" });
+    }
+  };
+
+  app.post("/api/v1/staff/tables/:tableId/clean", { preHandler: requireStaff }, handleCleanTableDirect);
+  app.put("/api/v1/staff/tables/:tableId/clean", { preHandler: requireStaff }, handleCleanTableDirect);
+
+  /**
    * GET /api/v1/staff/food-runner-items
    * Fetch ready-to-run kitchen items for Stewards
    */

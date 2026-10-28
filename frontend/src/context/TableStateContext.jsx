@@ -556,6 +556,10 @@ export function TableStateProvider({ children }) {
         socket.on("table:session_updated", handleSessionUpdated);
         socket.on("table:waiter_assigned", handleWaiterAssigned);
         socket.on("table:layout_updated", refreshTables);
+        socket.on("cleaner:table_dirty", refreshTables);
+        socket.on("cleaner:table_cleaned", refreshTables);
+        socket.on("cleaner:task_created", refreshTables);
+        socket.on("cleaner:task_completed", refreshTables);
         socket.on("order:created", handleOrderOrPayment);
         socket.on("order:updated", handleOrderOrPayment);
         socket.on("order:status_updated", handleOrderOrPayment);
@@ -566,6 +570,10 @@ export function TableStateProvider({ children }) {
             socket.off("table:session_updated", handleSessionUpdated);
             socket.off("table:waiter_assigned", handleWaiterAssigned);
             socket.off("table:layout_updated", refreshTables);
+            socket.off("cleaner:table_dirty", refreshTables);
+            socket.off("cleaner:table_cleaned", refreshTables);
+            socket.off("cleaner:task_created", refreshTables);
+            socket.off("cleaner:task_completed", refreshTables);
             socket.off("order:created", handleOrderOrPayment);
             socket.off("order:updated", handleOrderOrPayment);
             socket.off("order:status_updated", handleOrderOrPayment);

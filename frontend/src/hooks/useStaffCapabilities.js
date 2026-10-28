@@ -10,8 +10,9 @@ import { API } from "../config";
  * Realtime synchronization via Socket.IO events ('capabilities:updated', 'staff:updated').
  */
 export function useStaffCapabilities(overrideRestaurantId = null) {
-    const { token, user } = useAuth();
+    const { token, staffToken, user } = useAuth();
     const { socket } = useStaffSocket();
+    const effectiveToken = token || staffToken || (typeof window !== "undefined" ? localStorage.getItem("token") || sessionStorage.getItem("token") : null);
 
     const restaurantId = Number(
         overrideRestaurantId ||
@@ -37,7 +38,7 @@ export function useStaffCapabilities(overrideRestaurantId = null) {
 
         try {
             // First attempt staff capabilities endpoint
-            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            const headers = effectiveToken ? { Authorization: `Bearer ${effectiveToken}` } : {};
             const res = await axios.get(`${API}/api/v1/staff/capabilities`, {
                 headers,
                 params: { restaurantId },
@@ -49,7 +50,7 @@ export function useStaffCapabilities(overrideRestaurantId = null) {
         } catch (err) {
             // Fallback to owner capabilities endpoint if accessible
             try {
-                const headers = token ? { Authorization: `Bearer ${token}` } : {};
+                const headers = effectiveToken ? { Authorization: `Bearer ${effectiveToken}` } : {};
                 const fallbackRes = await axios.get(`${API}/owner/${restaurantId}/capabilities`, { headers });
                 if (fallbackRes.data?.capabilities) {
                     setCapabilities(fallbackRes.data.capabilities);

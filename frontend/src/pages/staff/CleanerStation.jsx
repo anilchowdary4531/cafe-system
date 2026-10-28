@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
     Sparkles,
     CheckCircle2,
@@ -16,18 +16,22 @@ import axios from "axios";
 import StaffShell from "../../components/StaffShell";
 import { useAuth } from "../../context/AuthContext";
 import { useStaffSocket } from "../../context/StaffSocketContext";
+import { useCanonicalTables } from "../../context/TableStateContext";
 import { API } from "../../config";
 import { showToast } from "../../utils/toast";
 import { playNotificationSound, triggerNotificationVibration } from "../../utils/soundPlayer";
 import useStaffCapabilities from "../../hooks/useStaffCapabilities";
 
 export default function CleanerStation() {
-    const { user, token } = useAuth();
+    const { user, token, staffToken } = useAuth();
     const { socket } = useStaffSocket();
+    const effectiveToken = token || staffToken || (typeof window !== "undefined" ? localStorage.getItem("token") || sessionStorage.getItem("token") : null);
+
+    const { tables: canonicalTables, refreshTables } = useCanonicalTables();
 
     const [activeTab, setActiveTab] = useState("TABLES"); // TABLES | CHECKLIST | MY_WORK | COMPLETED
     const [tasks, setTasks] = useState([]);
-    const [dirtyTables, setDirtyTables] = useState([]);
+    const [fetchedDirtyTables, setFetchedDirtyTables] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
@@ -42,10 +46,10 @@ export default function CleanerStation() {
     const { hasCleaner } = useStaffCapabilities(restaurantId);
 
     const fetchTasks = useCallback(async () => {
-        if (!token) return;
         try {
+            const headers = effectiveToken ? { Authorization: `Bearer ${effectiveToken}` } : {};
             const res = await axios.get(`${API}/api/v1/staff/tasks`, {
-                headers: { Authorization: `Bearer ${token}` },
+                headers,
                 params: { restaurantId, roleTarget: "CLEANER" },
             });
             if (res.data?.success) {
@@ -54,22 +58,45 @@ export default function CleanerStation() {
         } catch (err) {
             console.error("Failed to fetch cleaner tasks:", err);
         }
-    }, [token, restaurantId]);
+    }, [effectiveToken, restaurantId]);
 
     const fetchTables = useCallback(async () => {
-        if (!token) return;
         try {
-            const res = await axios.get(`${API}/tables`, {
-                headers: { Authorization: `Bearer ${token}` },
-                params: { restaurantId },
-            });
-            const list = res.data?.tables || res.data || [];
+            // First attempt to refresh canonical tables if TableStateProvider is available
+            if (typeof refreshTables === "function") {
+                const refreshed = await refreshTables({ force: true });
+                if (Array.isArray(refreshed) && refreshed.length > 0) {
+                    const dirty = refreshed.filter((t) => t.cleaningStatus === "DIRTY" || t.status === "DIRTY");
+                    setFetchedDirtyTables(dirty);
+                    return;
+                }
+            }
+
+            // Direct fallback to /owner/:restaurantId/tables or /tables
+            const headers = effectiveToken ? { Authorization: `Bearer ${effectiveToken}` } : {};
+            let list = [];
+            try {
+                const ownerRes = await axios.get(`${API}/owner/${restaurantId}/tables`, { headers });
+                list = Array.isArray(ownerRes.data?.tables) ? ownerRes.data.tables : Array.isArray(ownerRes.data) ? ownerRes.data : [];
+            } catch {
+                const publicRes = await axios.get(`${API}/tables`, { headers, params: { restaurantId } });
+                list = Array.isArray(publicRes.data?.tables) ? publicRes.data.tables : Array.isArray(publicRes.data) ? publicRes.data : [];
+            }
             const dirty = list.filter((t) => t.cleaningStatus === "DIRTY" || t.status === "DIRTY");
-            setDirtyTables(dirty);
+            setFetchedDirtyTables(dirty);
         } catch (err) {
             console.error("Failed to fetch dirty tables:", err);
         }
-    }, [token, restaurantId]);
+    }, [effectiveToken, restaurantId, refreshTables]);
+
+    const dirtyTables = useMemo(() => {
+        if (canonicalTables && canonicalTables.length > 0) {
+            return canonicalTables.filter(
+                (t) => t.cleaningStatus === "DIRTY" || t.status === "DIRTY"
+            );
+        }
+        return fetchedDirtyTables;
+    }, [canonicalTables, fetchedDirtyTables]);
 
     const refreshAll = useCallback(async () => {
         setRefreshing(true);
@@ -89,6 +116,7 @@ export default function CleanerStation() {
         const onCleaningAlert = (data) => {
             fetchTasks();
             fetchTables();
+            if (typeof refreshTables === "function") refreshTables({ force: true });
             playNotificationSound();
             triggerNotificationVibration();
             setUnreadCount((c) => c + 1);
@@ -102,10 +130,13 @@ export default function CleanerStation() {
         const onTableUpdated = () => {
             fetchTasks();
             fetchTables();
+            if (typeof refreshTables === "function") refreshTables({ force: true });
         };
 
         socket.on("cleaner:table_dirty", onCleaningAlert);
+        socket.on("cleaner:table_cleaned", onTableUpdated);
         socket.on("cleaner:task_created", onCleaningAlert);
+        socket.on("cleaner:task_completed", onTableUpdated);
         socket.on("cleaner:urgent_alert", onCleaningAlert);
         socket.on("table:updated", onTableUpdated);
         socket.on("task:updated", fetchTasks);
@@ -113,13 +144,15 @@ export default function CleanerStation() {
 
         return () => {
             socket.off("cleaner:table_dirty", onCleaningAlert);
+            socket.off("cleaner:table_cleaned", onTableUpdated);
             socket.off("cleaner:task_created", onCleaningAlert);
+            socket.off("cleaner:task_completed", onTableUpdated);
             socket.off("cleaner:urgent_alert", onCleaningAlert);
             socket.off("table:updated", onTableUpdated);
             socket.off("task:updated", fetchTasks);
             socket.off("task:completed", fetchTasks);
         };
-    }, [socket, fetchTasks, fetchTables]);
+    }, [socket, fetchTasks, fetchTables, refreshTables]);
 
     // Cleaner Actions
     const handleAcceptTask = async (taskId) => {
@@ -127,7 +160,7 @@ export default function CleanerStation() {
             await axios.put(
                 `${API}/api/v1/staff/tasks/${taskId}/accept`,
                 {},
-                { headers: { Authorization: `Bearer ${token}` } }
+                { headers: effectiveToken ? { Authorization: `Bearer ${effectiveToken}` } : {} }
             );
             showToast({ title: "Task Claimed", message: "Sanitation task claimed by you.", variant: "success" });
             fetchTasks();
@@ -141,7 +174,7 @@ export default function CleanerStation() {
             await axios.put(
                 `${API}/api/v1/staff/tasks/${taskId}/start`,
                 {},
-                { headers: { Authorization: `Bearer ${token}` } }
+                { headers: effectiveToken ? { Authorization: `Bearer ${effectiveToken}` } : {} }
             );
             showToast({ title: "Cleaning In Progress", message: "Cleaning started.", variant: "info" });
             fetchTasks();
@@ -155,7 +188,7 @@ export default function CleanerStation() {
             await axios.put(
                 `${API}/api/v1/staff/tasks/${taskId}/finish`,
                 {},
-                { headers: { Authorization: `Bearer ${token}` } }
+                { headers: effectiveToken ? { Authorization: `Bearer ${effectiveToken}` } : {} }
             );
             showToast({
                 title: "Table Cleaned & Ready!",
@@ -164,6 +197,7 @@ export default function CleanerStation() {
             });
             fetchTasks();
             fetchTables();
+            if (typeof refreshTables === "function") refreshTables({ force: true });
         } catch (err) {
             showToast({ title: "Error", message: err.response?.data?.message || "Failed to complete cleaning", variant: "error" });
         }
@@ -172,30 +206,49 @@ export default function CleanerStation() {
     // Quick direct sanitation if table is dirty but task not claimed
     const handleQuickSanitizeTable = async (table) => {
         try {
-            const existingTask = tasks.find((t) => t.tableId === table.id && !t.isCompleted);
-            if (existingTask) {
-                await handleMarkCleanAndReady(existingTask.id, table.tableNo);
-            } else {
-                const createRes = await axios.post(
-                    `${API}/api/v1/staff/tasks/request`,
-                    {
-                        restaurantId,
-                        tableId: table.id,
-                        title: `Clean Table ${table.tableNo}`,
-                        category: "CLEANING",
-                        taskType: "TABLE_BUS_AND_SANITIZE",
-                        roleTarget: "CLEANER",
-                        priority: "HIGH",
-                    },
-                    { headers: { Authorization: `Bearer ${token}` } }
-                );
-                const createdTask = createRes.data?.task;
-                if (createdTask?.id) {
-                    await handleMarkCleanAndReady(createdTask.id, table.tableNo);
+            // First attempt direct authoritative sanitation endpoint
+            const headers = effectiveToken ? { Authorization: `Bearer ${effectiveToken}` } : {};
+            await axios.post(
+                `${API}/api/v1/staff/tables/${table.id}/clean`,
+                { restaurantId },
+                { headers }
+            );
+            showToast({
+                title: "Table Cleaned & Ready!",
+                message: `Table ${table.tableNo || ""} is now sanitized and available for guests.`,
+                variant: "success",
+            });
+            fetchTasks();
+            fetchTables();
+            if (typeof refreshTables === "function") refreshTables({ force: true });
+        } catch (directErr) {
+            // Fallback to task-based sanitize
+            try {
+                const existingTask = tasks.find((t) => t.tableId === table.id && !t.isCompleted);
+                if (existingTask) {
+                    await handleMarkCleanAndReady(existingTask.id, table.tableNo);
+                } else {
+                    const createRes = await axios.post(
+                        `${API}/api/v1/staff/tasks/request`,
+                        {
+                            restaurantId,
+                            tableId: table.id,
+                            title: `Clean Table ${table.tableNo}`,
+                            category: "CLEANING",
+                            taskType: "TABLE_BUS_AND_SANITIZE",
+                            roleTarget: "CLEANER",
+                            priority: "HIGH",
+                        },
+                        { headers: effectiveToken ? { Authorization: `Bearer ${effectiveToken}` } : {} }
+                    );
+                    const createdTask = createRes.data?.task;
+                    if (createdTask?.id) {
+                        await handleMarkCleanAndReady(createdTask.id, table.tableNo);
+                    }
                 }
+            } catch (err) {
+                showToast({ title: "Error", message: "Failed to sanitize table", variant: "error" });
             }
-        } catch (err) {
-            showToast({ title: "Error", message: "Failed to sanitize table", variant: "error" });
         }
     };
 
