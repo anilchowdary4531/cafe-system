@@ -1,5 +1,6 @@
 import { createOrderByStaff } from "./orderService.js";
 import { computeBill, toPriceSubunitItems } from "./billingService.js";
+import { hasActiveCleaner } from "./staffManagementService.js";
 
 const ACTIVE_STATUSES = ["OPEN", "BILLING", "PAID"];
 
@@ -700,7 +701,15 @@ export const completeSessionAndReleaseTable = async ({
       },
     });
 
-    // C. Clear waiter assignment from table
+    // C. Check dynamic Cleaner availability
+    let cleanerExists = false;
+    try {
+      cleanerExists = await hasActiveCleaner({ prisma: tx, restaurantId: session.restaurantId });
+    } catch {
+      cleanerExists = false;
+    }
+
+    // Clear waiter assignment from table and set cleaning status based on cleaner availability
     const rawNo = String(session.tableNo || "").trim();
     const strippedNo = rawNo.replace(/^(table|tbl)[-\s]*/i, "");
     const candidates = Array.from(new Set([rawNo, strippedNo, `Table ${strippedNo}`].filter(Boolean)));
@@ -715,29 +724,31 @@ export const completeSessionAndReleaseTable = async ({
       data: {
         assignedWaiterId: null,
         assignedWaiterName: null,
-        cleaningStatus: "DIRTY",
+        cleaningStatus: cleanerExists ? "DIRTY" : "CLEAN",
       },
     }).catch(() => {});
 
-    // Create cleaning task for Cleaner / Steward station
-    try {
-      if (tx.staffTask) {
-        await tx.staffTask.create({
-          data: {
-            restaurantId: session.restaurantId,
-            tableId: session.tableId || null,
-            title: `Clean Table ${session.tableNo}`,
-            description: `Dining session completed for Table ${session.tableNo}. Thorough sanitation and busing required before new seating.`,
-            category: "CLEANING",
-            taskType: "TABLE_BUS_AND_SANITIZE",
-            roleTarget: "CLEANER",
-            priority: "HIGH",
-            status: "PENDING",
-          },
-        });
+    // Create cleaning task for Cleaner station ONLY if active cleaner exists
+    if (cleanerExists) {
+      try {
+        if (tx.staffTask) {
+          await tx.staffTask.create({
+            data: {
+              restaurantId: session.restaurantId,
+              tableId: session.tableId || null,
+              title: `Clean Table ${session.tableNo}`,
+              description: `Dining session completed for Table ${session.tableNo}. Thorough sanitation and busing required before new seating.`,
+              category: "CLEANING",
+              taskType: "TABLE_BUS_AND_SANITIZE",
+              roleTarget: "CLEANER",
+              priority: "HIGH",
+              status: "PENDING",
+            },
+          });
+        }
+      } catch {
+        // Non-blocking task creation
       }
-    } catch {
-      // Non-blocking task creation
     }
 
     // D. Audit log in TableOperationLog if available
@@ -764,11 +775,12 @@ export const completeSessionAndReleaseTable = async ({
       // Non-blocking audit log
     }
 
-    return closed;
+    return { ...closed, _cleanerExists: cleanerExists };
   });
 
   // 5. Emit Realtime Events after successful transaction commit
   const effectiveRid = session.restaurantId;
+  const cleanerExists = Boolean(updatedSession?._cleanerExists);
   const nowTimestamp = Date.now();
   const nowIso = new Date(nowTimestamp).toISOString();
   const clearPayload = {
@@ -777,8 +789,8 @@ export const completeSessionAndReleaseTable = async ({
     tableId: session.tableId || null,
     id: session.tableId || null,
     tableNo: session.tableNo,
-    status: "DIRTY",
-    cleaningStatus: "DIRTY",
+    status: cleanerExists ? "DIRTY" : "AVAILABLE",
+    cleaningStatus: cleanerExists ? "DIRTY" : "CLEAN",
     isOccupied: false,
     activeOrderCount: 0,
     activeOrders: [],
@@ -858,32 +870,34 @@ export const completeSessionAndReleaseTable = async ({
       status: "PAID",
       paymentMode,
     });
-    staff.to(`restaurant_${effectiveRid}`).emit("cleaner:table_dirty", {
-      restaurantId: effectiveRid,
-      tableId: session.tableId || null,
-      tableNo: session.tableNo,
-      timestamp: nowIso,
-    });
-    staff.to(`restaurant:${effectiveRid}`).emit("cleaner:table_dirty", {
-      restaurantId: effectiveRid,
-      tableId: session.tableId || null,
-      tableNo: session.tableNo,
-      timestamp: nowIso,
-    });
-    staff.to(`restaurant_${effectiveRid}`).emit("cleaner:task_created", {
-      restaurantId: effectiveRid,
-      tableId: session.tableId || null,
-      tableNo: session.tableNo,
-      taskType: "TABLE_BUS_AND_SANITIZE",
-      status: "PENDING",
-    });
-    staff.to(`restaurant:${effectiveRid}`).emit("cleaner:task_created", {
-      restaurantId: effectiveRid,
-      tableId: session.tableId || null,
-      tableNo: session.tableNo,
-      taskType: "TABLE_BUS_AND_SANITIZE",
-      status: "PENDING",
-    });
+    if (cleanerExists) {
+      staff.to(`restaurant_${effectiveRid}`).emit("cleaner:table_dirty", {
+        restaurantId: effectiveRid,
+        tableId: session.tableId || null,
+        tableNo: session.tableNo,
+        timestamp: nowIso,
+      });
+      staff.to(`restaurant:${effectiveRid}`).emit("cleaner:table_dirty", {
+        restaurantId: effectiveRid,
+        tableId: session.tableId || null,
+        tableNo: session.tableNo,
+        timestamp: nowIso,
+      });
+      staff.to(`restaurant_${effectiveRid}`).emit("cleaner:task_created", {
+        restaurantId: effectiveRid,
+        tableId: session.tableId || null,
+        tableNo: session.tableNo,
+        taskType: "TABLE_BUS_AND_SANITIZE",
+        status: "PENDING",
+      });
+      staff.to(`restaurant:${effectiveRid}`).emit("cleaner:task_created", {
+        restaurantId: effectiveRid,
+        tableId: session.tableId || null,
+        tableNo: session.tableNo,
+        taskType: "TABLE_BUS_AND_SANITIZE",
+        status: "PENDING",
+      });
+    }
   }
 
   if (typeof realtime?.emitTableSessionUpdated === "function") {

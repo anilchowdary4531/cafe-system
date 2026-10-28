@@ -81,7 +81,15 @@ import {
   mergeTables,
   splitTableOrTransferItems,
 } from "../controllers/tableOperationController.js";
-import { assignWaiterToTable, unassignWaiterFromTable, getWaiterAssignmentHistory, getWaiterWorkspaceData, getStaffPerformanceMetrics } from "../services/staffManagementService.js";
+import {
+  assignWaiterToTable,
+  unassignWaiterFromTable,
+  getWaiterAssignmentHistory,
+  getWaiterWorkspaceData,
+  getStaffPerformanceMetrics,
+  handleStaffLifecycleChange,
+  getActiveStaffByCapability,
+} from "../services/staffManagementService.js";
 import { getAuditLogs, logAuditEvent } from "../services/auditLogService.js";
 import { approveCancellation, approveDiscount, approveReprint } from "../controllers/managerApprovalController.js";
 import { completeSessionAndReleaseTable } from "../services/tableSessionService.js";
@@ -2985,7 +2993,8 @@ export default async function ownerRoutes(app, deps = {}) {
           );
         });
 
-      return { users: mapped, modules: STAFF_ACCESS_MODULES };
+      const capabilities = await getActiveStaffByCapability({ prisma, restaurantId });
+      return { users: mapped, modules: STAFF_ACCESS_MODULES, capabilities };
     } catch (err) {
       console.log(err);
       return reply.code(500).send({ message: "Failed to fetch staff users" });
@@ -2993,6 +3002,20 @@ export default async function ownerRoutes(app, deps = {}) {
   };
   app.get("/owner/:restaurantId/staff", handleGetStaffUsers);
   app.get("/api/owner/:restaurantId/staff", handleGetStaffUsers);
+
+  const handleGetCapabilities = async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
+      const capabilities = await getActiveStaffByCapability({ prisma, restaurantId });
+      return { success: true, restaurantId, capabilities, ...capabilities };
+    } catch (err) {
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to fetch restaurant capabilities" });
+    }
+  };
+  app.get("/owner/:restaurantId/capabilities", handleGetCapabilities);
+  app.get("/api/owner/:restaurantId/capabilities", handleGetCapabilities);
 
   app.post("/owner/:restaurantId/staff", async (req, reply) => {
     try {
@@ -3113,9 +3136,19 @@ export default async function ownerRoutes(app, deps = {}) {
         });
       }
 
+      const capabilities = await handleStaffLifecycleChange({
+        prisma,
+        restaurantId,
+        staffId: user.id,
+        updatedStaff: user,
+        realtime,
+        actor,
+      });
+
       return {
         message: "Staff user created",
         user: buildStaffUserResponse(user, normalizedAccess),
+        capabilities,
         ...(temporaryPassword ? { temporaryPassword } : {}),
       };
     } catch (err) {
@@ -3294,9 +3327,20 @@ export default async function ownerRoutes(app, deps = {}) {
         req,
       });
 
+      const capabilities = await handleStaffLifecycleChange({
+        prisma,
+        restaurantId,
+        staffId: staff.id,
+        previousStaff: staff,
+        updatedStaff: updated,
+        realtime,
+        actor,
+      });
+
       return {
         message: "Staff user updated",
         user: buildStaffUserResponse(updated),
+        capabilities,
       };
     } catch (err) {
       console.log(err);
@@ -3330,6 +3374,16 @@ export default async function ownerRoutes(app, deps = {}) {
         include: { staffAccess: { select: { permissions: true } } },
       });
 
+      const capabilities = await handleStaffLifecycleChange({
+        prisma,
+        restaurantId,
+        staffId,
+        previousStaff: staff,
+        updatedStaff: updated,
+        realtime,
+        actor,
+      });
+
       await logAuditEvent({
         prisma,
         restaurantId,
@@ -3349,6 +3403,7 @@ export default async function ownerRoutes(app, deps = {}) {
       return {
         message: `Staff user ${isActive ? "enabled" : "disabled"}`,
         user: buildStaffUserResponse(updated),
+        capabilities,
       };
     } catch (err) {
       console.log(err);
@@ -3552,13 +3607,23 @@ export default async function ownerRoutes(app, deps = {}) {
 
       const staff = await prisma.user.findUnique({
         where: { id: staffId },
-        select: { id: true, role: true, restaurantId: true },
+        select: { id: true, role: true, designation: true, isActive: true, restaurantId: true },
       });
       if (!staff || staff.restaurantId !== restaurantId) return reply.code(404).send({ message: "Staff user not found" });
       if (staff.role === "OWNER") return reply.code(400).send({ message: "Owner account cannot be deleted" });
 
       try {
         await prisma.user.delete({ where: { id: staffId } });
+
+        const capabilities = await handleStaffLifecycleChange({
+          prisma,
+          restaurantId,
+          staffId,
+          previousStaff: staff,
+          updatedStaff: null,
+          realtime,
+          actor,
+        });
 
         await logAuditEvent({
           prisma,
@@ -3572,7 +3637,7 @@ export default async function ownerRoutes(app, deps = {}) {
           req,
         });
 
-        return { message: "Staff user deleted" };
+        return { message: "Staff user deleted", capabilities };
       } catch (err) {
         if (err?.code === "P2003") {
           return reply.code(400).send({

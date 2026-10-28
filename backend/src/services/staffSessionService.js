@@ -13,7 +13,7 @@ export const inferRoleFromDesignation = (designation) => {
   if (!text) return null;
 
   if (text.includes("STEWARD")) return "STEWARD";
-  if (text.includes("CLEANER")) return "CLEANER";
+  if (text.includes("CLEANER") || text.includes("HOUSEKEEPING")) return "CLEANER";
   if (text.includes("SWIPER")) return "SWIPER";
   if (text.includes("CASHIER")) return "CASHIER";
   if (text.includes("SERVER") || text.includes("WAITER")) {
@@ -80,18 +80,42 @@ export const buildStaffLoginPayload = ({ user, normalizeDbPermissions }) => {
   return { userPayload, effectiveRole };
 };
 
-export const DEFAULT_STAFF_JWT_EXPIRES_IN = "12h";
+export const STAFF_OFFLINE_GRACE_PERIOD_HOURS = 72;
+export const STAFF_OFFLINE_GRACE_PERIOD_SECONDS = STAFF_OFFLINE_GRACE_PERIOD_HOURS * 60 * 60;
+export const STAFF_OFFLINE_GRACE_PERIOD_MS = STAFF_OFFLINE_GRACE_PERIOD_SECONDS * 1000;
 
-export const issueStaffSession = async ({ prisma, app, user, effectiveRole }) => {
-  const updated = await prisma.user.update({
-    where: { id: user.id },
-    data: { sessionVersion: { increment: 1 } },
-    select: { sessionVersion: true, mustChangePassword: true },
-  });
+export const DEFAULT_STAFF_ACCESS_TOKEN_EXPIRES_IN = "12h";
+export const DEFAULT_STAFF_REFRESH_TOKEN_EXPIRES_IN = "30d";
+export const DEFAULT_STAFF_JWT_EXPIRES_IN = DEFAULT_STAFF_ACCESS_TOKEN_EXPIRES_IN;
 
-  const sessionVersion = Number(updated.sessionVersion || 0);
-  const mustChangePassword = Boolean(user?.mustChangePassword ?? updated.mustChangePassword);
-  const expiresIn = process.env.STAFF_JWT_EXPIRES_IN || DEFAULT_STAFF_JWT_EXPIRES_IN;
+export const issueStaffSession = async ({
+  prisma,
+  app,
+  user,
+  effectiveRole,
+  skipVersionIncrement = false,
+}) => {
+  let sessionVersion = Number(user?.sessionVersion || 0);
+  let mustChangePassword = Boolean(user?.mustChangePassword);
+
+  if (!skipVersionIncrement) {
+    const updated = await prisma.user.update({
+      where: { id: user.id },
+      data: { sessionVersion: { increment: 1 } },
+      select: { sessionVersion: true, mustChangePassword: true },
+    });
+    sessionVersion = Number(updated.sessionVersion || 0);
+    mustChangePassword = Boolean(user?.mustChangePassword ?? updated.mustChangePassword);
+  }
+
+  const expiresIn =
+    process.env.STAFF_ACCESS_TOKEN_EXPIRES_IN ||
+    process.env.STAFF_JWT_EXPIRES_IN ||
+    DEFAULT_STAFF_ACCESS_TOKEN_EXPIRES_IN;
+  const refreshExpiresIn =
+    process.env.STAFF_REFRESH_TOKEN_EXPIRES_IN ||
+    DEFAULT_STAFF_REFRESH_TOKEN_EXPIRES_IN;
+
   const token = app.jwt.sign(
     {
       id: user.id,
@@ -105,7 +129,112 @@ export const issueStaffSession = async ({ prisma, app, user, effectiveRole }) =>
     { expiresIn }
   );
 
-  return { token, sessionVersion };
+  const refreshToken = app.jwt.sign(
+    {
+      id: user.id,
+      role: effectiveRole,
+      restaurantId: user.restaurantId || null,
+      branchId: user.branchId || null,
+      sessionVersion,
+      tokenType: "staff_refresh",
+      isRefresh: true,
+    },
+    { expiresIn: refreshExpiresIn }
+  );
+
+  return { token, refreshToken, sessionVersion };
+};
+
+export const refreshStaffSession = async ({ prisma, app, refreshToken, normalizeDbPermissions }) => {
+  if (!refreshToken || typeof refreshToken !== "string") {
+    const err = new Error("Refresh token is required");
+    err.statusCode = 400;
+    err.code = "REFRESH_TOKEN_REQUIRED";
+    throw err;
+  }
+
+  let decoded;
+  try {
+    decoded = app.jwt.verify(refreshToken);
+  } catch (err) {
+    const error = new Error("Invalid or expired refresh token");
+    error.statusCode = 401;
+    error.code = "INVALID_REFRESH_TOKEN";
+    throw error;
+  }
+
+  if (
+    !decoded ||
+    typeof decoded !== "object" ||
+    !decoded.id ||
+    (decoded.tokenType !== "staff_refresh" && !decoded.isRefresh)
+  ) {
+    const error = new Error("Invalid refresh token payload");
+    error.statusCode = 401;
+    error.code = "INVALID_REFRESH_TOKEN";
+    throw error;
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: decoded.id },
+    include: {
+      restaurant: { select: { id: true, name: true, logoUrl: true, slug: true } },
+      branch: { select: { id: true, name: true } },
+      staffAccess: { select: { permissions: true } },
+    },
+  });
+
+  if (!user || user.isActive === false) {
+    const error = new Error("Staff account is disabled or not found");
+    error.statusCode = 401;
+    error.code = "ACCOUNT_INACTIVE";
+    throw error;
+  }
+
+  if (user.lockedUntil && new Date(user.lockedUntil) > new Date()) {
+    const error = new Error("Account is temporarily locked");
+    error.statusCode = 403;
+    error.code = "ACCOUNT_LOCKED";
+    throw error;
+  }
+
+  const currentSessionVersion = Number(user.sessionVersion || 0);
+  const tokenSessionVersion = Number(decoded.sessionVersion || 0);
+
+  if (currentSessionVersion !== tokenSessionVersion) {
+    const error = new Error("Session has been invalidated. Please log in again.");
+    error.statusCode = 401;
+    error.code = "SESSION_VERSION_MISMATCH";
+    throw error;
+  }
+
+  const { userPayload, effectiveRole } = buildStaffLoginPayload({ user, normalizeDbPermissions });
+
+  const { token, refreshToken: newRefreshToken, sessionVersion } = await issueStaffSession({
+    prisma,
+    app,
+    user,
+    effectiveRole,
+    skipVersionIncrement: true,
+  });
+
+  userPayload.sessionVersion = sessionVersion;
+
+  return {
+    token,
+    refreshToken: newRefreshToken,
+    user: userPayload,
+    sessionVersion,
+  };
+};
+
+export const invalidateStaffSession = async ({ prisma, userId }) => {
+  if (!userId) return null;
+  return prisma.user.update({
+    where: { id: Number(userId) },
+    data: { sessionVersion: { increment: 1 } },
+    select: { id: true, sessionVersion: true },
+  });
 };
 
 export const buildStaffMagicLinkToken = ({ app, user, expiresIn = DEFAULT_STAFF_LINK_EXPIRES_IN }) =>

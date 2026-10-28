@@ -23,6 +23,7 @@ import { useStaffSocket } from "../../context/StaffSocketContext";
 import { API } from "../../config";
 import { showToast } from "../../utils/toast";
 import { playNotificationSound, triggerNotificationVibration } from "../../utils/soundPlayer";
+import useStaffCapabilities from "../../hooks/useStaffCapabilities";
 
 export default function StewardStation() {
     const { user, token } = useAuth();
@@ -42,6 +43,8 @@ export default function StewardStation() {
         localStorage.getItem("restaurantId") ||
         1
     );
+
+    const { hasSteward } = useStaffCapabilities(restaurantId);
 
     const fetchTasks = useCallback(async () => {
         if (!token) return;
@@ -221,6 +224,20 @@ export default function StewardStation() {
             }
         >
             <div className="space-y-4">
+                {!hasSteward && (
+                    <div className="bg-amber-50 dark:bg-amber-950/40 border-l-4 border-amber-500 p-4 rounded-xl mb-4 shadow-xs" role="alert">
+                        <div className="flex items-center gap-3">
+                            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                            <div>
+                                <h4 className="font-bold text-amber-900 dark:text-amber-200 text-sm">Steward Station Inactive</h4>
+                                <p className="text-xs text-amber-700 dark:text-amber-300">
+                                    No active staff members with <strong>Steward</strong> designation are currently configured for this restaurant. Operational food running and table assistance are handled directly by Servers.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Status KPI summary banner */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div

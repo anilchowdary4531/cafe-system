@@ -219,23 +219,23 @@ describe("Staff 72-Hour Offline Grace Period & Refresh Architecture", () => {
                 },
             });
 
-            // Mock retried original request success
+            // Mock retried original request
             axios.mockResolvedValueOnce({
                 status: 200,
-                data: { success: true, orders: [] },
+                data: { success: true, message: "KOTs fetched successfully" },
             });
 
-            const initialError = {
-                response: { status: 401, data: { code: "TOKEN_EXPIRED" } },
-                config: { url: "/kitchen/orders", headers: {} },
+            const err401 = {
+                response: { status: 401 },
+                config: { url: "/owner/1/kots", headers: {} },
             };
 
-            const result = await handleAuth401(initialError);
+            const result = await handleAuth401(err401);
 
             expect(result.status).toBe(200);
             expect(result.data.success).toBe(true);
 
-            // Access token and refresh token updated in storage
+            // Access token and refresh token rotated in storage
             expect(localStorage.getItem("token")).toBe("new_rotated_access_token");
             expect(localStorage.getItem("staff_refresh_token")).toBe("new_rotated_refresh_token");
 
@@ -419,6 +419,115 @@ describe("Staff 72-Hour Offline Grace Period & Refresh Architecture", () => {
 
                 clearStaffSession("local");
             });
+        });
+    });
+
+    describe("Phase 7 Verification: Comprehensive Lifecycle Cases", () => {
+        it("Case 7: Internet returns after 50 hours offline -> successful refresh renews the 72-hour grace period", async () => {
+            const initialTime = 1700000000000;
+            vi.useFakeTimers();
+            vi.setSystemTime(initialTime);
+
+            writeStaffSession({
+                token: "token_at_t0",
+                refreshToken: "refresh_at_t0",
+                user: { id: 401, name: "Reconnecting Server", role: "WAITER" },
+                scope: "local",
+                validatedAt: initialTime,
+            });
+
+            // Device is offline for 50 hours
+            vi.advanceTimersByTime(50 * 60 * 60 * 1000);
+            const timeAt50h = initialTime + 50 * 60 * 60 * 1000;
+
+            // Still within grace period
+            expect(isStaffWithinOfflineGracePeriod()).toBe(true);
+            expect(getStaffLastValidatedAt()).toBe(initialTime);
+
+            // Internet returns: 401 triggers refresh call which succeeds
+            axios.post.mockResolvedValueOnce({
+                data: {
+                    token: "token_at_t50",
+                    refreshToken: "refresh_at_t50",
+                    user: { id: 401, name: "Reconnecting Server", role: "WAITER" },
+                },
+            });
+            axios.mockResolvedValueOnce({ status: 200, data: { success: true } });
+
+            const err401 = {
+                response: { status: 401 },
+                config: { url: "/owner/orders", headers: {} },
+            };
+
+            await handleAuth401(err401);
+
+            // New 72-hour offline clock starts from the revalidation timestamp (timeAt50h)
+            expect(getStaffLastValidatedAt()).toBe(timeAt50h);
+            expect(localStorage.getItem("token")).toBe("token_at_t50");
+
+            // Advance another 60 hours from timeAt50h (total 110 hours from initialTime)
+            vi.advanceTimersByTime(60 * 60 * 60 * 1000);
+
+            // Must still be valid because the 72h window was renewed at 50h!
+            expect(isStaffWithinOfflineGracePeriod()).toBe(true);
+            expect(isStaffOfflineGracePeriodExpired()).toBe(false);
+            expect(getActiveStaffSession()).not.toBeNull();
+        });
+
+        it("Case 9: Server unreachable / timeout / ECONNABORTED does not trigger logout", async () => {
+            const initialTime = 1700000000000;
+            vi.useFakeTimers();
+            vi.setSystemTime(initialTime);
+
+            writeStaffSession({
+                token: "token_timeout_test",
+                refreshToken: "refresh_timeout_test",
+                user: { id: 402, name: "Steward Tim", role: "STEWARD" },
+                scope: "local",
+                validatedAt: initialTime,
+            });
+
+            vi.advanceTimersByTime(5 * 60 * 60 * 1000);
+
+            const timeoutError = new Error("timeout of 10000ms exceeded");
+            timeoutError.code = "ECONNABORTED";
+            axios.post.mockRejectedValueOnce(timeoutError);
+
+            const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+            const err401 = {
+                response: { status: 401 },
+                config: { url: "/api/v1/owner/1/tables", headers: {} },
+            };
+
+            await expect(handleAuth401(err401)).rejects.toThrow("timeout of 10000ms exceeded");
+
+            // Session preserved
+            expect(localStorage.getItem("token")).toBe("token_timeout_test");
+            expect(dispatchSpy).not.toHaveBeenCalledWith(
+                expect.objectContaining({ detail: { scope: "staff" } })
+            );
+        });
+
+        it("Case 13: Customer, Supplier, and Staff sessions remain strictly isolated", () => {
+            localStorage.setItem("customerToken", "cust_123");
+            localStorage.setItem("supplierToken", "supp_456");
+
+            writeStaffSession({
+                token: "staff_789",
+                refreshToken: "staff_ref_789",
+                user: { id: 501, name: "Cashier C", role: "CASHIER" },
+                scope: "local",
+            });
+
+            // Staff session clear does not affect customer or supplier
+            clearStaffSession("local");
+
+            expect(localStorage.getItem("token")).toBeNull();
+            expect(localStorage.getItem("customerToken")).toBe("cust_123");
+            expect(localStorage.getItem("supplierToken")).toBe("supp_456");
+
+            localStorage.clear();
         });
     });
 });

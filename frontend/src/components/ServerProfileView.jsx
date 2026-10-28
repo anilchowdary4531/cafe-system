@@ -21,6 +21,7 @@ import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { API } from "../config";
 import { showToast } from "../utils/toast";
+import NotificationSoundPicker from "./NotificationSoundPicker";
 
 export default function ServerProfileView({
     onBackToFloorPlan,
@@ -321,6 +322,18 @@ export default function ServerProfileView({
                         </div>
                     </form>
                 )}
+            </div>
+
+            {/* Sound & Vibration Section */}
+            <div className="rounded-2xl border border-[color:var(--app-border)]/40 bg-white dark:bg-slate-900 p-4 shadow-xs space-y-3">
+                <div className="flex items-center gap-2 border-b border-[color:var(--app-border)]/40 pb-2.5">
+                    <Sparkles className="h-4 w-4 text-orange-500" />
+                    <div>
+                        <h3 className="text-sm font-extrabold text-[color:var(--app-text)]">Sound & Vibration</h3>
+                        <p className="text-[11px] theme-muted">Customize alert tones and vibration patterns for notifications.</p>
+                    </div>
+                </div>
+                <NotificationSoundPicker defaultExpanded={false} />
             </div>
 
             {/* Security & Password Section */}

@@ -1,11 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { API } from "../config";
 import { clearAllCache } from "../utils/localCache";
 import { getCustomerSettings } from "../utils/customerSettings";
 import {
     clearStaffSession,
     getActiveStaffSession,
     getActiveStaffScope,
+    getStaffRefreshToken,
     writeStaffSession,
 } from "../utils/staffSessionStorage";
 
@@ -131,14 +134,25 @@ export function AuthProvider({ children }) {
             }
         };
 
+        const handleTokenRefreshed = (event) => {
+            if (event?.detail?.token) {
+                setStaffToken(event.detail.token);
+            }
+            if (event?.detail?.user) {
+                setUser(event.detail.user);
+            }
+        };
+
         window.addEventListener("storage", handleStorage);
         window.addEventListener("auth:logout", handleForcedLogout);
+        window.addEventListener("auth:token-refreshed", handleTokenRefreshed);
         window.addEventListener("pageshow", handlePageShow);
         window.addEventListener("focus", handleFocus);
         document.addEventListener("visibilitychange", handleVisibilityChange);
         return () => {
             window.removeEventListener("storage", handleStorage);
             window.removeEventListener("auth:logout", handleForcedLogout);
+            window.removeEventListener("auth:token-refreshed", handleTokenRefreshed);
             window.removeEventListener("pageshow", handlePageShow);
             window.removeEventListener("focus", handleFocus);
             document.removeEventListener("visibilitychange", handleVisibilityChange);
@@ -149,8 +163,10 @@ export function AuthProvider({ children }) {
         clearStaffSession("session");
         writeStaffSession({
             token: data.token,
+            refreshToken: data.refreshToken,
             user: data.user,
             scope: "local",
+            validatedAt: Date.now(),
         });
         setStaffToken(String(data.token || ""));
         setUser(data.user);
@@ -160,8 +176,10 @@ export function AuthProvider({ children }) {
     const loginSession = (data) => {
         writeStaffSession({
             token: data.token,
+            refreshToken: data.refreshToken,
             user: data.user,
             scope: "session",
+            validatedAt: Date.now(),
         });
         setStaffToken(String(data.token || ""));
         setUser(data.user);
@@ -203,8 +221,26 @@ export function AuthProvider({ children }) {
         setCustomer(nextCustomer);
     };
 
-    const logout = () => {
-        clearStaffSession(staffSessionScope || getActiveStaffScope() || "local");
+    const logout = async () => {
+        const refreshToken = getStaffRefreshToken();
+        const activeScope = staffSessionScope || getActiveStaffScope() || "local";
+
+        try {
+            if (refreshToken) {
+                await axios.post(
+                    `${API}/auth/staff/logout`,
+                    { refreshToken },
+                    {
+                        headers: staffToken ? { Authorization: `Bearer ${staffToken}` } : {},
+                        timeout: 2000,
+                    }
+                ).catch(() => {});
+            }
+        } catch {
+            // Best-effort server revocation
+        }
+
+        clearStaffSession(activeScope);
         setUser(null);
         setStaffToken(null);
         setStaffSessionScope(null);

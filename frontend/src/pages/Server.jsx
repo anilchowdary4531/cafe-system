@@ -37,6 +37,7 @@ import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { useStaffSocket } from "../context/StaffSocketContext";
 import useCachedGet from "../hooks/useCachedGet";
+import useStaffCapabilities from "../hooks/useStaffCapabilities";
 import { API } from "../config";
 import { api } from "../utils/apiClient";
 import { resolveImageUrl } from "../utils/resolveImageUrl";
@@ -249,6 +250,8 @@ export default function Server() {
         1
     );
     const restaurantName = String(user?.restaurant?.name || "Tiffzy Restaurant").trim();
+
+    const { hasSteward, hasCleaner } = useStaffCapabilities(restaurantId);
 
     // Time ticker for local clock
     const [currentTime, setCurrentTime] = useState(new Date());
@@ -1899,40 +1902,42 @@ export default function Server() {
                                                             💳 Settle Payment
                                                         </button>
                                                     )}
-                                                    <button
-                                                        type="button"
-                                                        onClick={async (e) => {
-                                                            e.stopPropagation();
-                                                            try {
-                                                                await axios.post(
-                                                                    `${API}/api/v1/staff/tasks/request`,
-                                                                    {
-                                                                        restaurantId,
-                                                                        tableId: table.id,
-                                                                        tableNo: table.tableNo,
-                                                                        title: `Service Assistance - Table ${table.tableNo}`,
-                                                                        description: "Water, cutlery, or guest assistance requested by server",
-                                                                        category: "SERVICE",
-                                                                        taskType: "SERVICE",
-                                                                        roleTarget: "STEWARD",
-                                                                        priority: "MEDIUM",
-                                                                    },
-                                                                    { headers: { Authorization: `Bearer ${token}` } }
-                                                                );
-                                                                showToast({
-                                                                    title: "Steward Called 🛎️",
-                                                                    message: `Service request dispatched for Table ${table.tableNo}.`,
-                                                                    variant: "success",
-                                                                });
-                                                            } catch (err) {
-                                                                showToast({ title: "Error", message: "Failed to dispatch steward request", variant: "error" });
-                                                            }
-                                                        }}
-                                                        className="w-full mt-1.5 py-1 px-2 rounded-lg bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-[10px] border border-slate-300 dark:border-slate-700 flex items-center justify-center gap-1 transition"
-                                                        title="Call floor steward for water, cutlery or table assistance"
-                                                    >
-                                                        🛎️ Call Steward
-                                                    </button>
+                                                    {hasSteward && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={async (e) => {
+                                                                e.stopPropagation();
+                                                                try {
+                                                                    await axios.post(
+                                                                        `${API}/api/v1/staff/tasks/request`,
+                                                                        {
+                                                                            restaurantId,
+                                                                            tableId: table.id,
+                                                                            tableNo: table.tableNo,
+                                                                            title: `Service Assistance - Table ${table.tableNo}`,
+                                                                            description: "Water, cutlery, or guest assistance requested by server",
+                                                                            category: "SERVICE",
+                                                                            taskType: "SERVICE",
+                                                                            roleTarget: "STEWARD",
+                                                                            priority: "MEDIUM",
+                                                                        },
+                                                                        { headers: { Authorization: `Bearer ${token}` } }
+                                                                    );
+                                                                    showToast({
+                                                                        title: "Steward Called 🛎️",
+                                                                        message: `Service request dispatched for Table ${table.tableNo}.`,
+                                                                        variant: "success",
+                                                                    });
+                                                                } catch (err) {
+                                                                    showToast({ title: "Error", message: "Failed to dispatch steward request", variant: "error" });
+                                                                }
+                                                            }}
+                                                            className="w-full mt-1.5 py-1 px-2 rounded-lg bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-[10px] border border-slate-300 dark:border-slate-700 flex items-center justify-center gap-1 transition"
+                                                            title="Call floor steward for water, cutlery or table assistance"
+                                                        >
+                                                            🛎️ Call Steward
+                                                        </button>
+                                                    )}
                                                 </div>
                                             ) : isReserved ? (
                                                 <div className="space-y-0.5">
@@ -1951,9 +1956,11 @@ export default function Server() {
                                             ) : isDirty ? (
                                                 <div className="space-y-1">
                                                     <p className="text-[10px] text-amber-500 font-bold">Needs cleaning before seating</p>
-                                                    <span className="inline-flex items-center gap-1 text-[10px] text-amber-400">
-                                                        <Sparkles className="h-3 w-3" /> Cleaner alerted
-                                                    </span>
+                                                    {hasCleaner && (
+                                                        <span className="inline-flex items-center gap-1 text-[10px] text-amber-400">
+                                                            <Sparkles className="h-3 w-3" /> Cleaner alerted
+                                                        </span>
+                                                    )}
                                                 </div>
                                             ) : (
                                                 <div className="space-y-0.5">

@@ -10,7 +10,6 @@ import {
     LoaderCircle,
     RefreshCw,
     Search,
-    Volume2,
     CheckCircle2,
     AlertTriangle,
     Info,
@@ -20,7 +19,6 @@ import { useAuth } from "../context/AuthContext";
 import { useStaffSocket } from "../context/StaffSocketContext";
 import { API } from "../config";
 import { showToast } from "../utils/toast";
-import NotificationSoundPicker from "./NotificationSoundPicker";
 import { playNotificationSound, triggerNotificationVibration } from "../utils/soundPlayer";
 
 const formatTime = (value) => {
@@ -49,7 +47,6 @@ export default function StaffNotificationsView({
     const [refreshing, setRefreshing] = useState(false);
     const [filterType, setFilterType] = useState("ALL"); // ALL | UNREAD | URGENT | TASKS
     const [searchQuery, setSearchQuery] = useState("");
-    const [showSoundSettings, setShowSoundSettings] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
 
     const handleBack = () => {
@@ -191,18 +188,6 @@ export default function StaffNotificationsView({
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
-                            onClick={() => setShowSoundSettings(!showSoundSettings)}
-                            className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition min-h-[38px] shadow-xs cursor-pointer ${
-                                showSoundSettings
-                                    ? "bg-[#FFF7ED] border-[#F97316] text-[#EA580C]"
-                                    : "bg-white hover:bg-[#FFF7ED] border-[#E7E5E4] text-[#57534E]"
-                            }`}
-                        >
-                            <Volume2 className="w-4 h-4 text-[#F97316]" />
-                            <span className="hidden sm:inline">Sounds</span>
-                        </button>
-                        <button
-                            type="button"
                             onClick={() => {
                                 setRefreshing(true);
                                 fetchNotifications();
@@ -229,12 +214,6 @@ export default function StaffNotificationsView({
 
             {/* Main Content - Full Width */}
             <main className="flex-1 w-full px-3 sm:px-4 md:px-6 py-4 space-y-3 max-w-none">
-                {/* Collapsible sound picker */}
-                {showSoundSettings && (
-                    <div className="bg-[#FFF7ED]/20 border border-[#E7E5E4] rounded-xl p-3 sm:p-4 shadow-xs">
-                        <NotificationSoundPicker defaultExpanded={true} />
-                    </div>
-                )}
 
                 {/* Filter and Search Bar */}
                 <div className="flex flex-col sm:flex-row gap-2.5">

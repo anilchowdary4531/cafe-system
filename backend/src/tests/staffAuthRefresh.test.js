@@ -52,7 +52,7 @@ const buildTestApp = async () => {
     buildQrTargetUrl: () => "http://localhost:5173",
     FRONTEND_URL: "http://localhost:5173",
     STAFF_ACCESS_MODULES,
-    STAFF_ALLOWED_ROLES: ["OWNER", "MANAGER", "WAITER", "CHEF", "CASHIER", "STAFF"],
+    STAFF_ALLOWED_ROLES: ["OWNER", "MANAGER", "WAITER", "SERVER", "CHEF", "CASHIER", "STAFF", "STEWARD", "CLEANER", "SWIPER"],
     normalizeAccess,
     normalizeDbPermissions,
     serializeAccess: (a, r) => JSON.stringify(normalizeAccess(a, r)),

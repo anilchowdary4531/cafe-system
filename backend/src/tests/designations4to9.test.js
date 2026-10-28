@@ -223,8 +223,21 @@ test("Designations 4-9: Table Cleaning State & Task Lifecycle", async (t) => {
   });
 
   await t.test("5. Steward assistance task creation emits realtime alert", async () => {
+    const stewardUser = await prisma.user.create({
+      data: {
+        name: "Test Steward",
+        email: `steward_${Date.now()}@test.com`,
+        phone: "+9199998" + Math.floor(10000 + Math.random() * 90000),
+        password: "hashedpassword123",
+        role: "WAITER",
+        designation: "Steward",
+        restaurantId: testRestaurant.id,
+        isActive: true,
+      },
+    });
+
     const stewardToken = app.jwt.sign({
-      userId: cleanerUser.id,
+      userId: stewardUser.id,
       restaurantId: testRestaurant.id,
       role: "STEWARD",
       designation: "STEWARD",

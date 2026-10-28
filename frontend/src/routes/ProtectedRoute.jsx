@@ -1,11 +1,21 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { resolveEffectiveStaffRole } from "../utils/staffRole";
-import { getActiveStaffSession } from "../utils/staffSessionStorage";
+import {
+    getActiveStaffSession,
+    isStaffOfflineGracePeriodExpired,
+    clearStaffSession,
+} from "../utils/staffSessionStorage";
 
 export default function ProtectedRoute({ children, role, roles }) {
     const { user, staffToken } = useAuth();
     const location = useLocation();
+
+    // Check authoritative 72-hour offline grace period
+    if (isStaffOfflineGracePeriodExpired()) {
+        clearStaffSession();
+        return <Navigate to="/login?mode=staff" replace state={{ from: location }} />;
+    }
 
     const activeStaffSession = getActiveStaffSession();
     const token = staffToken || activeStaffSession?.token || localStorage.getItem("supplierToken") || null;

@@ -11,7 +11,6 @@ import {
     RefreshCw,
     Search,
     ShoppingBag,
-    Volume2,
     CheckCircle2,
 } from "lucide-react";
 import axios from "axios";
@@ -19,7 +18,6 @@ import { useAuth } from "../context/AuthContext";
 import { useStaffSocket } from "../context/StaffSocketContext";
 import { API } from "../config";
 import { showToast } from "../utils/toast";
-import NotificationSoundPicker from "./NotificationSoundPicker";
 
 const formatTime = (value) => {
     const dt = new Date(value);
@@ -56,7 +54,6 @@ export default function ServerNotificationsView({
     const [hasMore, setHasMore] = useState(false);
     const [filterType, setFilterType] = useState("ALL"); // ALL | UNREAD | ORDERS | KITCHEN | SUCCESS | INFO
     const [searchQuery, setSearchQuery] = useState("");
-    const [showSoundSettings, setShowSoundSettings] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
 
     const onUnreadCountChangeRef = useRef(onUnreadCountChange);
@@ -303,20 +300,6 @@ export default function ServerNotificationsView({
                 <div className="flex items-center gap-2">
                     <button
                         type="button"
-                        onClick={() => setShowSoundSettings((prev) => !prev)}
-                        className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-bold transition ${
-                            showSoundSettings
-                                ? "bg-orange-500 text-white shadow-sm"
-                                : "bg-black/5 dark:bg-white/5 theme-muted hover:text-[color:var(--app-text)]"
-                        }`}
-                        title="Adjust Notification Sound"
-                    >
-                        <Volume2 className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">Sound Settings</span>
-                    </button>
-
-                    <button
-                        type="button"
                         onClick={() => fetchNotifications(1, true)}
                         disabled={refreshing}
                         className="rounded-lg bg-black/5 dark:bg-white/5 p-1.5 text-xs font-bold theme-muted hover:text-[color:var(--app-text)] transition cursor-pointer"
@@ -335,13 +318,6 @@ export default function ServerNotificationsView({
                     </button>
                 </div>
             </div>
-
-            {/* Notification Sound Picker - Toggle Panel */}
-            {showSoundSettings && (
-                <div className="animate-in fade-in duration-200">
-                    <NotificationSoundPicker defaultExpanded={true} />
-                </div>
-            )}
 
             {/* Filter & Search Bar - Alignment with Owner Notifications */}
             <div className="flex flex-wrap items-center justify-between gap-2 py-1 text-xs">

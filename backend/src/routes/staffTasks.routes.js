@@ -4,6 +4,11 @@ import { completeSessionAndReleaseTable } from "../services/tableSessionService.
 import { syncParentOrderStatusFromKots, getCanonicalReadyItems } from "../services/kotService.js";
 import { createAndDispatchNotification } from "../services/notificationService.js";
 import { NOTIFICATION_TYPES, RECIPIENT_TYPES } from "../constants/notificationTypes.js";
+import {
+  getActiveStaffByCapability,
+  hasActiveCleaner,
+  hasActiveSteward,
+} from "../services/staffManagementService.js";
 
 export default async function staffTaskRoutes(app, deps = {}) {
   const { prisma, realtime, STAFF_ALLOWED_ROLES } = deps || {};
@@ -24,6 +29,23 @@ export default async function staffTaskRoutes(app, deps = {}) {
       0
     );
   };
+
+  /**
+   * GET /api/v1/staff/capabilities
+   * Fetch dynamic operational capabilities (cleaner, steward availability)
+   */
+  app.get("/api/v1/staff/capabilities", { preHandler: requireStaff }, async (req, reply) => {
+    try {
+      const restaurantId = getEffectiveRid(req);
+      if (!restaurantId) return reply.code(400).send({ message: "restaurantId required" });
+
+      const capabilities = await getActiveStaffByCapability({ prisma, restaurantId });
+      return reply.send({ success: true, capabilities });
+    } catch (err) {
+      req.log?.error?.(err, "Failed to get staff capabilities");
+      return reply.code(500).send({ message: err.message || "Failed to fetch staff capabilities" });
+    }
+  });
 
   /**
    * GET /api/v1/staff/tasks
@@ -94,6 +116,29 @@ export default async function staffTaskRoutes(app, deps = {}) {
       } = req.body || {};
 
       if (!title) return reply.code(400).send({ message: "Task title is required" });
+
+      const normCategory = String(category).toUpperCase();
+      const normRoleTarget = String(roleTarget).toUpperCase();
+
+      if (normCategory === "CLEANING" || normRoleTarget === "CLEANER") {
+        const cleanerAvailable = await hasActiveCleaner({ prisma, restaurantId });
+        if (!cleanerAvailable) {
+          return reply.code(400).send({
+            message: "No active Cleaner staff configured for this restaurant",
+            code: "cleaner_unavailable",
+          });
+        }
+      }
+
+      if (normRoleTarget === "STEWARD") {
+        const stewardAvailable = await hasActiveSteward({ prisma, restaurantId });
+        if (!stewardAvailable) {
+          return reply.code(400).send({
+            message: "No active Steward staff configured for this restaurant",
+            code: "steward_unavailable",
+          });
+        }
+      }
 
       let resolvedTableId = tableId ? Number(tableId) : null;
       if (!resolvedTableId && tableNo) {
@@ -188,6 +233,26 @@ export default async function staffTaskRoutes(app, deps = {}) {
         return reply.code(409).send({ message: "Task is already claimed by another staff member" });
       }
 
+      if (existing.roleTarget === "CLEANER" || existing.category === "CLEANING") {
+        const cleanerAvailable = await hasActiveCleaner({ prisma, restaurantId: existing.restaurantId });
+        if (!cleanerAvailable) {
+          return reply.code(400).send({
+            message: "Cleaner capability is currently unavailable",
+            code: "cleaner_unavailable",
+          });
+        }
+      }
+
+      if (existing.roleTarget === "STEWARD") {
+        const stewardAvailable = await hasActiveSteward({ prisma, restaurantId: existing.restaurantId });
+        if (!stewardAvailable) {
+          return reply.code(400).send({
+            message: "Steward capability is currently unavailable",
+            code: "steward_unavailable",
+          });
+        }
+      }
+
       const updated = await prisma.staffTask.update({
         where: { id: taskId },
         data: {
@@ -231,6 +296,26 @@ export default async function staffTaskRoutes(app, deps = {}) {
 
       if (existing.status === "COMPLETED" || existing.isCompleted) {
         return reply.code(409).send({ message: "Task is already completed" });
+      }
+
+      if (existing.roleTarget === "CLEANER" || existing.category === "CLEANING") {
+        const cleanerAvailable = await hasActiveCleaner({ prisma, restaurantId: existing.restaurantId });
+        if (!cleanerAvailable) {
+          return reply.code(400).send({
+            message: "Cleaner capability is currently unavailable",
+            code: "cleaner_unavailable",
+          });
+        }
+      }
+
+      if (existing.roleTarget === "STEWARD") {
+        const stewardAvailable = await hasActiveSteward({ prisma, restaurantId: existing.restaurantId });
+        if (!stewardAvailable) {
+          return reply.code(400).send({
+            message: "Steward capability is currently unavailable",
+            code: "steward_unavailable",
+          });
+        }
       }
 
       const updated = await prisma.staffTask.update({

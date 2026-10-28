@@ -143,9 +143,10 @@ export default function StaffShell({
                         {/* Settings button */}
                         <button
                             type="button"
+                            data-testid="staff-settings-btn"
                             onClick={() => navigate("/staff/settings")}
                             className="min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] rounded-xl bg-white hover:bg-[#FFF7ED] text-[#57534E] hover:text-[#171717] flex items-center justify-center transition-colors border border-[#E7E5E4] shadow-xs"
-                            title="Staff Settings"
+                            title="Settings"
                             aria-label="View staff settings"
                         >
                             <Settings className="w-4 h-4" />

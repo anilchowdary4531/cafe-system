@@ -79,6 +79,16 @@ describe("ServerProfileView Unit Tests", () => {
         });
     });
 
+    it("renders Sound & Vibration configuration under Server Profile", async () => {
+        renderWithProviders(<ServerProfileView onBackToFloorPlan={vi.fn()} />);
+
+        await waitFor(() => {
+            expect(screen.getByText("Sound & Vibration")).toBeInTheDocument();
+            expect(screen.getByText("Notification Sound")).toBeInTheDocument();
+            expect(screen.getByText("Notification Vibration")).toBeInTheDocument();
+        });
+    });
+
     it("allows editing permitted profile fields (name and phone)", async () => {
         axios.put.mockResolvedValueOnce({
             data: {
@@ -238,19 +248,16 @@ describe("ServerNotificationsView Unit Tests", () => {
         expect(onNavigateMock).toHaveBeenCalledWith("4");
     });
 
-    it("toggles Sound Settings panel when clicked", async () => {
+    it("focuses on notifications list and filters without inline Sound Settings panel", async () => {
         renderWithProviders(<ServerNotificationsView onBackToFloorPlan={vi.fn()} />);
 
         await waitFor(() => {
             expect(screen.getByText("Notifications")).toBeInTheDocument();
         });
 
-        const soundSettingsBtn = screen.getByTitle("Adjust Notification Sound");
-        fireEvent.click(soundSettingsBtn);
-
-        await waitFor(() => {
-            expect(screen.getByText("Notification Sound")).toBeInTheDocument();
-        });
+        expect(screen.queryByTitle("Adjust Notification Sound")).toBeNull();
+        expect(screen.queryByText("Notification Sound")).toBeNull();
+        expect(screen.queryByText("Notification Vibration")).toBeNull();
     });
 
     it("marks single notification as read", async () => {

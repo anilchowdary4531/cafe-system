@@ -1,6 +1,7 @@
 import { logAuditEvent } from "./auditLogService.js";
 import { createAndDispatchNotification } from "./notificationService.js";
 import { NOTIFICATION_TYPES, RECIPIENT_TYPES } from "../constants/notificationTypes.js";
+import { inferRoleFromDesignation } from "./staffSessionService.js";
 
 /**
  * Unassign Waiter from Table & TableSession
@@ -444,4 +445,332 @@ export const getStaffPerformanceMetrics = async ({ prisma, restaurantId, staffUs
         },
         recentShifts: shifts,
     };
+};
+
+/**
+ * Determine if a user's authoritative designation/role maps to CLEANER / HOUSEKEEPING.
+ */
+export const isCleanerStaff = (user) => {
+    if (!user || user.isActive === false) return false;
+    const des = String(user.designation || "").trim().toUpperCase();
+    const role = String(user.role || "").trim().toUpperCase();
+    return (
+        des.includes("CLEANER") ||
+        des.includes("HOUSEKEEPING") ||
+        role === "CLEANER" ||
+        inferRoleFromDesignation(user.designation) === "CLEANER"
+    );
+};
+
+/**
+ * Determine if a user's authoritative designation/role maps to STEWARD.
+ */
+export const isStewardStaff = (user) => {
+    if (!user || user.isActive === false) return false;
+    const des = String(user.designation || "").trim().toUpperCase();
+    const role = String(user.role || "").trim().toUpperCase();
+    return (
+        des.includes("STEWARD") ||
+        role === "STEWARD" ||
+        inferRoleFromDesignation(user.designation) === "STEWARD"
+    );
+};
+
+/**
+ * Authoritatively calculates active staff capabilities for a restaurant.
+ */
+export const getActiveStaffByCapability = async ({ prisma, restaurantId }) => {
+    const rid = Number(restaurantId);
+    if (!rid || !prisma?.user?.findMany) {
+        return {
+            activeCleaners: [],
+            activeStewards: [],
+            hasCleaner: false,
+            hasSteward: false,
+            cleanerCount: 0,
+            stewardCount: 0,
+        };
+    }
+
+    const activeStaff = await prisma.user.findMany({
+        where: {
+            isActive: true,
+            OR: [
+                { restaurantId: rid },
+                { staffAccess: { restaurantId: rid } },
+            ],
+        },
+        select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            role: true,
+            designation: true,
+            isActive: true,
+            restaurantId: true,
+        },
+    }).catch(() => []);
+
+    const activeCleaners = activeStaff.filter(isCleanerStaff);
+    const activeStewards = activeStaff.filter(isStewardStaff);
+
+    return {
+        activeCleaners,
+        activeStewards,
+        hasCleaner: activeCleaners.length > 0,
+        hasSteward: activeStewards.length > 0,
+        cleanerCount: activeCleaners.length,
+        stewardCount: activeStewards.length,
+    };
+};
+
+export const hasActiveCleaner = async ({ prisma, restaurantId }) => {
+    const res = await getActiveStaffByCapability({ prisma, restaurantId });
+    return res.hasCleaner;
+};
+
+export const hasActiveSteward = async ({ prisma, restaurantId }) => {
+    const res = await getActiveStaffByCapability({ prisma, restaurantId });
+    return res.hasSteward;
+};
+
+/**
+ * Authoritatively handles staff creation, deletion, deactivation, or role/designation edits.
+ * Derives operational availability from actual staff configuration.
+ * Safely handles orphaned assignments, updates table dirty states when no cleaner remains,
+ * and emits realtime events to both staff and io rooms.
+ */
+export const handleStaffLifecycleChange = async ({
+    prisma,
+    restaurantId,
+    staffId = null,
+    previousStaff = null,
+    updatedStaff = null,
+    realtime = null,
+    actor = null,
+} = {}) => {
+    const rid = Number(restaurantId);
+    if (!rid || !prisma) return null;
+
+    const capabilities = await getActiveStaffByCapability({ prisma, restaurantId: rid });
+    const { hasCleaner, hasSteward, cleanerCount, stewardCount } = capabilities;
+
+    const io = realtime?.io || null;
+    const staff = realtime?.staff || null;
+
+    const nowTimestamp = Date.now();
+    const nowIso = new Date(nowTimestamp).toISOString();
+
+    // 1. Handle orphaned tasks assigned to this specific staff member if deleted or deactivated
+    const sid = staffId ? Number(staffId) : null;
+    const wasStaffDeactivatedOrDeleted =
+        sid &&
+        (updatedStaff === null ||
+            updatedStaff?.isActive === false ||
+            (previousStaff && !updatedStaff));
+
+    if (sid && prisma.staffTask) {
+        const pendingTasks = await prisma.staffTask.findMany({
+            where: {
+                restaurantId: rid,
+                assignedTo: sid,
+                isCompleted: false,
+            },
+            include: { table: true },
+        }).catch(() => []);
+
+        for (const task of pendingTasks) {
+            const isCleaning = task.category === "CLEANING" || task.roleTarget === "CLEANER";
+            const isSteward = task.roleTarget === "STEWARD" || task.category === "SERVICE";
+
+            if (isCleaning) {
+                if (hasCleaner) {
+                    // Other active cleaners exist: return to unassigned pool
+                    const reassigned = await prisma.staffTask.update({
+                        where: { id: task.id },
+                        data: { assignedTo: null, status: "PENDING" },
+                        include: {
+                            assignedUser: { select: { id: true, name: true, role: true, designation: true } },
+                            table: { select: { id: true, tableNo: true, section: true, cleaningStatus: true } },
+                        },
+                    }).catch(() => null);
+
+                    if (reassigned && staff) {
+                        staff.to(`restaurant_${rid}`).emit("task:updated", { task: reassigned });
+                        staff.to(`restaurant:${rid}`).emit("task:updated", { task: reassigned });
+                    }
+                } else {
+                    // No cleaner remains in restaurant: auto-cancel task
+                    await prisma.staffTask.update({
+                        where: { id: task.id },
+                        data: {
+                            status: "CANCELLED",
+                            isCompleted: true,
+                            completedAt: new Date(),
+                            description: task.description
+                                ? `${task.description}\n[Auto-cancelled: No active cleaner available in restaurant]`
+                                : "[Auto-cancelled: No active cleaner available in restaurant]",
+                        },
+                    }).catch(() => null);
+                }
+            } else if (isSteward) {
+                if (hasSteward) {
+                    // Other stewards exist: return to unassigned pool
+                    const reassigned = await prisma.staffTask.update({
+                        where: { id: task.id },
+                        data: { assignedTo: null, status: "PENDING" },
+                        include: {
+                            assignedUser: { select: { id: true, name: true, role: true, designation: true } },
+                            table: { select: { id: true, tableNo: true, section: true } },
+                        },
+                    }).catch(() => null);
+
+                    if (reassigned && staff) {
+                        staff.to(`restaurant_${rid}`).emit("task:updated", { task: reassigned });
+                        staff.to(`restaurant:${rid}`).emit("task:updated", { task: reassigned });
+                    }
+                } else {
+                    // No steward remains: auto-cancel task
+                    await prisma.staffTask.update({
+                        where: { id: task.id },
+                        data: {
+                            status: "CANCELLED",
+                            isCompleted: true,
+                            completedAt: new Date(),
+                            description: task.description
+                                ? `${task.description}\n[Auto-cancelled: No active steward available in restaurant]`
+                                : "[Auto-cancelled: No active steward available in restaurant]",
+                        },
+                    }).catch(() => null);
+                }
+            }
+        }
+    }
+
+    // 2. Global cleanup if NO cleaner remains in the restaurant:
+    // Cancel ALL pending cleaning tasks and mark tables CLEAN/AVAILABLE so they are not permanently locked
+    if (!hasCleaner && prisma.staffTask && prisma.diningTable) {
+        const uncompletedCleaningTasks = await prisma.staffTask.findMany({
+            where: {
+                restaurantId: rid,
+                category: "CLEANING",
+                isCompleted: false,
+            },
+            select: { id: true, tableId: true, description: true },
+        }).catch(() => []);
+
+        if (uncompletedCleaningTasks.length > 0) {
+            await prisma.staffTask.updateMany({
+                where: {
+                    id: { in: uncompletedCleaningTasks.map((t) => t.id) },
+                },
+                data: {
+                    status: "CANCELLED",
+                    isCompleted: true,
+                    completedAt: new Date(),
+                },
+            }).catch(() => {});
+        }
+
+        // Release all DIRTY tables to CLEAN and AVAILABLE
+        const dirtyTables = await prisma.diningTable.findMany({
+            where: {
+                restaurantId: rid,
+                cleaningStatus: "DIRTY",
+            },
+        }).catch(() => []);
+
+        if (dirtyTables.length > 0) {
+            await prisma.diningTable.updateMany({
+                where: {
+                    restaurantId: rid,
+                    cleaningStatus: "DIRTY",
+                },
+                data: {
+                    cleaningStatus: "CLEAN",
+                },
+            }).catch(() => {});
+
+            for (const t of dirtyTables) {
+                const payload = {
+                    type: "TABLE_UPDATED",
+                    restaurantId: rid,
+                    tableId: t.id,
+                    id: t.id,
+                    tableNo: t.tableNo,
+                    status: "AVAILABLE",
+                    cleaningStatus: "CLEAN",
+                    isOccupied: false,
+                    activeOrderCount: 0,
+                    activeOrders: [],
+                    activeOrderStatus: null,
+                    paymentStatus: null,
+                    occupiedSince: null,
+                    version: nowTimestamp,
+                    updatedAt: nowIso,
+                };
+                if (io) {
+                    io.to(`restaurant_${rid}`).emit("table:updated", payload);
+                    io.to(`restaurant:${rid}`).emit("table:updated", payload);
+                }
+                if (staff) {
+                    staff.to(`restaurant_${rid}`).emit("table:updated", payload);
+                    staff.to(`restaurant:${rid}`).emit("table:updated", payload);
+                }
+            }
+
+            if (io) {
+                io.to(`restaurant_${rid}`).emit("table:layout_updated", { restaurantId: rid });
+                io.to(`restaurant:${rid}`).emit("table:layout_updated", { restaurantId: rid });
+            }
+            if (staff) {
+                staff.to(`restaurant_${rid}`).emit("table:layout_updated", { restaurantId: rid });
+                staff.to(`restaurant:${rid}`).emit("table:layout_updated", { restaurantId: rid });
+            }
+        }
+    }
+
+    // 3. Global cleanup if NO steward remains in the restaurant:
+    // Cancel all pending steward tasks
+    if (!hasSteward && prisma.staffTask) {
+        await prisma.staffTask.updateMany({
+            where: {
+                restaurantId: rid,
+                roleTarget: "STEWARD",
+                isCompleted: false,
+            },
+            data: {
+                status: "CANCELLED",
+                isCompleted: true,
+                completedAt: new Date(),
+            },
+        }).catch(() => {});
+    }
+
+    // 4. Realtime capability broadcast to both staff and io sockets
+    const capPayload = {
+        restaurantId: rid,
+        hasCleaner,
+        hasSteward,
+        cleanerCount,
+        stewardCount,
+        timestamp: nowIso,
+    };
+
+    if (io) {
+        io.to(`restaurant_${rid}`).emit("capabilities:updated", capPayload);
+        io.to(`restaurant:${rid}`).emit("capabilities:updated", capPayload);
+        io.to(`restaurant_${rid}`).emit("staff:updated", { restaurantId: rid });
+        io.to(`restaurant:${rid}`).emit("staff:updated", { restaurantId: rid });
+    }
+
+    if (staff) {
+        staff.to(`restaurant_${rid}`).emit("capabilities:updated", capPayload);
+        staff.to(`restaurant:${rid}`).emit("capabilities:updated", capPayload);
+        staff.to(`restaurant_${rid}`).emit("staff:updated", { restaurantId: rid });
+        staff.to(`restaurant:${rid}`).emit("staff:updated", { restaurantId: rid });
+    }
+
+    return capPayload;
 };
