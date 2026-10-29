@@ -6,7 +6,9 @@ import {
   removeDeviceToken,
   getNotificationPreferences,
   updateNotificationPreferences,
+  resolveUserRoleConditions,
 } from "../services/notificationService.js";
+import { inferRoleFromDesignation } from "../services/staffSessionService.js";
 import { requireCustomerPhoneFromJwt } from "../services/customerProfileService.js";
 import { getPhoneVariants, normalizePhone } from "../services/phoneService.js";
 import { RECIPIENT_TYPES } from "../constants/notificationTypes.js";
@@ -108,6 +110,7 @@ export default async function notificationRoutes(app, deps) {
           const restaurantId = decoded.restaurantId || decoded.restaurant_id ? Number(decoded.restaurantId || decoded.restaurant_id) : null;
           const actorId = supplierId || Number(decoded.id);
           const isSupplier = Boolean(supplierId || decoded.role === "SUPPLIER");
+          const effectiveRole = inferRoleFromDesignation(decoded.designation) || String(decoded.role || "").toUpperCase();
 
           return {
             recipientType: isSupplier ? "SUPPLIER" : RECIPIENT_TYPES.USER,
@@ -115,6 +118,8 @@ export default async function notificationRoutes(app, deps) {
             supplierId,
             restaurantId,
             user: decoded,
+            effectiveRole,
+            designation: decoded.designation || null,
           };
         }
       }
@@ -138,6 +143,9 @@ export default async function notificationRoutes(app, deps) {
       recipientType: actor.recipientType,
       recipientId: actor.recipientId,
       restaurantId: actor.restaurantId,
+      effectiveRole: actor.effectiveRole,
+      designation: actor.designation,
+      role: actor.user?.role,
       isRead: parsedRead,
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 20,
@@ -155,13 +163,18 @@ export default async function notificationRoutes(app, deps) {
 
     let count;
     if (actor.recipientType === RECIPIENT_TYPES.USER && actor.restaurantId) {
+      const userConditions = await resolveUserRoleConditions({
+        prisma,
+        userId: actor.recipientId,
+        restaurantId: actor.restaurantId,
+        effectiveRole: actor.effectiveRole,
+        designation: actor.designation,
+        role: actor.user?.role,
+      });
       count = await prisma.notification.count({
         where: {
           restaurantId: Number(actor.restaurantId),
-          OR: [
-            { recipientType: RECIPIENT_TYPES.USER, recipientId: Number(actor.recipientId) },
-            { recipientType: RECIPIENT_TYPES.RESTAURANT, recipientId: Number(actor.restaurantId) },
-          ],
+          OR: userConditions,
           isRead: false,
         },
       });
@@ -201,7 +214,7 @@ export default async function notificationRoutes(app, deps) {
   app.get("/api/notifications/unread-count", unreadCountHandler);
   app.get("/notifications/unread-count", unreadCountHandler);
 
-  // PATCH & POST /api/notifications/:id/read — Mark single notification read
+  // PATCH & POST & PUT /api/notifications/:id/read — Mark single notification read
   const markReadHandler = async (req, reply) => {
     const actor = await resolveActor(req);
     if (!actor) return reply.code(401).send({ message: "Authentication required" });
@@ -213,16 +226,21 @@ export default async function notificationRoutes(app, deps) {
       recipientType: actor.recipientType,
       recipientId: actor.recipientId,
       restaurantId: actor.restaurantId,
+      effectiveRole: actor.effectiveRole,
+      designation: actor.designation,
+      role: actor.user?.role,
     });
 
     return { message: "Notification marked as read" };
   };
   app.patch("/api/notifications/:id/read", markReadHandler);
   app.post("/api/notifications/:id/read", markReadHandler);
+  app.put("/api/notifications/:id/read", markReadHandler);
   app.patch("/notifications/:id/read", markReadHandler);
   app.post("/notifications/:id/read", markReadHandler);
+  app.put("/notifications/:id/read", markReadHandler);
 
-  // PATCH & POST /api/notifications/read-all — Mark all notifications read
+  // PATCH & POST & PUT /api/notifications/read-all — Mark all notifications read
   const markAllReadHandler = async (req, reply) => {
     const actor = await resolveActor(req);
     if (!actor) return reply.code(401).send({ message: "Authentication required" });
@@ -232,14 +250,19 @@ export default async function notificationRoutes(app, deps) {
       recipientType: actor.recipientType,
       recipientId: actor.recipientId,
       restaurantId: actor.restaurantId,
+      effectiveRole: actor.effectiveRole,
+      designation: actor.designation,
+      role: actor.user?.role,
     });
 
     return { message: "All notifications marked as read" };
   };
   app.patch("/api/notifications/read-all", markAllReadHandler);
   app.post("/api/notifications/read-all", markAllReadHandler);
+  app.put("/api/notifications/read-all", markAllReadHandler);
   app.patch("/notifications/read-all", markAllReadHandler);
   app.post("/notifications/read-all", markAllReadHandler);
+  app.put("/notifications/read-all", markAllReadHandler);
 
   // POST /api/notifications/devices — Register/update FCM Device Token
   app.post("/api/notifications/devices", async (req, reply) => {

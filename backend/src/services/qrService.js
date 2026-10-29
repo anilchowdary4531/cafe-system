@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { getOrCreateActiveSession, recalculateSessionTotals } from "./tableSessionService.js";
 import { createOrderByStaff } from "./orderService.js";
 import { timeToMinutes } from "./reservationService.js";
-import { createAndDispatchNotification } from "./notificationService.js";
+import { createAndDispatchNotification, dispatchDesignationNotification } from "./notificationService.js";
 import { RECIPIENT_TYPES, NOTIFICATION_TYPES } from "../constants/notificationTypes.js";
 
 /**
@@ -805,17 +805,47 @@ export const callWaiterForTable = async ({ token, reason = "Assistance requested
 
   // Dispatch notification for staff & owner dashboards
   try {
+    const realtimeStaff = { io, staff: io?.of ? io.of("/staff") : null };
+
+    // 1. Notify assigned waiter directly if assigned, otherwise notify all active waiters
+    if (table.assignedWaiterId) {
+      await createAndDispatchNotification({
+        prisma,
+        realtime: realtimeStaff,
+        recipientType: RECIPIENT_TYPES.USER,
+        recipientId: table.assignedWaiterId,
+        restaurantId: rid,
+        notificationType: NOTIFICATION_TYPES.WAITER_CALL,
+        title: `🔔 Waiter Call — Table ${table.tableNo}`,
+        message: `Guest at Table ${table.tableNo} (${table.section || "Main Floor"}) called for waiter: ${payload.reason}`,
+        data: payload,
+        idempotencyKey: `waiter_call_user_${table.assignedWaiterId}_${table.id}_${Math.floor(Date.now() / 30000)}`,
+      }).catch(() => {});
+    } else {
+      await dispatchDesignationNotification({
+        prisma,
+        realtime: realtimeStaff,
+        restaurantId: rid,
+        targetDesignation: "WAITER",
+        notificationType: NOTIFICATION_TYPES.WAITER_CALL,
+        title: `🔔 Waiter Call — Table ${table.tableNo}`,
+        message: `Guest at Table ${table.tableNo} (${table.section || "Main Floor"}) called for waiter: ${payload.reason}`,
+        data: payload,
+      }).catch(() => {});
+    }
+
+    // 2. Also notify Owner / Manager
     await createAndDispatchNotification({
       prisma,
-      realtime: { io },
+      realtime: realtimeStaff,
       recipientType: RECIPIENT_TYPES.RESTAURANT,
       recipientId: rid,
       restaurantId: rid,
-      notificationType: NOTIFICATION_TYPES.IMPORTANT_ORDER_ALERT,
+      notificationType: NOTIFICATION_TYPES.WAITER_CALL,
       title: `🔔 Waiter Call — Table ${table.tableNo}`,
       message: `Guest at Table ${table.tableNo} (${table.section || "Main Floor"}) called for waiter: ${payload.reason}`,
       data: payload,
-      idempotencyKey: `waiter_call_${table.id}_${Math.floor(Date.now() / 30000)}`, // 30 sec cooldown key
+      idempotencyKey: `waiter_call_restaurant_${table.id}_${Math.floor(Date.now() / 30000)}`,
     }).catch(() => {});
   } catch (_) {}
 
@@ -907,17 +937,48 @@ export const requestBillForTable = async ({ token, prisma, io }) => {
 
   // Dispatch notification for staff & owner dashboards
   try {
-    await createAndDispatchNotification({
+    const realtimeStaff = { io, staff: io?.of ? io.of("/staff") : null };
+
+    // 1. Notify Cashier designation
+    await dispatchDesignationNotification({
       prisma,
-      realtime: { io },
-      recipientType: RECIPIENT_TYPES.RESTAURANT,
-      recipientId: rid,
+      realtime: realtimeStaff,
       restaurantId: rid,
-      notificationType: NOTIFICATION_TYPES.IMPORTANT_ORDER_ALERT,
+      targetDesignation: "CASHIER",
+      notificationType: NOTIFICATION_TYPES.BILL_REQUESTED,
       title: `💳 Bill Requested — Table ${table.tableNo}`,
       message: `Table ${table.tableNo} requested bill. Total: ₹${Math.round(activeSession.total)}`,
       data: payload,
-      idempotencyKey: `bill_request_${activeSession.id}_${Math.floor(Date.now() / 60000)}`, // 1 min cooldown key
+    }).catch(() => {});
+
+    // 2. Notify assigned waiter directly if assigned
+    if (table.assignedWaiterId) {
+      await createAndDispatchNotification({
+        prisma,
+        realtime: realtimeStaff,
+        recipientType: RECIPIENT_TYPES.USER,
+        recipientId: table.assignedWaiterId,
+        restaurantId: rid,
+        notificationType: NOTIFICATION_TYPES.BILL_REQUESTED,
+        title: `💳 Bill Requested — Table ${table.tableNo}`,
+        message: `Table ${table.tableNo} requested bill. Total: ₹${Math.round(activeSession.total)}`,
+        data: payload,
+        idempotencyKey: `bill_request_waiter_${activeSession.id}_${Math.floor(Date.now() / 60000)}`,
+      }).catch(() => {});
+    }
+
+    // 3. Notify Owner / Manager
+    await createAndDispatchNotification({
+      prisma,
+      realtime: realtimeStaff,
+      recipientType: RECIPIENT_TYPES.RESTAURANT,
+      recipientId: rid,
+      restaurantId: rid,
+      notificationType: NOTIFICATION_TYPES.BILL_REQUESTED,
+      title: `💳 Bill Requested — Table ${table.tableNo}`,
+      message: `Table ${table.tableNo} requested bill. Total: ₹${Math.round(activeSession.total)}`,
+      data: payload,
+      idempotencyKey: `bill_request_restaurant_${activeSession.id}_${Math.floor(Date.now() / 60000)}`,
     }).catch(() => {});
   } catch (_) {}
 

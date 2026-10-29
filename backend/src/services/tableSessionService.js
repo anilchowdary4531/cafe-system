@@ -1,6 +1,8 @@
 import { createOrderByStaff } from "./orderService.js";
 import { computeBill, toPriceSubunitItems } from "./billingService.js";
 import { hasActiveCleaner } from "./staffManagementService.js";
+import { createAndDispatchNotification, dispatchDesignationNotification } from "./notificationService.js";
+import { NOTIFICATION_TYPES, RECIPIENT_TYPES } from "../constants/notificationTypes.js";
 
 const ACTIVE_STATUSES = ["OPEN", "BILLING", "PAID"];
 
@@ -897,7 +899,66 @@ export const completeSessionAndReleaseTable = async ({
         taskType: "TABLE_BUS_AND_SANITIZE",
         status: "PENDING",
       });
+
+      // Dispatch persistent & realtime notification to all active Cleaners and Owner
+      dispatchDesignationNotification({
+        prisma,
+        realtime: { io, staff },
+        restaurantId: effectiveRid,
+        designation: "CLEANER",
+        title: `🧹 Table ${session.tableNo} Needs Sanitation`,
+        message: `Dining session ended. Table ${session.tableNo} is dirty and awaiting busing & sanitation.`,
+        notificationType: NOTIFICATION_TYPES.TABLE_DIRTY || "TABLE_DIRTY",
+        priority: "HIGH",
+        data: {
+          restaurantId: effectiveRid,
+          tableId: session.tableId ? Number(session.tableId) : null,
+          tableNo: session.tableNo,
+          sessionId: session.id,
+          taskType: "TABLE_BUS_AND_SANITIZE",
+        },
+        idempotencyKey: `table_dirty_${effectiveRid}_${session.tableId}_${session.id}`,
+      }).catch((e) => console.warn("[tableSessionService] Cleaner notification error:", e?.message));
+
+      createAndDispatchNotification({
+        prisma,
+        realtime: { io, staff },
+        recipientType: RECIPIENT_TYPES.OWNER || "OWNER",
+        recipientId: effectiveRid,
+        restaurantId: effectiveRid,
+        notificationType: NOTIFICATION_TYPES.TABLE_DIRTY || "TABLE_DIRTY",
+        title: `🧹 Table ${session.tableNo} Requires Cleaning`,
+        message: `Table ${session.tableNo} marked dirty and dispatched to Cleaner Station.`,
+        data: { tableId: session.tableId, tableNo: session.tableNo },
+        idempotencyKey: `owner_table_dirty_${effectiveRid}_${session.tableId}_${session.id}`,
+      }).catch(() => {});
     }
+
+    // Dispatch payment settlement notification to Cashier and Owner
+    dispatchDesignationNotification({
+      prisma,
+      realtime: { io, staff },
+      restaurantId: effectiveRid,
+      designation: "CASHIER",
+      title: `💰 Payment Received — Table ${session.tableNo}`,
+      message: `Table ${session.tableNo} bill settled (₹${Math.round(session.total || 0)}) via ${paymentMode || "Cash/Online"}.`,
+      notificationType: NOTIFICATION_TYPES.PAYMENT_SUCCESS || "PAYMENT_SUCCESS",
+      data: { tableId: session.tableId, tableNo: session.tableNo, total: session.total, paymentMode },
+      idempotencyKey: `cashier_payment_settled_${effectiveRid}_${session.id}`,
+    }).catch(() => {});
+
+    createAndDispatchNotification({
+      prisma,
+      realtime: { io, staff },
+      recipientType: RECIPIENT_TYPES.OWNER || "OWNER",
+      recipientId: effectiveRid,
+      restaurantId: effectiveRid,
+      notificationType: NOTIFICATION_TYPES.PAYMENT_SUCCESS || "PAYMENT_SUCCESS",
+      title: `💰 Payment Settled — Table ${session.tableNo}`,
+      message: `Table ${session.tableNo} bill settled (₹${Math.round(session.total || 0)}) via ${paymentMode || "Cash/Online"}.`,
+      data: { tableId: session.tableId, tableNo: session.tableNo, total: session.total, paymentMode },
+      idempotencyKey: `owner_payment_settled_${effectiveRid}_${session.id}`,
+    }).catch(() => {});
   }
 
   if (typeof realtime?.emitTableSessionUpdated === "function") {

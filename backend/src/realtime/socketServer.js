@@ -5,6 +5,7 @@ import { createAndDispatchNotification } from "../services/notificationService.j
 import { RECIPIENT_TYPES, NOTIFICATION_TYPES } from "../constants/notificationTypes.js";
 import { dispatchKotPrint } from "../services/kotService.js";
 import { getPhoneVariants } from "../services/phoneService.js";
+import { inferRoleFromDesignation } from "../services/staffSessionService.js";
 
 const restaurantRoom = (restaurantId) => `restaurant:${Number(restaurantId || 0)}`;
 const branchRoom = (restaurantId, branchId) => `branch:${Number(restaurantId || 0)}:${Number(branchId || 0)}`;
@@ -55,6 +56,7 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
       socket.data.actor = {
         userId: Number(decoded?.id || 0) || null,
         role: String(decoded?.role || "").toUpperCase(),
+        designation: decoded?.designation || null,
         restaurantId: Number(decoded?.restaurantId || 0) || null,
         branchId: Number(decoded?.branchId || 0) || null,
       };
@@ -75,6 +77,12 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
     if (rid) {
       rooms.push(restaurantRoom(rid));
       rooms.push(`restaurant_${rid}`);
+
+      const effectiveRole = inferRoleFromDesignation(actor.designation) || String(actor.role || "").toUpperCase();
+      if (effectiveRole) {
+        rooms.push(`restaurant:${rid}:role:${effectiveRole}`);
+        rooms.push(`restaurant_${rid}_role_${effectiveRole}`);
+      }
     }
     if (rid && bid) rooms.push(branchRoom(rid, bid));
     if (uid) {

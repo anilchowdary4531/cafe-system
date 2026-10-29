@@ -39,13 +39,14 @@ export default function StaffNotificationsView({
     title = "Staff Notifications",
 }) {
     const navigate = useNavigate();
-    const { user, token } = useAuth();
+    const { user, token, staffToken } = useAuth();
+    const effectiveToken = token || staffToken || (typeof window !== "undefined" ? localStorage.getItem("token") || localStorage.getItem("staffToken") : null);
     const { socket } = useStaffSocket();
 
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [filterType, setFilterType] = useState("ALL"); // ALL | UNREAD | URGENT | TASKS
+    const [filterType, setFilterType] = useState("ALL"); // ALL | UNREAD | CLEANING | ORDERS | TABLES | URGENT
     const [searchQuery, setSearchQuery] = useState("");
     const [unreadCount, setUnreadCount] = useState(0);
 
@@ -58,10 +59,13 @@ export default function StaffNotificationsView({
     };
 
     const fetchNotifications = useCallback(async () => {
-        if (!token) return;
+        if (!effectiveToken) {
+            setLoading(false);
+            return;
+        }
         try {
             const res = await axios.get(`${API}/api/notifications`, {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { Authorization: `Bearer ${effectiveToken}` },
                 params: { page: 1, limit: 100 },
             });
             const list = res.data?.notifications || res.data?.data || [];
@@ -74,7 +78,7 @@ export default function StaffNotificationsView({
             setLoading(false);
             setRefreshing(false);
         }
-    }, [token]);
+    }, [effectiveToken]);
 
     useEffect(() => {
         fetchNotifications();
@@ -86,13 +90,16 @@ export default function StaffNotificationsView({
 
         const handleNewNotification = (notif) => {
             if (!notif) return;
-            setNotifications((prev) => [notif, ...prev]);
+            setNotifications((prev) => {
+                if (prev.some((p) => p.id === notif.id)) return prev;
+                return [notif, ...prev];
+            });
             setUnreadCount((prev) => prev + 1);
             playNotificationSound();
             triggerNotificationVibration();
             showToast({
-                title: notif.title || "New Notification",
-                message: notif.message || "You have a new update.",
+                title: notif.title || notif.data?.title || "New Notification",
+                message: notif.message || notif.data?.message || "You have a new update.",
                 variant: notif.priority === "URGENT" ? "error" : "info",
             });
         };
@@ -111,7 +118,7 @@ export default function StaffNotificationsView({
             await axios.put(
                 `${API}/api/notifications/${id}/read`,
                 {},
-                { headers: { Authorization: `Bearer ${token}` } }
+                { headers: effectiveToken ? { Authorization: `Bearer ${effectiveToken}` } : {} }
             );
             setNotifications((prev) =>
                 prev.map((n) => (n.id === id ? { ...n, isRead: true, read: true } : n))
@@ -127,7 +134,7 @@ export default function StaffNotificationsView({
             await axios.put(
                 `${API}/api/notifications/read-all`,
                 {},
-                { headers: { Authorization: `Bearer ${token}` } }
+                { headers: effectiveToken ? { Authorization: `Bearer ${effectiveToken}` } : {} }
             );
             setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true, read: true })));
             setUnreadCount(0);
@@ -144,15 +151,18 @@ export default function StaffNotificationsView({
     const filteredNotifications = useMemo(() => {
         return notifications.filter((n) => {
             const isRead = Boolean(n.isRead || n.read);
+            const notifType = String(n.type || n.notificationType || "").toUpperCase();
             if (filterType === "UNREAD" && isRead) return false;
-            if (filterType === "URGENT" && n.priority !== "URGENT" && n.type !== "URGENT") return false;
-            if (filterType === "TASKS" && !String(n.type || "").includes("TASK")) return false;
+            if (filterType === "URGENT" && n.priority !== "URGENT" && notifType !== "URGENT") return false;
+            if (filterType === "CLEANING" && !notifType.includes("CLEAN")) return false;
+            if (filterType === "ORDERS" && !notifType.includes("ORDER") && !notifType.includes("BILL")) return false;
+            if (filterType === "TABLES" && !notifType.includes("TABLE") && !notifType.includes("WAITER")) return false;
 
             if (searchQuery.trim()) {
                 const q = searchQuery.toLowerCase();
-                const titleMatch = String(n.title || "").toLowerCase().includes(q);
-                const msgMatch = String(n.message || "").toLowerCase().includes(q);
-                const tableMatch = String(n.tableNo || "").toLowerCase().includes(q);
+                const titleMatch = String(n.title || n.data?.title || "").toLowerCase().includes(q);
+                const msgMatch = String(n.message || n.data?.message || "").toLowerCase().includes(q);
+                const tableMatch = String(n.tableNo || n.data?.tableNo || "").toLowerCase().includes(q);
                 return titleMatch || msgMatch || tableMatch;
             }
             return true;
@@ -182,10 +192,13 @@ export default function StaffNotificationsView({
                                     </span>
                                 )}
                             </h1>
+                            <p className="text-xs text-[#78716C] hidden sm:block">
+                                Real-time operational alerts for your active shift.
+                            </p>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                         <button
                             type="button"
                             onClick={() => {
@@ -193,42 +206,42 @@ export default function StaffNotificationsView({
                                 fetchNotifications();
                             }}
                             disabled={refreshing}
-                            className="p-2 sm:p-2.5 rounded-xl bg-white hover:bg-[#FFF7ED] border border-[#E7E5E4] text-[#57534E] hover:text-[#171717] transition min-h-[38px] min-w-[38px] flex items-center justify-center disabled:opacity-50 shadow-xs cursor-pointer"
+                            className="p-2 sm:p-2.5 rounded-xl bg-white hover:bg-[#FFF7ED] text-[#57534E] hover:text-[#171717] transition min-h-[38px] min-w-[38px] flex items-center justify-center border border-[#E7E5E4] shadow-xs cursor-pointer"
                             title="Refresh notifications"
                         >
-                            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+                            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin text-[#F97316]" : ""}`} />
                         </button>
                         {unreadCount > 0 && (
                             <button
                                 type="button"
                                 onClick={handleMarkAllAsRead}
-                                className="px-3 py-1.5 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white text-xs font-bold flex items-center gap-1.5 transition min-h-[38px] shadow-xs cursor-pointer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white font-bold text-xs transition min-h-[38px] shadow-xs cursor-pointer"
                             >
                                 <CheckCheck className="w-4 h-4" />
-                                <span>Mark all read</span>
+                                <span className="hidden sm:inline">Mark All as Read</span>
                             </button>
                         )}
                     </div>
                 </div>
             </header>
 
-            {/* Main Content - Full Width */}
-            <main className="flex-1 w-full px-3 sm:px-4 md:px-6 py-4 space-y-3 max-w-none">
-
-                {/* Filter and Search Bar */}
-                <div className="flex flex-col sm:flex-row gap-2.5">
+            {/* Filter and Content */}
+            <main className="flex-1 w-full max-w-5xl mx-auto px-3 py-4 sm:px-4 sm:py-6 space-y-4">
+                {/* Search & Filter Bar */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#FAFAF9] p-2.5 sm:p-3 rounded-2xl border border-[#E7E5E4]">
                     <div className="relative flex-1">
                         <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#78716C]" />
                         <input
                             type="text"
-                            placeholder="Search notifications..."
+                            placeholder="Search by title, table number, or message..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-white border border-[#E7E5E4] rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-[#171717] placeholder-[#78716C] focus:outline-none focus:border-[#F97316] min-h-[38px] shadow-xs"
+                            className="w-full pl-9 pr-4 py-1.5 bg-white border border-[#E7E5E4] rounded-xl text-xs sm:text-sm text-[#171717] focus:outline-none focus:border-[#F97316] transition shadow-xs"
                         />
                     </div>
+
                     <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-                        {["ALL", "UNREAD", "URGENT", "TASKS"].map((type) => (
+                        {["ALL", "UNREAD", "CLEANING", "ORDERS", "TABLES", "URGENT"].map((type) => (
                             <button
                                 key={type}
                                 type="button"
@@ -264,6 +277,10 @@ export default function StaffNotificationsView({
                         {filteredNotifications.map((notif) => {
                             const isRead = Boolean(notif.isRead || notif.read);
                             const isUrgent = notif.priority === "URGENT" || notif.type === "URGENT";
+                            const title = notif.title || notif.data?.title || "Staff Alert";
+                            const message = notif.message || notif.data?.message || "";
+                            const tableNo = notif.tableNo || notif.data?.tableNo;
+
                             return (
                                 <div
                                     key={notif.id}
@@ -293,16 +310,16 @@ export default function StaffNotificationsView({
                                                     <h4 className={`text-xs sm:text-sm font-bold truncate ${
                                                         isUrgent ? "text-[#DC2626]" : !isRead ? "text-[#171717]" : "text-[#57534E]"
                                                     }`}>
-                                                        {notif.title || "Staff Alert"}
+                                                        {title}
                                                     </h4>
                                                     {isUrgent && (
                                                         <span className="px-1.5 py-0.2 rounded-full text-[10px] font-extrabold bg-[#DC2626] text-white">
                                                             URGENT
                                                         </span>
                                                     )}
-                                                    {notif.tableNo && (
+                                                    {tableNo && (
                                                         <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-[#FFF7ED] text-[#EA580C] border border-[#F97316]/30">
-                                                            Table {notif.tableNo}
+                                                            Table {tableNo}
                                                         </span>
                                                     )}
                                                 </div>
@@ -311,9 +328,11 @@ export default function StaffNotificationsView({
                                                 </div>
                                             </div>
 
-                                            <p className="text-xs text-[#57534E] mt-0.5 break-words">
-                                                {notif.message}
-                                            </p>
+                                            {message && (
+                                                <p className="text-xs text-[#57534E] mt-0.5 break-words">
+                                                    {message}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
 

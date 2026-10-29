@@ -252,18 +252,76 @@ export default function CleanerStation() {
         }
     };
 
+    const isToday = (dateVal) => {
+        if (!dateVal) return false;
+        const d = new Date(dateVal);
+        if (Number.isNaN(d.getTime())) return false;
+        const now = new Date();
+        return (
+            d.getDate() === now.getDate() &&
+            d.getMonth() === now.getMonth() &&
+            d.getFullYear() === now.getFullYear()
+        );
+    };
+
+    const formatCleaningDate = (dateVal) => {
+        if (!dateVal) return "Unknown Date";
+        const d = new Date(dateVal);
+        if (Number.isNaN(d.getTime())) return "Unknown Date";
+        if (isToday(d)) return "Today";
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        if (
+            d.getDate() === yesterday.getDate() &&
+            d.getMonth() === yesterday.getMonth() &&
+            d.getFullYear() === yesterday.getFullYear()
+        ) {
+            return "Yesterday";
+        }
+        return d.toLocaleDateString("en-IN", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+        });
+    };
+
+    const formatCleaningTime = (dateVal) => {
+        if (!dateVal) return "";
+        const d = new Date(dateVal);
+        if (Number.isNaN(d.getTime())) return "";
+        return d.toLocaleTimeString("en-IN", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+        });
+    };
+
     const staffId = user?.id;
     const pendingTasks = tasks.filter((t) => t.status === "PENDING");
     const myActiveTasks = tasks.filter(
         (t) => (t.status === "ACCEPTED" || t.status === "IN_PROGRESS") && t.assignedTo === staffId
     );
     const completedTasks = tasks.filter((t) => t.status === "COMPLETED");
+    const sanitizedTodayTasks = useMemo(() => {
+        return completedTasks.filter((t) => isToday(t.completedAt || t.updatedAt || t.createdAt));
+    }, [completedTasks]);
+
+    const groupedHistory = useMemo(() => {
+        const groups = {};
+        completedTasks.forEach((task) => {
+            const dateStr = formatCleaningDate(task.completedAt || task.updatedAt || task.createdAt);
+            if (!groups[dateStr]) groups[dateStr] = [];
+            groups[dateStr].push(task);
+        });
+        return Object.entries(groups);
+    }, [completedTasks]);
 
     const tabs = [
         { id: "TABLES", label: "Dirty Tables", icon: Sparkles, badge: dirtyTables.length },
         { id: "CHECKLIST", label: "Cleaning Queue", icon: Bell, badge: pendingTasks.length },
         { id: "MY_WORK", label: "My Tasks", icon: Play, badge: myActiveTasks.length },
-        { id: "COMPLETED", label: "Sanitized Today", icon: CheckCircle2, badge: completedTasks.length },
+        { id: "COMPLETED", label: "Sanitized Today", icon: CheckCircle2, badge: sanitizedTodayTasks.length },
+        { id: "HISTORY", label: "History", icon: Clock, badge: completedTasks.length },
     ];
 
     return (
@@ -370,7 +428,7 @@ export default function CleanerStation() {
                             <CheckCircle2 className="w-4 h-4 text-[#059669]" />
                         </div>
                         <div className="text-2xl sm:text-3xl font-extrabold text-[#171717] mt-1">
-                            {completedTasks.length}
+                            {sanitizedTodayTasks.length}
                         </div>
                         <div className="text-[11px] text-[#78716C] mt-0.5">Tables & areas clean</div>
                     </div>
@@ -576,7 +634,7 @@ export default function CleanerStation() {
                     </div>
                 )}
 
-                {/* Tab 4: Completed Cleaning Tasks */}
+                {/* Tab 4: Completed Cleaning Tasks (Strictly Today) */}
                 {activeTab === "COMPLETED" && (
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
@@ -585,18 +643,21 @@ export default function CleanerStation() {
                                 Sanitized & Released Today
                             </h2>
                             <span className="text-xs font-semibold text-[#57534E]">
-                                {completedTasks.length} completed
+                                {sanitizedTodayTasks.length} completed today
                             </span>
                         </div>
 
-                        {completedTasks.length === 0 ? (
+                        {sanitizedTodayTasks.length === 0 ? (
                             <div className="p-8 sm:p-12 text-center bg-white border border-[#E7E5E4] rounded-xl shadow-xs">
-                                <CheckCircle2 className="w-12 h-12 text-[#78716C] mx-auto mb-3" />
+                                <CheckCircle2 className="w-12 h-12 text-[#78716C] mx-auto mb-3 opacity-50" />
                                 <h3 className="text-base font-bold text-[#171717]">No Cleaning Logs Today</h3>
+                                <p className="text-xs text-[#57534E] mt-1">
+                                    Sanitation tasks completed today will appear here.
+                                </p>
                             </div>
                         ) : (
                             <div className="space-y-2">
-                                {completedTasks.slice(0, 25).map((task) => (
+                                {sanitizedTodayTasks.map((task) => (
                                     <div
                                         key={task.id}
                                         className="bg-white border border-[#E7E5E4] rounded-xl p-3 flex items-center justify-between gap-3 text-[#57534E] shadow-xs"
@@ -604,16 +665,103 @@ export default function CleanerStation() {
                                         <div className="flex items-center gap-3">
                                             <CheckCircle2 className="w-5 h-5 text-[#059669] shrink-0" />
                                             <div>
-                                                <div className="font-bold text-sm text-[#171717]">{task.title}</div>
+                                                <div className="font-bold text-sm text-[#171717]">
+                                                    {task.table?.tableNo ? `Table ${task.table.tableNo}` : task.title}
+                                                </div>
                                                 <div className="text-xs text-[#78716C]">
-                                                    {task.table?.tableNo ? `Table ${task.table.tableNo} · ` : ""}
-                                                    {task.completedAt ? new Date(task.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Today"}
+                                                    Cleaned by {task.assignedUser?.name || "Staff"} · {formatCleaningTime(task.completedAt || task.updatedAt)}
                                                 </div>
                                             </div>
                                         </div>
                                         <span className="text-xs font-bold text-[#059669] px-2.5 py-0.5 rounded-full bg-[#ECFDF5] border border-[#059669]/20">
-                                            Cleaned
+                                            Sanitized Today
                                         </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Tab 5: Complete Cleaning History */}
+                {activeTab === "HISTORY" && (
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-base sm:text-lg font-bold text-[#171717] flex items-center gap-2">
+                                <Clock className="w-5 h-5 text-[#F97316]" />
+                                Sanitation & Cleaning History
+                            </h2>
+                            <span className="text-xs font-semibold text-[#57534E]">
+                                {completedTasks.length} total records
+                            </span>
+                        </div>
+
+                        {completedTasks.length === 0 ? (
+                            <div className="p-8 sm:p-12 text-center bg-white border border-[#E7E5E4] rounded-xl shadow-xs">
+                                <Clock className="w-12 h-12 text-[#78716C] mx-auto mb-3 opacity-50" />
+                                <h3 className="text-base font-bold text-[#171717]">No Cleaning History</h3>
+                                <p className="text-xs text-[#57534E] mt-1">
+                                    Historical sanitation and cleaning logs will be preserved here.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {groupedHistory.map(([dateGroup, groupTasks]) => (
+                                    <div key={dateGroup} className="space-y-2">
+                                        <div className="flex items-center justify-between px-1">
+                                            <h3 className="text-xs font-bold text-[#57534E] uppercase tracking-wider">
+                                                {dateGroup}
+                                            </h3>
+                                            <span className="text-[11px] font-semibold text-[#78716C]">
+                                                {groupTasks.length} {groupTasks.length === 1 ? "record" : "records"}
+                                            </span>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            {groupTasks.map((task) => (
+                                                <div
+                                                    key={task.id}
+                                                    className="bg-white border border-[#E7E5E4] rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[#57534E] shadow-xs hover:border-[#059669]/30 transition"
+                                                >
+                                                    <div className="flex items-start gap-3 min-w-0">
+                                                        <CheckCircle2 className="w-5 h-5 text-[#059669] shrink-0 mt-0.5" />
+                                                        <div className="min-w-0 space-y-0.5">
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <span className="font-bold text-sm text-[#171717]">
+                                                                    {task.table?.tableNo ? `Table ${task.table.tableNo}` : (task.title || "Sanitation Task")}
+                                                                </span>
+                                                                {task.table?.section && (
+                                                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[#F5F5F4] text-[#78716C]">
+                                                                        {task.table.section}
+                                                                    </span>
+                                                                )}
+                                                                <span className="text-xs text-[#78716C]">
+                                                                    · {formatCleaningTime(task.completedAt || task.updatedAt || task.createdAt)}
+                                                                </span>
+                                                            </div>
+
+                                                            <div className="text-xs text-[#57534E] flex items-center gap-2 flex-wrap">
+                                                                <span>
+                                                                    Cleaned by: <strong>{task.assignedUser?.name || "Cleaner"}</strong>
+                                                                </span>
+                                                                {task.description && (
+                                                                    <span className="text-[#78716C] truncate max-w-xs">
+                                                                        ({task.description})
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                                                        <span className="text-xs font-bold text-[#059669] px-2.5 py-1 rounded-full bg-[#ECFDF5] border border-[#059669]/20 flex items-center gap-1">
+                                                            <Check className="w-3.5 h-3.5" />
+                                                            Sanitized & Ready
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 ))}
                             </div>

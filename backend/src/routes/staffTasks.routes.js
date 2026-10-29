@@ -2,7 +2,7 @@ import { requireStaffJwt } from "../services/staffAuthService.js";
 import { logAuditEvent } from "../services/auditLogService.js";
 import { completeSessionAndReleaseTable } from "../services/tableSessionService.js";
 import { syncParentOrderStatusFromKots, getCanonicalReadyItems } from "../services/kotService.js";
-import { createAndDispatchNotification } from "../services/notificationService.js";
+import { createAndDispatchNotification, dispatchDesignationNotification } from "../services/notificationService.js";
 import { NOTIFICATION_TYPES, RECIPIENT_TYPES } from "../constants/notificationTypes.js";
 import {
   getActiveStaffByCapability,
@@ -199,6 +199,56 @@ export default async function staffTaskRoutes(app, deps = {}) {
         staff.to(`restaurant_${restaurantId}`).emit("task:assigned", payload);
         staff.to(`restaurant:${restaurantId}`).emit("task:assigned", payload);
       }
+
+      // Persist and dispatch designation-based notification
+      try {
+        const targetRole = task.roleTarget === "CLEANER" ? "CLEANER" :
+                           task.roleTarget === "STEWARD" ? "STEWARD" :
+                           task.roleTarget === "CASHIER" ? "CASHIER" :
+                           task.roleTarget === "SWIPER" ? "SWIPER" :
+                           task.roleTarget === "WAITER" ? "WAITER" : null;
+        if (targetRole) {
+          const notifType = targetRole === "CLEANER" ? NOTIFICATION_TYPES.CLEANING_TASK :
+                            targetRole === "STEWARD" ? NOTIFICATION_TYPES.STEWARD_TASK :
+                            targetRole === "CASHIER" ? NOTIFICATION_TYPES.CASHIER_TASK :
+                            targetRole === "SWIPER" ? NOTIFICATION_TYPES.SWIPER_TASK :
+                            NOTIFICATION_TYPES.SYSTEM_ALERT;
+          await dispatchDesignationNotification({
+            prisma,
+            realtime,
+            restaurantId,
+            targetDesignation: targetRole,
+            notificationType: notifType,
+            title: `📋 New Task: ${task.title}`,
+            message: task.description || `${task.title} for Table ${payload.tableNo || "N/A"}`,
+            data: {
+              taskId: task.id,
+              tableId: task.tableId,
+              tableNo: payload.tableNo,
+              priority: task.priority,
+              category: task.category,
+            },
+          }).catch(() => {});
+        }
+
+        // Also notify OWNER of new staff task
+        await dispatchDesignationNotification({
+          prisma,
+          realtime,
+          restaurantId,
+          targetDesignation: "OWNER",
+          notificationType: NOTIFICATION_TYPES.SYSTEM_ALERT,
+          title: `📋 Staff Task: ${task.title}`,
+          message: `${task.requestedByUser?.name || "Staff"} requested ${task.title} (Target: ${task.roleTarget || "All"})`,
+          data: {
+            taskId: task.id,
+            tableId: task.tableId,
+            tableNo: payload.tableNo,
+            roleTarget: task.roleTarget,
+            priority: task.priority,
+          },
+        }).catch(() => {});
+      } catch (_) {}
 
       return reply.code(201).send({ success: true, message: "Task request created successfully", task });
     } catch (err) {
@@ -456,6 +506,24 @@ export default async function staffTaskRoutes(app, deps = {}) {
               cleanedBy: req.staffActor?.name || "Cleaner",
               timestamp: nowIso,
             });
+
+            try {
+              await dispatchDesignationNotification({
+                prisma,
+                realtime,
+                restaurantId: effectiveRid,
+                targetDesignation: "OWNER",
+                notificationType: NOTIFICATION_TYPES.TABLE_CLEANED,
+                title: `✨ Table ${existing.table?.tableNo} Sanitized`,
+                message: `Table ${existing.table?.tableNo} has been sanitized and is ready for guests.`,
+                data: {
+                  tableId: existing.tableId,
+                  tableNo: existing.table?.tableNo,
+                  cleanedBy: req.staffActor?.name || "Cleaner",
+                  timestamp: nowIso,
+                },
+              }).catch(() => {});
+            } catch (_) {}
           }
         }
       }
@@ -585,6 +653,42 @@ export default async function staffTaskRoutes(app, deps = {}) {
           tableNo: table.tableNo,
         });
       }
+
+      // Persist and dispatch TABLE_CLEANED notification to OWNER & assigned waiter
+      try {
+        await dispatchDesignationNotification({
+          prisma,
+          realtime,
+          restaurantId: effectiveRid,
+          targetDesignation: "OWNER",
+          notificationType: NOTIFICATION_TYPES.TABLE_CLEANED,
+          title: `✨ Table ${table.tableNo} Sanitized`,
+          message: `Table ${table.tableNo} has been sanitized and is ready for guests.`,
+          data: {
+            tableId: table.id,
+            tableNo: table.tableNo,
+            cleanedBy: req.staffActor?.name || "Cleaner",
+            timestamp: nowIso,
+          },
+        }).catch(() => {});
+
+        if (table.assignedWaiterId) {
+          await createAndDispatchNotification({
+            prisma,
+            realtime,
+            recipientType: RECIPIENT_TYPES.USER,
+            recipientId: table.assignedWaiterId,
+            restaurantId: effectiveRid,
+            notificationType: NOTIFICATION_TYPES.TABLE_CLEANED,
+            title: `✨ Table ${table.tableNo} Sanitized`,
+            message: `Table ${table.tableNo} has been cleaned and is ready for new guests.`,
+            data: {
+              tableId: table.id,
+              tableNo: table.tableNo,
+            },
+          }).catch(() => {});
+        }
+      } catch (_) {}
 
       await logAuditEvent({
         prisma,

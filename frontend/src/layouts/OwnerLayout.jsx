@@ -1035,10 +1035,38 @@ export default function OwnerLayout() {
     }, [sidebarOpen]);
 
     useEffect(() => {
-        const syncUnread = () => setUnreadCount(getOwnerUnreadCount());
-        syncUnread();
+        let isMounted = true;
+        const fetchUnread = async () => {
+            const token = localStorage.getItem("token") || localStorage.getItem("staffToken");
+            if (!token) {
+                if (isMounted) setUnreadCount(getOwnerUnreadCount());
+                return;
+            }
+            try {
+                const res = await axios.get(`${API}/api/notifications/unread-count`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                if (isMounted && res.data && typeof res.data.count === "number") {
+                    setUnreadCount(res.data.count);
+                    return;
+                }
+            } catch (_) {}
+            if (isMounted) setUnreadCount(getOwnerUnreadCount());
+        };
+
+        fetchUnread();
+        const interval = setInterval(fetchUnread, 30000);
+
+        const syncUnread = () => fetchUnread();
         const unsubscribe = subscribeOwnerNotifications(syncUnread);
-        return unsubscribe;
+        window.addEventListener("notifications:updated", syncUnread);
+
+        return () => {
+            isMounted = false;
+            clearInterval(interval);
+            unsubscribe();
+            window.removeEventListener("notifications:updated", syncUnread);
+        };
     }, []);
 
     const [popupOrder, setPopupOrder] = useState(null);
@@ -1317,12 +1345,18 @@ export default function OwnerLayout() {
             loadTableOverview();
         };
 
+        const handleNotificationNew = () => {
+            setUnreadCount((c) => c + 1);
+            playNotificationSound("default").catch(() => {});
+            loadTableOverview();
+        };
+
         socket.on("order:created", handleNewOrder);
         socket.on("new_order", handleNewOrder);
         socket.on("order:updated", loadTableOverview);
         socket.on("order:status_updated", loadTableOverview);
         socket.on("payment:updated", loadTableOverview);
-        socket.on("notification:new", loadTableOverview);
+        socket.on("notification:new", handleNotificationNew);
         socket.on("reservation:updated", loadTableOverview);
         socket.on("table:updated", handleTableUpdated);
         socket.on("table:session_updated", handleSessionUpdated);
@@ -1339,7 +1373,7 @@ export default function OwnerLayout() {
             socket.off("order:updated", loadTableOverview);
             socket.off("order:status_updated", loadTableOverview);
             socket.off("payment:updated", loadTableOverview);
-            socket.off("notification:new", loadTableOverview);
+            socket.off("notification:new", handleNotificationNew);
             socket.off("reservation:updated", loadTableOverview);
             socket.off("table:updated", handleTableUpdated);
             socket.off("table:session_updated", handleSessionUpdated);

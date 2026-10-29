@@ -1,12 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     Bell,
     Check,
     CheckCheck,
     Clock,
     Filter,
+    RefreshCw,
     Search,
 } from "lucide-react";
+import axios from "axios";
+import { API } from "../../config";
+import { useStaffSocket } from "../../context/StaffSocketContext";
+import { playNotificationSound } from "../../utils/soundPlayer";
 import {
     getOwnerNotifications,
     markAllOwnerNotificationsRead,
@@ -31,29 +36,149 @@ const formatTime = (value) => {
 
 export default function OwnerNotifications() {
     const [notifications, setNotifications] = useState(() => getOwnerNotifications());
-    const [filterType, setFilterType] = useState("ALL"); // ALL | UNREAD | ORDERS | SUCCESS | INFO
+    const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const [filterType, setFilterType] = useState("ALL"); // ALL | UNREAD | ORDERS | TABLES | SUCCESS | INFO
     const [searchQuery, setSearchQuery] = useState("");
+    const { socket } = useStaffSocket?.() || {};
 
     const unreadCount = useMemo(
         () => notifications.reduce((sum, item) => sum + (item.read ? 0 : 1), 0),
         [notifications]
     );
 
-    useEffect(() => {
-        const unsubscribe = subscribeOwnerNotifications((next) => {
-            setNotifications(Array.isArray(next) ? next : []);
-        });
-        return unsubscribe;
+    const fetchBackendNotifications = useCallback(async (isRefresh = false) => {
+        const token = localStorage.getItem("token") || localStorage.getItem("staffToken");
+        if (!token) {
+            setNotifications(getOwnerNotifications());
+            return;
+        }
+
+        if (isRefresh) setRefreshing(true);
+        else setLoading(true);
+
+        try {
+            const res = await axios.get(`${API}/api/notifications`, {
+                headers: { Authorization: `Bearer ${token}` },
+                params: { page: 1, limit: 100 },
+            });
+            const list = res.data?.notifications || res.data?.data || [];
+            if (Array.isArray(list)) {
+                const mapped = list.map((item) => ({
+                    id: item.id,
+                    title: item.title || item.data?.title || item.notificationType || "Notification",
+                    message: item.message || item.data?.message || "",
+                    type: item.notificationType || item.type || "INFO",
+                    createdAt: item.createdAt,
+                    read: Boolean(item.isRead || item.read),
+                    data: item.data,
+                }));
+                setNotifications(mapped);
+            }
+        } catch {
+            // Graceful fallback to local cache
+            setNotifications(getOwnerNotifications());
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
     }, []);
 
-    const onMarkAllRead = () => {
+    useEffect(() => {
+        fetchBackendNotifications();
+    }, [fetchBackendNotifications]);
+
+    // Local storage subscription for backward compatibility / fallback
+    useEffect(() => {
+        const unsubscribe = subscribeOwnerNotifications((next) => {
+            if (Array.isArray(next) && next.length > 0 && notifications.length === 0) {
+                setNotifications(next);
+            }
+        });
+        return unsubscribe;
+    }, [notifications.length]);
+
+    // Realtime notification socket listener
+    useEffect(() => {
+        if (!socket) return;
+
+        const handleNewNotification = (notif) => {
+            if (!notif) return;
+            const mapped = {
+                id: notif.id || `notif_${Date.now()}`,
+                title: notif.title || notif.data?.title || notif.notificationType || "Notification",
+                message: notif.message || notif.data?.message || "",
+                type: notif.notificationType || notif.type || "INFO",
+                createdAt: notif.createdAt || new Date().toISOString(),
+                read: false,
+                data: notif.data,
+            };
+
+            setNotifications((prev) => {
+                if (prev.some((p) => p.id === mapped.id)) return prev;
+                return [mapped, ...prev];
+            });
+
+            playNotificationSound("default").catch(() => {});
+            window.dispatchEvent(new CustomEvent("notifications:updated"));
+        };
+
+        socket.on("notification:new", handleNewNotification);
+        return () => {
+            socket.off("notification:new", handleNewNotification);
+        };
+    }, [socket]);
+
+    const onMarkAllRead = async () => {
+        setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
         markAllOwnerNotificationsRead();
-        setNotifications(getOwnerNotifications());
+        window.dispatchEvent(new CustomEvent("notifications:updated"));
+
+        const token = localStorage.getItem("token") || localStorage.getItem("staffToken");
+        if (token) {
+            try {
+                await axios.put(
+                    `${API}/api/notifications/read-all`,
+                    {},
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+            } catch {
+                try {
+                    await axios.patch(
+                        `${API}/api/notifications/read-all`,
+                        {},
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    );
+                } catch (_) {}
+            }
+        }
     };
 
-    const onMarkOneRead = (id) => {
+    const onMarkOneRead = async (id) => {
+        setNotifications((prev) =>
+            prev.map((item) => (item.id === id ? { ...item, read: true } : item))
+        );
         markOwnerNotificationRead(id);
-        setNotifications(getOwnerNotifications());
+        window.dispatchEvent(new CustomEvent("notifications:updated"));
+
+        const token = localStorage.getItem("token") || localStorage.getItem("staffToken");
+        if (token && typeof id === "number") {
+            try {
+                await axios.put(
+                    `${API}/api/notifications/${id}/read`,
+                    {},
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+            } catch {
+                try {
+                    await axios.patch(
+                        `${API}/api/notifications/${id}/read`,
+                        {},
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    );
+                } catch (_) {}
+            }
+        }
     };
 
     // Filter & Search Notifications
@@ -61,10 +186,10 @@ export default function OwnerNotifications() {
         return notifications.filter((item) => {
             // Type / Unread filter
             if (filterType === "UNREAD" && item.read) return false;
-            if (filterType !== "ALL" && filterType !== "UNREAD") {
-                const itemType = String(item.type || "").toUpperCase();
-                if (!itemType.includes(filterType.toUpperCase())) return false;
-            }
+            if (filterType === "ORDERS" && !String(item.type || "").toUpperCase().includes("ORDER")) return false;
+            if (filterType === "TABLES" && !String(item.type || "").toUpperCase().includes("TABLE")) return false;
+            if (filterType === "SUCCESS" && !String(item.type || "").toUpperCase().includes("SUCCESS")) return false;
+            if (filterType === "INFO" && !["INFO", "SYSTEM"].some((t) => String(item.type || "").toUpperCase().includes(t))) return false;
 
             // Search query
             if (searchQuery.trim()) {
@@ -96,12 +221,21 @@ export default function OwnerNotifications() {
                             </span>
                         </h1>
                         <p className="text-[11px] theme-muted">
-                            Real-time owner activity alerts and system updates.
+                            Real-time operational activity alerts and system updates.
                         </p>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => fetchBackendNotifications(true)}
+                        disabled={refreshing}
+                        className="rounded-lg border border-[color:var(--app-border)]/60 bg-black/5 dark:bg-white/5 p-1.5 text-xs text-[color:var(--app-text)] hover:bg-black/10 dark:hover:bg-white/10 transition"
+                        title="Refresh notifications"
+                    >
+                        <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin text-orange-500" : ""}`} />
+                    </button>
                     <button
                         type="button"
                         onClick={onMarkAllRead}
@@ -117,7 +251,7 @@ export default function OwnerNotifications() {
             <div className="flex flex-wrap items-center justify-between gap-2 py-1 text-xs">
                 {/* Filter Quick Tabs */}
                 <div className="flex items-center gap-1 overflow-x-auto py-0.5 text-[11px]">
-                    {["ALL", "UNREAD", "ORDERS", "SUCCESS", "INFO"].map((tab) => (
+                    {["ALL", "UNREAD", "ORDERS", "TABLES", "SUCCESS", "INFO"].map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setFilterType(tab)}
@@ -156,8 +290,9 @@ export default function OwnerNotifications() {
                     {filteredNotifications.map((item) => {
                         const isUnread = !item.read;
                         const typeUpper = String(item.type || "INFO").toUpperCase();
-                        const isSuccess = typeUpper.includes("SUCCESS");
-                        const isOrder = typeUpper.includes("ORDER");
+                        const isSuccess = typeUpper.includes("SUCCESS") || typeUpper.includes("CLEANED");
+                        const isOrder = typeUpper.includes("ORDER") || typeUpper.includes("BILL");
+                        const isTable = typeUpper.includes("TABLE") || typeUpper.includes("CLEAN");
 
                         return (
                             <div
@@ -177,6 +312,7 @@ export default function OwnerNotifications() {
                                         </h4>
                                         <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                                             isOrder ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" :
+                                            isTable ? "bg-purple-500/15 text-purple-600 dark:text-purple-400" :
                                             isSuccess ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" :
                                             "bg-sky-500/15 text-sky-600 dark:text-sky-400"
                                         }`}>
