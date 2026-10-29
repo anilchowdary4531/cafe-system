@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useStaffSocket } from "../../context/StaffSocketContext";
+import { useConnectivity } from "../../hooks/useConnectivity";
 import useCachedGet from "../../hooks/useCachedGet";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
 import { showToast } from "../../utils/toast";
@@ -580,6 +581,7 @@ export default function NewOrder() {
     const [searchParams] = useSearchParams();
     const { user } = useAuth();
     const { socket, connected, error: socketError } = useStaffSocket();
+    const { isLive, isOffline, isReconnecting } = useConnectivity();
 
     const restaurantId = user?.restaurantId || user?.restaurant?.id;
     const slug = String(user?.restaurant?.slug || "").trim();
@@ -1363,7 +1365,7 @@ export default function NewOrder() {
                                         Billing Desk
                                     </h1>
                                     <p className="theme-muted text-xs sm:text-sm truncate">
-                                        {user?.restaurant?.name || "Restaurant"} - {connected ? "Live" : "Offline"}
+                                        {user?.restaurant?.name || "Restaurant"} - {isLive ? "Live" : isOffline ? "Offline" : "Reconnecting"}
                                         {socketError ? ` (${socketError})` : ""}
                                     </p>
                                 </div>

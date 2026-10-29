@@ -24,7 +24,16 @@ export function StaffSocketProvider({ children }) {
     const [error, setError] = useState("");
 
     useEffect(() => {
-        const token = String(staffToken || "").trim();
+        const token =
+            String(staffToken || "").trim() ||
+            (typeof window !== "undefined"
+                ? String(
+                      window.sessionStorage?.getItem("token") ||
+                      window.localStorage?.getItem("staffToken") ||
+                      window.localStorage?.getItem("token") ||
+                      ""
+                  ).trim()
+                : "");
 
         if (!user || !token) {
             if (socketRef.current) {
@@ -87,6 +96,7 @@ export function StaffSocketProvider({ children }) {
         () => ({
             socket: socketInstance,
             connected,
+            isConnected: connected, // alias for backwards compatibility
             error,
         }),
         [connected, error, socketInstance]
@@ -95,10 +105,19 @@ export function StaffSocketProvider({ children }) {
     return <StaffSocketContext.Provider value={value}>{children}</StaffSocketContext.Provider>;
 }
 
+const DEFAULT_SOCKET_STATE = {
+    socket: null,
+    connected: false,
+    isConnected: false,
+    error: "",
+};
+
 export function useStaffSocket() {
     const ctx = useContext(StaffSocketContext);
-    if (!ctx) {
-        throw new Error("useStaffSocket must be used inside StaffSocketProvider");
-    }
-    return ctx;
+    return ctx || DEFAULT_SOCKET_STATE;
+}
+
+export function useOptionalStaffSocket() {
+    const ctx = useContext(StaffSocketContext);
+    return ctx || DEFAULT_SOCKET_STATE;
 }

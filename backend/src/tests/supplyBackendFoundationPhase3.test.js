@@ -37,6 +37,20 @@ test("Phase 3 — Backend Foundation Tests", async (t) => {
         assert.equal(payload.status, "ok");
     });
 
+    await t.test("should return 200 OK on GET /api/health", async () => {
+        const app = Fastify();
+        await healthRoutes(app);
+
+        const res = await app.inject({
+            method: "GET",
+            url: "/api/health",
+        });
+
+        assert.equal(res.statusCode, 200);
+        const payload = JSON.parse(res.payload);
+        assert.equal(payload.status, "ok");
+    });
+
     await t.test("should verify rate limiting middleware behavior", async () => {
         const req = { ip: "127.0.0.1", headers: {} };
         let sentCode = null;

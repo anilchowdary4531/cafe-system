@@ -26,5 +26,6 @@ export default async function healthRoutes(app) {
     };
 
     app.get("/health", checkHealth);
+    app.get("/api/health", checkHealth);
     app.get("/api/v1/health", checkHealth);
 }

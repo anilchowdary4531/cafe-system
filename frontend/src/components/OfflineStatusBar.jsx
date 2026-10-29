@@ -5,10 +5,7 @@ import { offlineSyncEngine } from "../utils/offline/offlineSyncEngine";
 import { getPendingOfflineOperations } from "../utils/offline/offlineDb";
 
 export default function OfflineStatusBar() {
-    const [connState, setConnState] = useState({
-        isOnline: navigator.onLine,
-        isReachable: navigator.onLine,
-    });
+    const [connState, setConnState] = useState(() => connectivityService.getState());
     const [syncState, setSyncState] = useState({
         isSyncing: false,
         lastSyncTime: null,
@@ -35,7 +32,7 @@ export default function OfflineStatusBar() {
         };
     }, []);
 
-    const isOffline = !connState.isReachable;
+    const isOffline = !connState.isOnline || (connState.checked && !connState.isReachable);
     const isSyncing = syncState.isSyncing;
     const hasConflict = !!syncState.conflictPayload;
 

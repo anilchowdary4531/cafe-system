@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useStaffSocket } from "../context/StaffSocketContext";
+import { useConnectivity } from "../hooks/useConnectivity";
 import { resolveEffectiveStaffRole } from "../utils/staffRole";
 import { getDesignationTheme } from "../utils/staffThemes";
 
@@ -27,7 +28,8 @@ export default function StaffShell({
     const navigate = useNavigate();
     const location = useLocation();
     const { user, logout } = useAuth();
-    const { socket, isConnected } = useStaffSocket();
+    const { socket } = useStaffSocket();
+    const { isLive, isOffline, isReconnecting } = useConnectivity();
 
     const effectiveRole = resolveEffectiveStaffRole(user?.role, user?.designation || designation);
     const displayDesignation = designation || user?.designation || effectiveRole || "STAFF";
@@ -112,15 +114,31 @@ export default function StaffShell({
                         {/* Connection status indicator */}
                         <div
                             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border ${
-                                isConnected
+                                isLive
                                     ? "bg-[#ECFDF5] text-[#059669] border-[#059669]/30"
+                                    : isOffline
+                                    ? "bg-[#FEF2F2] text-[#DC2626] border-[#DC2626]/30"
                                     : "bg-[#FFFBEB] text-[#D97706] border-[#D97706]/30"
                             }`}
-                            title={isConnected ? "Realtime connected" : "Connecting to server..."}
+                            title={
+                                isLive
+                                    ? "Realtime connected"
+                                    : isOffline
+                                    ? "Network offline — check connection"
+                                    : "Connecting realtime..."
+                            }
                         >
-                            <span className={`w-2 h-2 rounded-full ${isConnected ? "bg-[#059669] animate-pulse" : "bg-[#D97706]"}`} />
+                            <span
+                                className={`w-2 h-2 rounded-full ${
+                                    isLive
+                                        ? "bg-[#059669] animate-pulse"
+                                        : isOffline
+                                        ? "bg-[#DC2626]"
+                                        : "bg-[#D97706] animate-pulse"
+                                }`}
+                            />
                             <span className="text-[11px] font-bold hidden sm:inline">
-                                {isConnected ? "Live" : "Offline"}
+                                {isLive ? "Live" : isOffline ? "Offline" : "Reconnecting"}
                             </span>
                         </div>
 

@@ -99,8 +99,9 @@ describe("Cleaner Station Table Cleaning Synchronization Suite", () => {
             </MemoryRouter>
         );
 
-        // Header shows Offline when socket is not connected
-        expect(screen.getByText("Offline")).toBeInTheDocument();
+        // Header does not falsely display Offline when socket is reconnecting
+        expect(screen.getByText("Reconnecting")).toBeInTheDocument();
+        expect(screen.queryByText("Offline")).not.toBeInTheDocument();
 
         // Dirty table count must be 1 (Table 4)
         await waitFor(() => {
@@ -189,8 +190,9 @@ describe("Cleaner Station Table Cleaning Synchronization Suite", () => {
             expect(screen.getByText("Table 12")).toBeInTheDocument();
         });
 
-        // Realtime status correctly reflects Socket.IO disconnected ("Offline")
-        expect(screen.getByText("Offline")).toBeInTheDocument();
+        // Realtime status correctly reflects Socket.IO reconnecting ("Reconnecting", NOT false "Offline")
+        expect(screen.getByText("Reconnecting")).toBeInTheDocument();
+        expect(screen.queryByText("Offline")).not.toBeInTheDocument();
     });
 
     it("TEST 6: Realtime 'cleaner:table_dirty' event dynamically adds dirty table without page refresh", async () => {

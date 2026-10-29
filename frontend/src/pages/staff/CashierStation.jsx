@@ -39,6 +39,7 @@ import axios from "axios";
 import StaffShell from "../../components/StaffShell";
 import { useAuth } from "../../context/AuthContext";
 import { useStaffSocket } from "../../context/StaffSocketContext";
+import { useConnectivity } from "../../hooks/useConnectivity";
 import { useCanonicalTables } from "../../context/TableStateContext";
 import { API } from "../../config";
 import { showToast } from "../../utils/toast";
@@ -73,8 +74,9 @@ export const getAuthoritativeTotal = (order) => {
 
 export default function CashierStation() {
     const { user, token } = useAuth();
-    const { socket, isConnected } = useStaffSocket();
-    const isOnline = isConnected ?? true;
+    const { socket } = useStaffSocket();
+    const { isLive, isOffline, isReconnecting } = useConnectivity();
+    const isOnline = !isOffline;
     const { tables, occupiedCount, freeCount, loading: loadingTables, refreshTables } = useCanonicalTables();
 
     // Workstation view tab: "terminal" | "transactions" | "shift"
@@ -781,9 +783,29 @@ export default function CashierStation() {
                         <div className="flex items-center gap-4 flex-wrap">
                             {/* Online / Realtime Status */}
                             <div className="flex items-center gap-1.5 font-bold">
-                                <span className={`w-2.5 h-2.5 rounded-full ${isConnected ? "bg-emerald-500 shadow-xs" : "bg-rose-500 shadow-xs"}`} />
-                                <span className={isConnected ? "text-emerald-700 font-extrabold uppercase tracking-wider" : "text-rose-700 font-extrabold uppercase tracking-wider"}>
-                                    {isConnected ? "ONLINE • REALTIME POS" : "OFFLINE • SYNC PENDING"}
+                                <span
+                                    className={`w-2.5 h-2.5 rounded-full ${
+                                        isLive
+                                            ? "bg-emerald-500 shadow-xs"
+                                            : isOffline
+                                            ? "bg-rose-500 shadow-xs"
+                                            : "bg-amber-500 animate-pulse shadow-xs"
+                                    }`}
+                                />
+                                <span
+                                    className={
+                                        isLive
+                                            ? "text-emerald-700 font-extrabold uppercase tracking-wider"
+                                            : isOffline
+                                            ? "text-rose-700 font-extrabold uppercase tracking-wider"
+                                            : "text-amber-700 font-extrabold uppercase tracking-wider"
+                                    }
+                                >
+                                    {isLive
+                                        ? "ONLINE • REALTIME POS"
+                                        : isOffline
+                                        ? "OFFLINE • SYNC PENDING"
+                                        : "RECONNECTING • REALTIME"}
                                 </span>
                             </div>
 
