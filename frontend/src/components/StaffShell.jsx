@@ -44,12 +44,12 @@ export default function StaffShell({
     };
 
     return (
-        <div className="min-h-screen bg-white text-[#171717] flex flex-col font-sans">
+        <div className="min-h-screen bg-white text-[#171717] flex flex-col font-sans overflow-x-hidden">
             {/* Top Navigation Header */}
-            <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-[#E7E5E4] px-3 py-2 sm:px-4 sm:py-2.5 shadow-xs">
-                <div className="w-full flex items-center justify-between gap-2 sm:gap-4">
+            <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-[#E7E5E4] px-2.5 sm:px-4 lg:px-6 py-2 sm:py-2.5 shadow-xs">
+                <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-1.5 sm:gap-4">
                     {/* Left: Brand + Restaurant + Title */}
-                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
                         <Link
                             to={`/staff/${effectiveRole.toLowerCase()}`}
                             className="flex items-center gap-2 group shrink-0"
@@ -61,10 +61,10 @@ export default function StaffShell({
                         </Link>
                         <div className="min-w-0">
                             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                                <span className="font-bold text-[#171717] text-sm sm:text-base tracking-tight truncate max-w-[100px] min-[360px]:max-w-[140px] sm:max-w-[220px]">
+                                <span className="font-bold text-[#171717] text-xs min-[360px]:text-sm sm:text-base tracking-tight truncate max-w-[70px] min-[360px]:max-w-[120px] sm:max-w-[220px]">
                                     {restaurantName}
                                 </span>
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-[#FFF7ED] text-[#EA580C] border border-[#F97316]/30 uppercase tracking-wider shrink-0">
+                                <span className="inline-flex items-center px-1.5 py-0.5 sm:px-2 rounded-full text-[9px] min-[360px]:text-[10px] sm:text-xs font-bold bg-[#FFF7ED] text-[#EA580C] border border-[#F97316]/30 uppercase tracking-wider shrink-0">
                                     {displayDesignation}
                                 </span>
                             </div>
@@ -76,7 +76,7 @@ export default function StaffShell({
 
                     {/* Middle: Desktop tabs if provided */}
                     {tabs && tabs.length > 0 && onTabChange && (
-                        <nav className="hidden md:flex items-center gap-1 bg-[#FFF7ED] p-1 rounded-xl border border-[#E7E5E4]">
+                        <nav className="hidden lg:flex items-center gap-1 bg-[#FFF7ED] p-1 rounded-xl border border-[#E7E5E4]">
                             {tabs.map((tab) => {
                                 const isActive = activeTab === tab.id;
                                 const Icon = tab.icon;
@@ -108,7 +108,7 @@ export default function StaffShell({
                     )}
 
                     {/* Right: Actions, Realtime Status, Notifications, Settings, Profile, Logout */}
-                    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                    <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                         {actions}
 
                         {/* Connection status indicator */}
@@ -198,7 +198,7 @@ export default function StaffShell({
 
             {/* Mobile Tabs Bar if tabs provided */}
             {tabs && tabs.length > 0 && onTabChange && (
-                <div className="md:hidden sticky top-[53px] z-30 bg-white/95 backdrop-blur border-b border-[#E7E5E4] px-2.5 py-1.5 overflow-x-auto scrollbar-none shadow-xs">
+                <div className="lg:hidden sticky top-[53px] z-30 bg-white/95 backdrop-blur border-b border-[#E7E5E4] px-2.5 py-1.5 overflow-x-auto scrollbar-none shadow-xs">
                     <div className="flex items-center gap-1.5 min-w-max">
                         {tabs.map((tab) => {
                             const isActive = activeTab === tab.id;
@@ -208,7 +208,7 @@ export default function StaffShell({
                                     key={tab.id}
                                     type="button"
                                     onClick={() => onTabChange(tab.id)}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap min-h-[38px] transition-all ${
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap min-h-[40px] transition-all ${
                                         isActive
                                             ? "bg-[#F97316] text-white shadow-xs font-bold"
                                             : "bg-[#FFF7ED] text-[#57534E] hover:text-[#171717] border border-[#E7E5E4]"
@@ -231,7 +231,7 @@ export default function StaffShell({
             )}
 
             {/* Main Workspace Body - Full width operational layout */}
-            <main className="flex-1 w-full px-3 sm:px-4 md:px-5 py-3 sm:py-4 pb-20 md:pb-6">
+            <main className="flex-1 w-full max-w-full overflow-x-hidden px-3 sm:px-4 lg:px-6 py-3 sm:py-4 pb-20 md:pb-6">
                 {children}
             </main>
         </div>

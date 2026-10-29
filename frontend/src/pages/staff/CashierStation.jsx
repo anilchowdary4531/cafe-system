@@ -777,7 +777,7 @@ export default function CashierStation() {
         >
             {/* VIEW 1: MAIN POS CHECKOUT WORKSTATION */}
             {stationView === "terminal" && (
-                <div className="space-y-4">
+                <div className="space-y-4 max-w-7xl mx-auto w-full min-w-0">
                     {/* TOP STATUS BAR: Connection, Drawer Quick Status, Summary Counter */}
                     <div className="bg-white border border-[#E7E5E4] rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs">
                         <div className="flex items-center gap-4 flex-wrap">
@@ -865,7 +865,7 @@ export default function CashierStation() {
                         <div className={`lg:col-span-5 xl:col-span-5 space-y-3 ${selectedOrder ? "hidden lg:block" : "block"}`}>
                             {/* FLOOR / TABLE STATUS STRIP */}
                             <div className="bg-white border border-[#E7E5E4] rounded-xl p-3 space-y-2.5 shadow-xs">
-                                <div className="flex items-center justify-between text-xs">
+                                <div className="flex flex-col min-[420px]:flex-row min-[420px]:items-center justify-between gap-2 text-xs">
                                     <span className="font-extrabold text-[#171717] uppercase tracking-wider flex items-center gap-1.5">
                                         <Layers className="w-3.5 h-3.5 text-[#EA580C]" />
                                         Table Floor Map ({tableStripData.length})
@@ -1446,7 +1446,7 @@ export default function CashierStation() {
 
             {/* VIEW 2: RECENT TRANSACTIONS & RECEIPT REPRINT */}
             {stationView === "transactions" && (
-                <div className="bg-white border border-[#E7E5E4] rounded-xl p-4 sm:p-6 shadow-xs space-y-4">
+                <div className="bg-white border border-[#E7E5E4] rounded-xl p-4 sm:p-6 shadow-xs space-y-4 max-w-7xl mx-auto w-full min-w-0">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E7E5E4] pb-4">
                         <div>
                             <h2 className="text-lg font-black text-[#171717] flex items-center gap-2">
@@ -1571,7 +1571,7 @@ export default function CashierStation() {
 
             {/* VIEW 3: CASH DRAWER & SHIFT RECONCILIATION */}
             {stationView === "shift" && (
-                <div className="bg-white border border-[#E7E5E4] rounded-xl p-4 sm:p-6 shadow-xs space-y-6 w-full max-w-none">
+                <div className="bg-white border border-[#E7E5E4] rounded-xl p-4 sm:p-6 shadow-xs space-y-6 max-w-7xl mx-auto w-full min-w-0">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E7E5E4] pb-4">
                         <div>
                             <div className="flex items-center gap-2">
@@ -1598,7 +1598,7 @@ export default function CashierStation() {
                                     type="button"
                                     data-testid="close-shift-btn"
                                     onClick={() => setShowCloseShiftModal(true)}
-                                    className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-xs"
+                                    className="px-4 py-2 min-h-[40px] rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-xs"
                                 >
                                     <Lock className="w-4 h-4" />
                                     <span>Close Shift & Reconcile</span>
@@ -1608,7 +1608,7 @@ export default function CashierStation() {
                                     type="button"
                                     data-testid="open-shift-btn"
                                     onClick={() => setShowOpenShiftModal(true)}
-                                    className="px-4 py-2 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white font-bold text-xs transition flex items-center gap-1.5 shadow-xs"
+                                    className="px-4 py-2 min-h-[40px] rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white font-bold text-xs transition flex items-center gap-1.5 shadow-xs"
                                 >
                                     <Unlock className="w-4 h-4" />
                                     <span>Open Shift</span>
@@ -1620,7 +1620,7 @@ export default function CashierStation() {
                     {currentShift ? (
                         <div className="space-y-6">
                             {/* Summary Metric Cards */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div className="grid grid-cols-1 min-[360px]:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
                                 <div className="p-3.5 bg-stone-50 rounded-xl border border-[#E7E5E4]">
                                     <span className="text-[10px] text-[#57534E] uppercase font-bold block mb-1">Opening Cash Float</span>
                                     <span className="text-lg font-black text-[#171717]">₹{shiftStats?.openingCash || 0}</span>
@@ -1640,7 +1640,7 @@ export default function CashierStation() {
                             </div>
 
                             {/* Authoritative Expected Cash in Drawer */}
-                            <div className="p-4 bg-[#FFF7ED] rounded-xl border border-orange-200 flex items-center justify-between">
+                            <div className="p-4 bg-[#FFF7ED] rounded-xl border border-orange-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div>
                                     <span className="text-xs uppercase font-extrabold text-[#57534E] tracking-wider block">
                                         Authoritative Expected Cash In Drawer
@@ -1656,7 +1656,7 @@ export default function CashierStation() {
 
                             {/* Cash Movement Ledger */}
                             <div className="space-y-3">
-                                <div className="flex items-center justify-between">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                     <h3 className="font-extrabold text-[#171717] text-sm">
                                         Cash Movement Audit Trail ({currentShift.cashMovements?.length || 0})
                                     </h3>
@@ -1668,7 +1668,7 @@ export default function CashierStation() {
                                                 setCashMovementType("CASH_IN");
                                                 setShowCashMovementModal(true);
                                             }}
-                                            className="px-3 py-1.5 rounded-lg bg-white hover:bg-[#FFF7ED] text-[#171717] text-xs font-semibold flex items-center gap-1 border border-[#E7E5E4]"
+                                            className="px-3 py-1.5 min-h-[36px] sm:min-h-[40px] rounded-lg bg-white hover:bg-[#FFF7ED] text-[#171717] text-xs font-semibold flex items-center gap-1 border border-[#E7E5E4]"
                                         >
                                             <PlusCircle className="w-3.5 h-3.5 text-emerald-600" />
                                             <span>+ Cash In</span>

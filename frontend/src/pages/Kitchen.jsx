@@ -982,7 +982,7 @@ export default function Kitchen() {
     }, [kots, workload.chefs]);
 
     return (
-        <div className="min-h-screen bg-slate-50/40 text-slate-900 font-sans">
+        <div className="min-h-screen bg-slate-50/40 text-slate-900 font-sans overflow-x-hidden">
             {/* Top Bar Header */}
             <header className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -1071,7 +1071,7 @@ export default function Kitchen() {
                                 loadWorkload();
                             }}
                             disabled={refreshing}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition shadow-sm"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 min-h-[36px] sm:min-h-[40px] text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition shadow-sm"
                         >
                             <RefreshCw size={13} className={refreshing ? "animate-spin text-orange-500" : "text-slate-500"} />
                             Refresh
@@ -1080,7 +1080,7 @@ export default function Kitchen() {
                         <button
                             type="button"
                             onClick={() => setSoundModalOpen(true)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-sm"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 min-h-[36px] sm:min-h-[40px] text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-sm"
                         >
                             {soundMuted ? <BellOff size={13} className="text-slate-400" /> : <Bell size={13} className="text-orange-500" />}
                             {soundMuted ? "Muted" : "Alert On"}
@@ -1098,10 +1098,10 @@ export default function Kitchen() {
                                     navigate("/kitchen/notifications");
                                 }
                             }}
-                            className={`relative flex items-center gap-1.5 rounded-xl border px-2.5 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                            className={`relative flex items-center gap-1.5 rounded-xl border px-2.5 sm:px-3 py-1.5 sm:py-2 min-h-[36px] sm:min-h-[40px] text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
                                 viewMode === "NOTIFICATIONS"
-                                    ? "border-orange-500 bg-orange-500 text-white"
-                                    : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                                     ? "border-orange-500 bg-orange-500 text-white"
+                                     : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
                             }`}
                             title="Kitchen Notifications"
                         >
@@ -1126,10 +1126,10 @@ export default function Kitchen() {
                                     navigate("/kitchen/profile");
                                 }
                             }}
-                            className={`flex items-center gap-1.5 rounded-xl border px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                            className={`flex items-center gap-1.5 rounded-xl border px-2 sm:px-3 py-1.5 min-h-[36px] sm:min-h-[40px] text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
                                 viewMode === "PROFILE"
-                                    ? "border-orange-500 bg-orange-500 text-white"
-                                    : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                                     ? "border-orange-500 bg-orange-500 text-white"
+                                     : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
                             }`}
                             title="My Profile"
                         >
@@ -1180,7 +1180,7 @@ export default function Kitchen() {
 
             {/* Main Content Body */}
             {viewMode === "PROFILE" ? (
-                <div className="flex-1 p-3 sm:p-4 max-w-7xl mx-auto w-full">
+                <div className="flex-1 p-3 sm:p-4 max-w-7xl mx-auto w-full min-w-0">
                     <ServerProfileView
                         onBackToFloorPlan={() => {
                             setViewMode("KDS");
@@ -1195,7 +1195,7 @@ export default function Kitchen() {
                     />
                 </div>
             ) : viewMode === "NOTIFICATIONS" ? (
-                <div className="flex-1 p-3 sm:p-4 max-w-7xl mx-auto w-full">
+                <div className="flex-1 p-3 sm:p-4 max-w-7xl mx-auto w-full min-w-0">
                     <ServerNotificationsView
                         onUnreadCountChange={setUnreadNotificationCount}
                         onNavigateToTable={(tableNo) => {
@@ -1215,7 +1215,7 @@ export default function Kitchen() {
                     />
                 </div>
             ) : viewMode === "HISTORY" ? (
-                <div className="flex-1 p-4 sm:p-6 max-w-7xl mx-auto w-full space-y-6" data-testid="senior-chef-history-container">
+                <div className="flex-1 p-4 sm:p-6 max-w-7xl mx-auto w-full min-w-0 space-y-6" data-testid="senior-chef-history-container">
                     {/* Top Header & Operational Metrics Summary Banner */}
                     <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
                         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -1236,7 +1236,7 @@ export default function Kitchen() {
                         </div>
 
                         {/* Authoritative Operational Summary Metrics */}
-                        <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3" data-testid="history-summary-cards">
+                        <div className="mt-5 grid grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3" data-testid="history-summary-cards">
                             {/* 1. Completed Items */}
                             <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
                                 <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Completed Items</div>
@@ -1550,8 +1550,8 @@ export default function Kitchen() {
             ) : (
                 <>
                     {/* TOP KPI / SUMMARY AREA */}
-                    <div className="px-4 pt-4 sm:px-6">
-                        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:grid-cols-8">
+                    <div className="px-4 pt-4 sm:px-6 max-w-7xl mx-auto w-full min-w-0">
+                        <div className="grid grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-2.5">
                             {/* 1. New Orders / Pending Items */}
                             <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
                                 <div className="flex items-center justify-between text-slate-500 mb-1">
@@ -1686,7 +1686,7 @@ export default function Kitchen() {
                     </div>
 
                     {/* CHEF WORKLOAD PANEL */}
-                    <div className="px-4 pt-3 sm:px-6">
+                    <div className="px-4 pt-3 sm:px-6 max-w-7xl mx-auto w-full min-w-0">
                         <ChefWorkloadPanel
                             chefs={workload.chefs}
                             selectedChefId={selectedChefFilter}
@@ -1700,7 +1700,7 @@ export default function Kitchen() {
                     </div>
 
                     {/* DEDICATED UNASSIGNED WORK QUEUE */}
-                    <div className="px-4 pt-3 sm:px-6">
+                    <div className="px-4 pt-3 sm:px-6 max-w-7xl mx-auto w-full min-w-0">
                         <div className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden">
                             <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 bg-slate-50/70">
                                 <div className="flex items-center gap-2">
@@ -1961,7 +1961,7 @@ export default function Kitchen() {
                     </div>
 
                     {/* Filter Bar & Controls */}
-                    <div className="border-b border-slate-200 bg-white px-4 py-2.5 sm:px-6 mt-3">
+                    <div className="border-b border-slate-200 bg-white px-4 py-2.5 sm:px-6 mt-3 max-w-7xl mx-auto w-full min-w-0">
                         <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
                             <div className="flex flex-wrap items-center gap-2 text-xs">
                                 {/* Station Filter */}
@@ -2074,7 +2074,7 @@ export default function Kitchen() {
                     </div>
 
                     {/* Main KDS Columns View */}
-                    <main className="p-4 sm:p-6">
+                    <main className="p-4 sm:p-6 max-w-7xl mx-auto w-full min-w-0">
                         {error && (
                             <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
                                 {error}
@@ -2093,7 +2093,7 @@ export default function Kitchen() {
                                 <p className="text-xs text-slate-400">Try switching your chef filter, priority, or search parameters.</p>
                             </div>
                         ) : (
-                            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 items-start">
+                            <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-start">
                                 {/* COLUMN 1: NEW / PENDING */}
                                 <div className="space-y-3">
                                     <div className="flex items-center justify-between border-b border-slate-200 pb-2">

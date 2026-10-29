@@ -198,7 +198,7 @@ export default function SwiperStation() {
                 </button>
             }
         >
-            <div className="w-full max-w-none space-y-4">
+            <div className="w-full max-w-7xl mx-auto space-y-4 min-w-0">
                 {/* Search & Header */}
                 <div className="bg-white border border-[#E7E5E4] rounded-xl p-4 shadow-xs space-y-3">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -229,7 +229,7 @@ export default function SwiperStation() {
                             <p className="text-xs text-[#57534E]">No tables waiting for tableside payment.</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 min-[340px]:grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        <div className="grid grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
                             {filteredOrders.map((o) => {
                                 const isSelected = selectedOrder?.id === o.id;
                                 return (
@@ -265,8 +265,8 @@ export default function SwiperStation() {
 
                 {/* Selected Table Checkout Form */}
                 {selectedOrder ? (
-                    <div className="bg-white border border-[#E7E5E4] rounded-xl p-6 shadow-xs space-y-6">
-                        <div className="flex items-center justify-between border-b border-[#E7E5E4] pb-4">
+                    <div className="bg-white border border-[#E7E5E4] rounded-xl p-4 sm:p-6 shadow-xs space-y-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E7E5E4] pb-4">
                             <div>
                                 <div className="flex items-center gap-2">
                                     <span className="px-3 py-1 rounded-xl bg-[#F97316] text-white font-extrabold text-sm">
@@ -280,7 +280,7 @@ export default function SwiperStation() {
                                     Guest: {selectedOrder.customer?.name || "Walk-in Guest"}
                                 </div>
                             </div>
-                            <div className="text-right">
+                            <div className="text-left sm:text-right">
                                 <div className="text-xs text-[#57534E]">Total Due</div>
                                 <div className="text-2xl font-black text-[#EA580C]">
                                     ₹{getAuthoritativeTotal(selectedOrder)}

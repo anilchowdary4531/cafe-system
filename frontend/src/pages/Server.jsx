@@ -1310,17 +1310,17 @@ export default function Server() {
                     </Link>
                     <div className="min-w-0 flex items-center gap-1 sm:gap-1.5">
                         <span className="text-xs font-extrabold text-[color:var(--app-muted)] hidden min-[360px]:inline">•</span>
-                        <h1 className="text-xs sm:text-sm font-extrabold tracking-tight text-[color:var(--app-text)] truncate max-w-[90px] min-[400px]:max-w-[130px] lg:max-w-[160px]">
+                        <h1 className="text-xs sm:text-sm font-extrabold tracking-tight text-[color:var(--app-text)] truncate max-w-[80px] min-[360px]:max-w-[110px] sm:max-w-[160px] lg:max-w-[200px]">
                             {restaurantName}
                         </h1>
-                        <span className="rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400 px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold border border-orange-500/30 whitespace-nowrap">
+                        <span className="rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400 px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold border border-orange-500/30 whitespace-nowrap shrink-0">
                             Server Station
                         </span>
                     </div>
                 </div>
 
-                {/* Meal Shift Selector */}
-                <div className="flex items-center gap-0.5 bg-black/5 dark:bg-white/5 p-0.5 sm:p-1 rounded-xl border border-[color:var(--app-border)]/40 shrink-0">
+                {/* Meal Shift Selector (Desktop >= 1024px) */}
+                <div className="hidden lg:flex items-center gap-0.5 bg-black/5 dark:bg-white/5 p-0.5 sm:p-1 rounded-xl border border-[color:var(--app-border)]/40 shrink-0">
                     {[
                         { id: "BREAKFAST", label: "🍳 Breakfast", time: `${shiftConfig.breakfast.start}-${shiftConfig.breakfast.end}` },
                         { id: "LUNCH", label: "🍱 Lunch", time: `${shiftConfig.lunch.start}-${shiftConfig.lunch.end}` },
@@ -1354,7 +1354,7 @@ export default function Server() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                     {/* Ready to Distribute Trigger Button */}
                     <button
                         type="button"
@@ -1371,7 +1371,7 @@ export default function Server() {
                                 });
                             }
                         }}
-                        className={`relative flex items-center justify-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl border px-2 sm:px-2.5 h-8 sm:h-9 text-[11px] sm:text-xs font-extrabold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                        className={`relative flex items-center justify-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl border px-2 sm:px-2.5 min-h-[36px] sm:min-h-[40px] text-[11px] sm:text-xs font-extrabold transition cursor-pointer whitespace-nowrap shadow-xs ${
                             readyItemsToDistribute.length > 0
                                 ? "border-emerald-500 bg-emerald-500 text-white shadow-emerald-500/25 animate-pulse"
                                 : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
@@ -1393,7 +1393,7 @@ export default function Server() {
                         type="button"
                         data-testid="server-waitlist-nav-btn"
                         onClick={() => setIsWaitlistOpen(true)}
-                        className="relative flex items-center justify-center rounded-lg sm:rounded-xl border border-orange-500/30 bg-orange-500/10 w-8 h-8 sm:w-9 sm:h-9 text-orange-600 dark:text-orange-400 hover:bg-orange-500/20 transition cursor-pointer shrink-0 shadow-xs"
+                        className="relative flex items-center justify-center rounded-lg sm:rounded-xl border border-orange-500/30 bg-orange-500/10 w-8 h-8 min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] text-orange-600 dark:text-orange-400 hover:bg-orange-500/20 transition cursor-pointer shrink-0 shadow-xs"
                         title="Waitlist"
                         aria-label="Waitlist"
                     >
@@ -1414,7 +1414,7 @@ export default function Server() {
                             setEditingReservation(null);
                             setIsReservationModalOpen(true);
                         }}
-                        className="flex items-center justify-center rounded-lg sm:rounded-xl bg-orange-500 w-8 h-8 sm:w-9 sm:h-9 text-white hover:bg-orange-600 transition shadow-xs cursor-pointer shrink-0"
+                        className="flex items-center justify-center rounded-lg sm:rounded-xl bg-orange-500 w-8 h-8 min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] text-white hover:bg-orange-600 transition shadow-xs cursor-pointer shrink-0"
                         title="New Reservation"
                         aria-label="New Reservation"
                     >
@@ -1430,7 +1430,7 @@ export default function Server() {
                             setViewMode("FLOOR_PLAN");
                             navigate("/server");
                         }}
-                        className={`flex items-center justify-center rounded-lg sm:rounded-xl border w-8 h-8 sm:w-9 sm:h-9 transition cursor-pointer shrink-0 shadow-xs ${
+                        className={`hidden min-[480px]:flex items-center justify-center rounded-lg sm:rounded-xl border w-8 h-8 min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] transition cursor-pointer shrink-0 shadow-xs ${
                             viewMode === "FLOOR_PLAN" || viewMode === "ORDERING"
                                 ? "border-orange-500 bg-orange-500 text-white shadow-xs shadow-orange-500/20"
                                 : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
@@ -1455,7 +1455,7 @@ export default function Server() {
                                 navigate("/server/history");
                             }
                         }}
-                        className={`relative flex items-center justify-center rounded-lg sm:rounded-xl border w-8 h-8 sm:w-9 sm:h-9 transition cursor-pointer shrink-0 shadow-xs ${
+                        className={`hidden min-[480px]:flex relative items-center justify-center rounded-lg sm:rounded-xl border w-8 h-8 min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] transition cursor-pointer shrink-0 shadow-xs ${
                             viewMode === "HISTORY"
                                 ? "border-orange-500 bg-orange-500 text-white shadow-xs shadow-orange-500/20"
                                 : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
@@ -1479,7 +1479,7 @@ export default function Server() {
                                 navigate("/server/notifications");
                             }
                         }}
-                        className={`relative flex items-center justify-center rounded-lg sm:rounded-xl border w-8 h-8 sm:w-9 sm:h-9 transition cursor-pointer shrink-0 shadow-xs ${
+                        className={`relative flex items-center justify-center rounded-lg sm:rounded-xl border w-8 h-8 min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] transition cursor-pointer shrink-0 shadow-xs ${
                             viewMode === "NOTIFICATIONS"
                                 ? "border-orange-500 bg-orange-500 text-white shadow-xs shadow-orange-500/20"
                                 : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
@@ -1496,13 +1496,13 @@ export default function Server() {
                     </button>
 
                     {/* Staff Profile Area with Time & Date aligned horizontally on the same baseline */}
-                    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                    <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
                         {/* Time & Date Display (Authoritative) */}
-                        <div className="text-right leading-none select-none flex flex-col items-end justify-center py-0.5" data-testid="server-station-clock">
+                        <div className="text-right leading-none select-none hidden min-[400px]:flex flex-col items-end justify-center py-0.5" data-testid="server-station-clock">
                             <span className="text-[10px] sm:text-[11px] font-bold text-[color:var(--app-text,#0f172a)] tabular-nums tracking-tight">
                                 {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
-                            <span className="text-[8.5px] sm:text-[9.5px] font-medium text-[color:var(--app-muted,#64748b)] whitespace-nowrap mt-0.5">
+                            <span className="text-[8.5px] sm:text-[9.5px] font-medium text-[color:var(--app-muted,#64748b)] whitespace-nowrap mt-0.5 hidden sm:inline">
                                 {currentTime.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/,/g, '')}
                             </span>
                         </div>
@@ -1520,7 +1520,7 @@ export default function Server() {
                                     navigate("/server/settings");
                                 }
                             }}
-                            className={`flex items-center justify-center rounded-lg sm:rounded-xl border w-8 h-8 sm:w-9 sm:h-9 transition cursor-pointer shrink-0 shadow-xs ${
+                            className={`flex items-center justify-center rounded-lg sm:rounded-xl border w-8 h-8 min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] transition cursor-pointer shrink-0 shadow-xs ${
                                 viewMode === "PROFILE" && location.pathname.endsWith("/settings")
                                     ? "border-orange-500 bg-orange-500 text-white shadow-xs shadow-orange-500/20"
                                     : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
@@ -1544,7 +1544,7 @@ export default function Server() {
                                     navigate("/server/profile");
                                 }
                             }}
-                            className={`flex items-center justify-center rounded-lg sm:rounded-xl border w-8 h-8 sm:w-9 sm:h-9 transition cursor-pointer shrink-0 shadow-xs ${
+                            className={`flex items-center justify-center rounded-lg sm:rounded-xl border w-8 h-8 min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] transition cursor-pointer shrink-0 shadow-xs ${
                                 viewMode === "PROFILE" && !location.pathname.endsWith("/settings")
                                     ? "border-orange-500 bg-orange-500 text-white shadow-xs shadow-orange-500/20"
                                     : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
@@ -1558,9 +1558,84 @@ export default function Server() {
                 </div>
             </header>
 
+            {/* Mobile / Tablet Sub Navigation Bar (< 1024px) */}
+            <div className="lg:hidden sticky top-14 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-[color:var(--app-border)]/50 px-2.5 py-1.5 overflow-x-auto scrollbar-none shadow-xs">
+                <div className="flex items-center justify-between gap-2 min-w-max">
+                    {/* Shift Selector */}
+                    <div className="flex items-center gap-1 bg-black/5 dark:bg-white/5 p-1 rounded-xl border border-[color:var(--app-border)]/40 shrink-0">
+                        {[
+                            { id: "BREAKFAST", label: "🍳 Breakfast" },
+                            { id: "LUNCH", label: "🍱 Lunch" },
+                            { id: "DINNER", label: "🕯️ Dinner" },
+                        ].map((shift) => (
+                            <button
+                                key={shift.id}
+                                type="button"
+                                onClick={() => setActiveShift(shift.id)}
+                                className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold transition whitespace-nowrap min-h-[36px] ${
+                                    activeShift === shift.id
+                                        ? "bg-orange-500 text-white shadow-xs"
+                                        : "theme-muted hover:text-[color:var(--app-text)]"
+                                }`}
+                            >
+                                <span>{shift.label}</span>
+                            </button>
+                        ))}
+                        <button
+                            type="button"
+                            onClick={() => setIsShiftConfigOpen(true)}
+                            className="p-1.5 text-slate-400 hover:text-orange-500 rounded-lg transition shrink-0 min-h-[36px] min-w-[36px] flex items-center justify-center"
+                            title="Configure Shift Timings"
+                            aria-label="Configure Shift Timings"
+                        >
+                            <Settings2 className="h-3.5 w-3.5" />
+                        </button>
+                    </div>
+
+                    {/* Quick navigation mode buttons on mobile */}
+                    <div className="flex items-center gap-1 shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setViewMode("FLOOR_PLAN");
+                                navigate("/server");
+                            }}
+                            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition min-h-[36px] ${
+                                viewMode === "FLOOR_PLAN" || viewMode === "ORDERING"
+                                    ? "bg-orange-500 text-white shadow-xs"
+                                    : "bg-black/5 dark:bg-white/5 theme-muted"
+                            }`}
+                        >
+                            <ConciergeBell className="w-3.5 h-3.5" />
+                            <span>Floor Plan</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (viewMode === "HISTORY") {
+                                    setViewMode("FLOOR_PLAN");
+                                    navigate("/server");
+                                } else {
+                                    setViewMode("HISTORY");
+                                    navigate("/server/history");
+                                }
+                            }}
+                            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition min-h-[36px] ${
+                                viewMode === "HISTORY"
+                                    ? "bg-orange-500 text-white shadow-xs"
+                                    : "bg-black/5 dark:bg-white/5 theme-muted"
+                            }`}
+                        >
+                            <HistoryIcon className="w-3.5 h-3.5" />
+                            <span>History</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             {/* Main Content Body */}
             {viewMode === "PROFILE" ? (
-                <div className="flex-1 p-3 sm:p-4 w-full max-w-none">
+                <div className="flex-1 p-3 sm:p-4 max-w-7xl mx-auto w-full min-w-0">
                     <ServerProfileView
                         onBackToFloorPlan={() => {
                             setViewMode("FLOOR_PLAN");
@@ -1569,7 +1644,7 @@ export default function Server() {
                     />
                 </div>
             ) : viewMode === "NOTIFICATIONS" ? (
-                <div className="flex-1 p-3 sm:p-4 w-full max-w-none">
+                <div className="flex-1 p-3 sm:p-4 max-w-7xl mx-auto w-full min-w-0">
                     <ServerNotificationsView
                         onUnreadCountChange={setUnreadNotificationCount}
                         onNavigateToTable={(tableNo, tableId) => {
@@ -1587,7 +1662,7 @@ export default function Server() {
                     />
                 </div>
             ) : viewMode === "HISTORY" ? (
-                <div className="flex-1 p-3 sm:p-4 w-full max-w-none">
+                <div className="flex-1 p-3 sm:p-4 max-w-7xl mx-auto w-full min-w-0">
                     <ServerHistoryView
                         onBackToFloorPlan={() => {
                             setViewMode("FLOOR_PLAN");
@@ -1596,7 +1671,7 @@ export default function Server() {
                     />
                 </div>
             ) : viewMode === "FLOOR_PLAN" ? (
-                <div className="flex-1 p-3 sm:p-4 space-y-3 sm:space-y-4 w-full max-w-none">
+                <div className="flex-1 p-3 sm:p-4 space-y-3 sm:space-y-4 max-w-7xl mx-auto w-full min-w-0">
                     {/* Ready to Distribute Notification Banner & Grid */}
                     {readyItemsToDistribute.length > 0 && (
                         <div
@@ -1757,7 +1832,7 @@ export default function Server() {
                             <p className="font-bold text-xs">No dining tables match selected section or search filter.</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+                        <div className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
                             {filteredTables.map((table) => {
                                 const isBlocked = Boolean(table.isBlocked);
                                 const isDirty = table.cleaningStatus === "DIRTY" || table.status === "DIRTY";

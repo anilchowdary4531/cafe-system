@@ -344,7 +344,7 @@ export default function CleanerStation() {
                 </button>
             }
         >
-            <div className="space-y-4">
+            <div className="space-y-4 max-w-7xl mx-auto w-full min-w-0">
                 {!hasCleaner && (
                     <div className="bg-amber-50 dark:bg-amber-950/40 border-l-4 border-amber-500 p-4 rounded-xl mb-4 shadow-xs" role="alert">
                         <div className="flex items-center gap-3">
@@ -359,90 +359,104 @@ export default function CleanerStation() {
                     </div>
                 )}
 
-                {/* KPI Overview - Compact operational metrics */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-                    <div
-                        onClick={() => setActiveTab("TABLES")}
-                        className={`cursor-pointer p-3 sm:p-3.5 rounded-xl border transition-all ${
-                            activeTab === "TABLES"
-                                ? "bg-[#FFFBEB] border-[#D97706]/50 shadow-xs ring-1 ring-[#D97706]/30"
-                                : "bg-white border-[#E7E5E4] hover:border-[#D97706]/40 hover:bg-[#FFFBEB]/40"
-                        }`}
-                    >
-                        <div className="text-xs font-semibold text-[#57534E] flex items-center justify-between">
-                            <span>Dirty Tables</span>
-                            <Sparkles className="w-4 h-4 text-[#D97706]" />
+                {/* KPI Overview - Compact operational metrics (hidden when viewing History to eliminate duplicate navigation) */}
+                {activeTab !== "HISTORY" && (
+                    <div className="grid grid-cols-1 min-[360px]:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+                        <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setActiveTab("TABLES")}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveTab("TABLES"); } }}
+                            className={`cursor-pointer p-3 sm:p-3.5 rounded-xl border transition-all min-h-[80px] flex flex-col justify-between ${
+                                activeTab === "TABLES"
+                                    ? "bg-[#FFFBEB] border-[#D97706]/50 shadow-xs ring-1 ring-[#D97706]/30"
+                                    : "bg-white border-[#E7E5E4] hover:border-[#D97706]/40 hover:bg-[#FFFBEB]/40"
+                            }`}
+                        >
+                            <div className="text-xs font-semibold text-[#57534E] flex items-center justify-between gap-1">
+                                <span className="truncate">Dirty Tables</span>
+                                <Sparkles className="w-4 h-4 text-[#D97706] shrink-0" />
+                            </div>
+                            <div className="text-2xl sm:text-3xl font-extrabold text-[#171717] mt-1">
+                                {dirtyTables.length}
+                            </div>
+                            <div className="text-[11px] text-[#78716C] mt-0.5 truncate">Need busing & sanitize</div>
                         </div>
-                        <div className="text-2xl sm:text-3xl font-extrabold text-[#171717] mt-1">
-                            {dirtyTables.length}
-                        </div>
-                        <div className="text-[11px] text-[#78716C] mt-0.5">Need busing & sanitize</div>
-                    </div>
 
-                    <div
-                        onClick={() => setActiveTab("CHECKLIST")}
-                        className={`cursor-pointer p-3 sm:p-3.5 rounded-xl border transition-all ${
-                            activeTab === "CHECKLIST"
-                                ? "bg-[#FFF7ED] border-[#F97316]/50 shadow-xs ring-1 ring-[#F97316]/30"
-                                : "bg-white border-[#E7E5E4] hover:border-[#F97316]/40 hover:bg-[#FFF7ED]/40"
-                        }`}
-                    >
-                        <div className="text-xs font-semibold text-[#57534E] flex items-center justify-between">
-                            <span>Cleaning Queue</span>
-                            <Bell className="w-4 h-4 text-[#F97316]" />
+                        <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setActiveTab("CHECKLIST")}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveTab("CHECKLIST"); } }}
+                            className={`cursor-pointer p-3 sm:p-3.5 rounded-xl border transition-all min-h-[80px] flex flex-col justify-between ${
+                                activeTab === "CHECKLIST"
+                                    ? "bg-[#FFF7ED] border-[#F97316]/50 shadow-xs ring-1 ring-[#F97316]/30"
+                                    : "bg-white border-[#E7E5E4] hover:border-[#F97316]/40 hover:bg-[#FFF7ED]/40"
+                            }`}
+                        >
+                            <div className="text-xs font-semibold text-[#57534E] flex items-center justify-between gap-1">
+                                <span className="truncate">Cleaning Queue</span>
+                                <Bell className="w-4 h-4 text-[#F97316] shrink-0" />
+                            </div>
+                            <div className="text-2xl sm:text-3xl font-extrabold text-[#171717] mt-1">
+                                {pendingTasks.length}
+                            </div>
+                            <div className="text-[11px] text-[#78716C] mt-0.5 truncate">Spills & checklists</div>
                         </div>
-                        <div className="text-2xl sm:text-3xl font-extrabold text-[#171717] mt-1">
-                            {pendingTasks.length}
-                        </div>
-                        <div className="text-[11px] text-[#78716C] mt-0.5">Spills & checklists</div>
-                    </div>
 
-                    <div
-                        onClick={() => setActiveTab("MY_WORK")}
-                        className={`cursor-pointer p-3 sm:p-3.5 rounded-xl border transition-all ${
-                            activeTab === "MY_WORK"
-                                ? "bg-[#F0F9FF] border-[#0284C7]/50 shadow-xs ring-1 ring-[#0284C7]/30"
-                                : "bg-white border-[#E7E5E4] hover:border-[#0284C7]/40 hover:bg-[#F0F9FF]/40"
-                        }`}
-                    >
-                        <div className="text-xs font-semibold text-[#57534E] flex items-center justify-between">
-                            <span>My Tasks</span>
-                            <Play className="w-4 h-4 text-[#0284C7]" />
+                        <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setActiveTab("MY_WORK")}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveTab("MY_WORK"); } }}
+                            className={`cursor-pointer p-3 sm:p-3.5 rounded-xl border transition-all min-h-[80px] flex flex-col justify-between ${
+                                activeTab === "MY_WORK"
+                                    ? "bg-[#F0F9FF] border-[#0284C7]/50 shadow-xs ring-1 ring-[#0284C7]/30"
+                                    : "bg-white border-[#E7E5E4] hover:border-[#0284C7]/40 hover:bg-[#F0F9FF]/40"
+                            }`}
+                        >
+                            <div className="text-xs font-semibold text-[#57534E] flex items-center justify-between gap-1">
+                                <span className="truncate">My Tasks</span>
+                                <Play className="w-4 h-4 text-[#0284C7] shrink-0" />
+                            </div>
+                            <div className="text-2xl sm:text-3xl font-extrabold text-[#171717] mt-1">
+                                {myActiveTasks.length}
+                            </div>
+                            <div className="text-[11px] text-[#78716C] mt-0.5 truncate">Currently cleaning</div>
                         </div>
-                        <div className="text-2xl sm:text-3xl font-extrabold text-[#171717] mt-1">
-                            {myActiveTasks.length}
-                        </div>
-                        <div className="text-[11px] text-[#78716C] mt-0.5">Currently cleaning</div>
-                    </div>
 
-                    <div
-                        onClick={() => setActiveTab("COMPLETED")}
-                        className={`cursor-pointer p-3 sm:p-3.5 rounded-xl border transition-all ${
-                            activeTab === "COMPLETED"
-                                ? "bg-[#ECFDF5] border-[#059669]/50 shadow-xs ring-1 ring-[#059669]/30"
-                                : "bg-white border-[#E7E5E4] hover:border-[#059669]/40 hover:bg-[#ECFDF5]/40"
-                        }`}
-                    >
-                        <div className="text-xs font-semibold text-[#57534E] flex items-center justify-between">
-                            <span>Sanitized Today</span>
-                            <CheckCircle2 className="w-4 h-4 text-[#059669]" />
+                        <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setActiveTab("COMPLETED")}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveTab("COMPLETED"); } }}
+                            className={`cursor-pointer p-3 sm:p-3.5 rounded-xl border transition-all min-h-[80px] flex flex-col justify-between ${
+                                activeTab === "COMPLETED"
+                                    ? "bg-[#ECFDF5] border-[#059669]/50 shadow-xs ring-1 ring-[#059669]/30"
+                                    : "bg-white border-[#E7E5E4] hover:border-[#059669]/40 hover:bg-[#ECFDF5]/40"
+                            }`}
+                        >
+                            <div className="text-xs font-semibold text-[#57534E] flex items-center justify-between gap-1">
+                                <span className="truncate">Sanitized Today</span>
+                                <CheckCircle2 className="w-4 h-4 text-[#059669] shrink-0" />
+                            </div>
+                            <div className="text-2xl sm:text-3xl font-extrabold text-[#171717] mt-1">
+                                {sanitizedTodayTasks.length}
+                            </div>
+                            <div className="text-[11px] text-[#78716C] mt-0.5 truncate">Tables & areas clean</div>
                         </div>
-                        <div className="text-2xl sm:text-3xl font-extrabold text-[#171717] mt-1">
-                            {sanitizedTodayTasks.length}
-                        </div>
-                        <div className="text-[11px] text-[#78716C] mt-0.5">Tables & areas clean</div>
                     </div>
-                </div>
+                )}
 
                 {/* Tab 1: Dirty Tables (Strict Sanitation) */}
                 {activeTab === "TABLES" && (
                     <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-base sm:text-lg font-bold text-[#171717] flex items-center gap-2">
-                                <Sparkles className="w-5 h-5 text-[#D97706]" />
-                                Tables Awaiting Sanitation ({dirtyTables.length})
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <h2 className="text-sm min-[380px]:text-base sm:text-lg font-bold text-[#171717] flex items-center gap-2 min-w-0">
+                                <Sparkles className="w-5 h-5 text-[#D97706] shrink-0" />
+                                <span className="truncate">Tables Awaiting Sanitation ({dirtyTables.length})</span>
                             </h2>
-                            <span className="text-xs text-[#D97706] font-bold bg-[#FFFBEB] px-2.5 py-1 rounded-full border border-[#D97706]/30">
+                            <span className="text-[11px] sm:text-xs text-[#D97706] font-bold bg-[#FFFBEB] px-2.5 py-1 rounded-full border border-[#D97706]/30 self-start sm:self-auto shrink-0">
                                 Strict Sanitation Active
                             </span>
                         </div>
@@ -456,25 +470,25 @@ export default function CleanerStation() {
                                 </p>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                            <div className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
                                 {dirtyTables.map((tbl) => (
                                     <div
                                         key={tbl.id}
                                         className="bg-white border border-[#E7E5E4] hover:border-[#D97706]/40 rounded-xl p-3.5 shadow-xs flex flex-col justify-between gap-3 transition-colors"
                                     >
-                                        <div>
-                                            <div className="flex items-center justify-between">
-                                                <span className="px-2.5 py-1 rounded-lg bg-[#F97316] text-white font-extrabold text-xs sm:text-sm shadow-xs">
+                                        <div className="min-w-0">
+                                            <div className="flex items-center justify-between flex-wrap gap-2">
+                                                <span className="px-2.5 py-1 rounded-lg bg-[#F97316] text-white font-extrabold text-xs sm:text-sm shadow-xs shrink-0">
                                                     Table {tbl.tableNo}
                                                 </span>
-                                                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#FFFBEB] text-[#D97706] border border-[#D97706]/30 animate-pulse">
+                                                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#FFFBEB] text-[#D97706] border border-[#D97706]/30 animate-pulse shrink-0">
                                                     DIRTY
                                                 </span>
                                             </div>
-                                            <div className="text-xs font-semibold text-[#57534E] mt-2.5">
+                                            <div className="text-xs font-semibold text-[#57534E] mt-2.5 truncate">
                                                 Section: {tbl.section || "Main Hall"} · {tbl.seats || 4} Seats
                                             </div>
-                                            <p className="text-xs text-[#78716C] mt-1">
+                                            <p className="text-xs text-[#78716C] mt-1 break-words">
                                                 Dining session completed. Clean and sanitize surface before new guests arrive.
                                             </p>
                                         </div>
@@ -482,10 +496,10 @@ export default function CleanerStation() {
                                         <button
                                             type="button"
                                             onClick={() => handleQuickSanitizeTable(tbl)}
-                                            className="w-full py-2.5 rounded-xl bg-[#059669] hover:bg-[#047857] text-white font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 min-h-[40px] shadow-xs cursor-pointer"
+                                            className="w-full py-2.5 rounded-xl bg-[#059669] hover:bg-[#047857] text-white font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 min-h-[42px] shadow-xs cursor-pointer active:scale-[0.99]"
                                         >
-                                            <Check className="w-4 h-4" />
-                                            Mark Clean & Available
+                                            <Check className="w-4 h-4 shrink-0" />
+                                            <span>Mark Clean & Available</span>
                                         </button>
                                     </div>
                                 ))}
@@ -497,12 +511,12 @@ export default function CleanerStation() {
                 {/* Tab 2: Cleaning Queue / Requests */}
                 {activeTab === "CHECKLIST" && (
                     <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-base sm:text-lg font-bold text-[#171717] flex items-center gap-2">
-                                <Bell className="w-5 h-5 text-[#F97316]" />
-                                Cleaning Tasks & Sanitation Queue
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
+                            <h2 className="text-sm min-[380px]:text-base sm:text-lg font-bold text-[#171717] flex items-center gap-2 min-w-0">
+                                <Bell className="w-5 h-5 text-[#F97316] shrink-0" />
+                                <span className="truncate">Cleaning Tasks & Sanitation Queue</span>
                             </h2>
-                            <span className="text-xs font-semibold text-[#57534E]">
+                            <span className="text-xs font-semibold text-[#57534E] self-start sm:self-auto shrink-0">
                                 {pendingTasks.length} pending
                             </span>
                         </div>
@@ -522,35 +536,35 @@ export default function CleanerStation() {
                                         key={task.id}
                                         className="bg-white border border-[#E7E5E4] hover:border-[#F97316]/30 rounded-xl p-3 sm:p-3.5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors"
                                     >
-                                        <div className="space-y-1">
+                                        <div className="space-y-1 min-w-0 flex-1">
                                             <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#FFFBEB] text-[#D97706] border border-[#D97706]/30">
+                                                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#FFFBEB] text-[#D97706] border border-[#D97706]/30 shrink-0">
                                                     {task.taskType || task.category || "CLEANING"}
                                                 </span>
                                                 {task.table?.tableNo && (
-                                                    <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#F97316] text-white">
+                                                    <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#F97316] text-white shrink-0">
                                                         Table {task.table.tableNo}
                                                     </span>
                                                 )}
                                                 {task.priority === "HIGH" || task.priority === "URGENT" ? (
-                                                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#FEF2F2] text-[#DC2626] border border-[#DC2626]/30">
+                                                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#FEF2F2] text-[#DC2626] border border-[#DC2626]/30 shrink-0">
                                                         URGENT
                                                     </span>
                                                 ) : null}
                                             </div>
-                                            <h3 className="font-bold text-[#171717] text-sm sm:text-base">{task.title}</h3>
+                                            <h3 className="font-bold text-[#171717] text-sm sm:text-base break-words">{task.title}</h3>
                                             {task.description && (
-                                                <p className="text-xs text-[#57534E]">{task.description}</p>
+                                                <p className="text-xs text-[#57534E] break-words">{task.description}</p>
                                             )}
                                         </div>
 
                                         <button
                                             type="button"
                                             onClick={() => handleAcceptTask(task.id)}
-                                            className="px-4 py-2 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 min-h-[38px] shrink-0 shadow-xs cursor-pointer"
+                                            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 min-h-[40px] shrink-0 shadow-xs cursor-pointer active:scale-[0.99]"
                                         >
-                                            <Play className="w-4 h-4" />
-                                            Claim Task
+                                            <Play className="w-4 h-4 shrink-0" />
+                                            <span>Claim Task</span>
                                         </button>
                                     </div>
                                 ))}
@@ -562,12 +576,12 @@ export default function CleanerStation() {
                 {/* Tab 3: My In-Progress Tasks */}
                 {activeTab === "MY_WORK" && (
                     <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-base sm:text-lg font-bold text-[#171717] flex items-center gap-2">
-                                <Play className="w-5 h-5 text-[#0284C7]" />
-                                Sanitation Tasks Claimed by Me
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
+                            <h2 className="text-sm min-[380px]:text-base sm:text-lg font-bold text-[#171717] flex items-center gap-2 min-w-0">
+                                <Play className="w-5 h-5 text-[#0284C7] shrink-0" />
+                                <span className="truncate">Sanitation Tasks Claimed by Me</span>
                             </h2>
-                            <span className="text-xs font-semibold text-[#57534E]">
+                            <span className="text-xs font-semibold text-[#57534E] self-start sm:self-auto shrink-0">
                                 {myActiveTasks.length} active
                             </span>
                         </div>
@@ -587,9 +601,9 @@ export default function CleanerStation() {
                                         key={task.id}
                                         className="bg-white border border-[#E7E5E4] hover:border-[#0284C7]/30 rounded-xl p-3 sm:p-3.5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors"
                                     >
-                                        <div className="space-y-1">
+                                        <div className="space-y-1 min-w-0 flex-1">
                                             <div className="flex items-center gap-2 flex-wrap">
-                                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold shrink-0 ${
                                                     task.status === "IN_PROGRESS"
                                                         ? "bg-[#F0F9FF] text-[#0284C7] border border-[#0284C7]/30"
                                                         : "bg-[#FFFBEB] text-[#D97706] border border-[#D97706]/30"
@@ -597,34 +611,35 @@ export default function CleanerStation() {
                                                     {task.status}
                                                 </span>
                                                 {task.table?.tableNo && (
-                                                    <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#F97316] text-white">
+                                                    <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#F97316] text-white shrink-0">
                                                         Table {task.table.tableNo}
                                                     </span>
                                                 )}
                                             </div>
-                                            <h3 className="font-bold text-[#171717] text-sm sm:text-base">{task.title}</h3>
+                                            <h3 className="font-bold text-[#171717] text-sm sm:text-base break-words">{task.title}</h3>
                                             {task.description && (
-                                                <p className="text-xs text-[#57534E]">{task.description}</p>
+                                                <p className="text-xs text-[#57534E] break-words">{task.description}</p>
                                             )}
                                         </div>
 
-                                        <div className="flex items-center gap-2 shrink-0">
+                                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto shrink-0">
                                             {task.status === "ACCEPTED" && (
                                                 <button
                                                     type="button"
                                                     onClick={() => handleStartTask(task.id)}
-                                                    className="px-3.5 py-2 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold text-xs transition min-h-[38px] shadow-xs cursor-pointer"
+                                                    className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold text-xs sm:text-sm transition flex items-center justify-center gap-1.5 min-h-[40px] shadow-xs cursor-pointer active:scale-[0.99]"
                                                 >
-                                                    Start Cleaning
+                                                    <Play className="w-4 h-4 shrink-0" />
+                                                    <span>Start Cleaning</span>
                                                 </button>
                                             )}
                                             <button
                                                 type="button"
                                                 onClick={() => handleMarkCleanAndReady(task.id, task.table?.tableNo)}
-                                                className="px-3.5 py-2 rounded-xl bg-[#059669] hover:bg-[#047857] text-white font-bold text-xs transition flex items-center gap-1.5 min-h-[38px] shadow-xs cursor-pointer"
+                                                className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-[#059669] hover:bg-[#047857] text-white font-bold text-xs sm:text-sm transition flex items-center justify-center gap-1.5 min-h-[40px] shadow-xs cursor-pointer active:scale-[0.99]"
                                             >
-                                                <Check className="w-4 h-4" />
-                                                Mark Clean & Available
+                                                <Check className="w-4 h-4 shrink-0" />
+                                                <span>Mark Clean & Available</span>
                                             </button>
                                         </div>
                                     </div>
@@ -637,12 +652,12 @@ export default function CleanerStation() {
                 {/* Tab 4: Completed Cleaning Tasks (Strictly Today) */}
                 {activeTab === "COMPLETED" && (
                     <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-base sm:text-lg font-bold text-[#171717] flex items-center gap-2">
-                                <CheckCircle2 className="w-5 h-5 text-[#059669]" />
-                                Sanitized & Released Today
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
+                            <h2 className="text-sm min-[380px]:text-base sm:text-lg font-bold text-[#171717] flex items-center gap-2 min-w-0">
+                                <CheckCircle2 className="w-5 h-5 text-[#059669] shrink-0" />
+                                <span className="truncate">Sanitized & Released Today</span>
                             </h2>
-                            <span className="text-xs font-semibold text-[#57534E]">
+                            <span className="text-xs font-semibold text-[#57534E] self-start sm:self-auto shrink-0">
                                 {sanitizedTodayTasks.length} completed today
                             </span>
                         </div>
@@ -660,20 +675,22 @@ export default function CleanerStation() {
                                 {sanitizedTodayTasks.map((task) => (
                                     <div
                                         key={task.id}
-                                        className="bg-white border border-[#E7E5E4] rounded-xl p-3 flex items-center justify-between gap-3 text-[#57534E] shadow-xs"
+                                        className="bg-white border border-[#E7E5E4] rounded-xl p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 text-[#57534E] shadow-xs hover:border-[#059669]/30 transition"
                                     >
-                                        <div className="flex items-center gap-3">
-                                            <CheckCircle2 className="w-5 h-5 text-[#059669] shrink-0" />
-                                            <div>
-                                                <div className="font-bold text-sm text-[#171717]">
+                                        <div className="flex items-start sm:items-center gap-3 min-w-0">
+                                            <CheckCircle2 className="w-5 h-5 text-[#059669] shrink-0 mt-0.5 sm:mt-0" />
+                                            <div className="min-w-0">
+                                                <div className="font-bold text-sm text-[#171717] break-words">
                                                     {task.table?.tableNo ? `Table ${task.table.tableNo}` : task.title}
                                                 </div>
-                                                <div className="text-xs text-[#78716C]">
-                                                    Cleaned by {task.assignedUser?.name || "Staff"} · {formatCleaningTime(task.completedAt || task.updatedAt)}
+                                                <div className="text-xs text-[#78716C] flex items-center gap-1.5 flex-wrap">
+                                                    <span>Cleaned by {task.assignedUser?.name || "Staff"}</span>
+                                                    <span>·</span>
+                                                    <span>{formatCleaningTime(task.completedAt || task.updatedAt)}</span>
                                                 </div>
                                             </div>
                                         </div>
-                                        <span className="text-xs font-bold text-[#059669] px-2.5 py-0.5 rounded-full bg-[#ECFDF5] border border-[#059669]/20">
+                                        <span className="text-xs font-bold text-[#059669] px-2.5 py-1 rounded-full bg-[#ECFDF5] border border-[#059669]/20 self-start sm:self-center shrink-0">
                                             Sanitized Today
                                         </span>
                                     </div>
@@ -686,12 +703,12 @@ export default function CleanerStation() {
                 {/* Tab 5: Complete Cleaning History */}
                 {activeTab === "HISTORY" && (
                     <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-base sm:text-lg font-bold text-[#171717] flex items-center gap-2">
-                                <Clock className="w-5 h-5 text-[#F97316]" />
-                                Sanitation & Cleaning History
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
+                            <h2 className="text-sm min-[380px]:text-base sm:text-lg font-bold text-[#171717] flex items-center gap-2 min-w-0">
+                                <Clock className="w-5 h-5 text-[#F97316] shrink-0" />
+                                <span className="truncate">Sanitation & Cleaning History</span>
                             </h2>
-                            <span className="text-xs font-semibold text-[#57534E]">
+                            <span className="text-xs font-semibold text-[#57534E] self-start sm:self-auto shrink-0">
                                 {completedTasks.length} total records
                             </span>
                         </div>
@@ -721,7 +738,7 @@ export default function CleanerStation() {
                                             {groupTasks.map((task) => (
                                                 <div
                                                     key={task.id}
-                                                    className="bg-white border border-[#E7E5E4] rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[#57534E] shadow-xs hover:border-[#059669]/30 transition"
+                                                    className="bg-white border border-[#E7E5E4] rounded-xl p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[#57534E] shadow-xs hover:border-[#059669]/30 transition"
                                                 >
                                                     <div className="flex items-start gap-3 min-w-0">
                                                         <CheckCircle2 className="w-5 h-5 text-[#059669] shrink-0 mt-0.5" />
@@ -745,7 +762,7 @@ export default function CleanerStation() {
                                                                     Cleaned by: <strong>{task.assignedUser?.name || "Cleaner"}</strong>
                                                                 </span>
                                                                 {task.description && (
-                                                                    <span className="text-[#78716C] truncate max-w-xs">
+                                                                    <span className="text-[#78716C] break-words">
                                                                         ({task.description})
                                                                     </span>
                                                                 )}
@@ -753,7 +770,7 @@ export default function CleanerStation() {
                                                         </div>
                                                     </div>
 
-                                                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                                                    <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
                                                         <span className="text-xs font-bold text-[#059669] px-2.5 py-1 rounded-full bg-[#ECFDF5] border border-[#059669]/20 flex items-center gap-1">
                                                             <Check className="w-3.5 h-3.5" />
                                                             Sanitized & Ready

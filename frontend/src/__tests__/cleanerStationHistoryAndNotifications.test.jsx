@@ -164,6 +164,12 @@ describe("Cleaner Station History & Notification Parity", () => {
             expect(screen.getAllByText(/Carlos Cleaner/).length).toBeGreaterThanOrEqual(1);
             expect(screen.getByText(/John Housekeeping/)).toBeInTheDocument();
         });
+
+        // Confirm duplicated navigation/category section is removed from History page body
+        expect(screen.queryByText("Need busing & sanitize")).not.toBeInTheDocument();
+        expect(screen.queryByText("Spills & checklists")).not.toBeInTheDocument();
+        expect(screen.queryByText("Currently cleaning")).not.toBeInTheDocument();
+        expect(screen.queryByText("Tables & areas clean")).not.toBeInTheDocument();
     });
 
     it("2. StaffNotificationsView fetches and displays categorized notifications correctly", async () => {
