@@ -122,6 +122,18 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
           changedByName: payload?.changedByName,
         });
         emitOrderUpdated(updated);
+        if (status === "DELIVERED" && Array.isArray(updated.kots)) {
+          const rid = Number(updated.restaurantId || 0);
+          if (rid) {
+            for (const k of updated.kots) {
+              staff.to(restaurantRoom(rid)).emit("kot:status_updated", k);
+              if (io) {
+                io.to(`restaurant_${rid}`).emit("kot:status_updated", k);
+                io.to(`restaurant:${rid}`).emit("kot:status_updated", k);
+              }
+            }
+          }
+        }
         safeAck(ack, { ok: true, order: updated });
       } catch (err) {
         safeAck(ack, { ok: false, message: err?.message || "update_failed", code: err?.code || "" });

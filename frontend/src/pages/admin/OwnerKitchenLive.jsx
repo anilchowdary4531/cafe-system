@@ -101,7 +101,7 @@ const formatTimeOnly = (isoDate) => {
 
 const normalizeStatus = (status) => {
     const raw = String(status || "PLACED").toUpperCase();
-    const value = raw === "ACCEPTED" ? "PLACED" : raw;
+    const value = raw === "ACCEPTED" ? "PLACED" : (raw === "SERVED" ? "DELIVERED" : raw);
     return STATUS_COLUMNS.includes(value) ? value : "PLACED";
 };
 
@@ -358,18 +358,67 @@ export default function OwnerKitchenLive() {
                 const idx = list.findIndex((o) => Number(o?.id || 0) === id);
                 if (idx === -1) return [order, ...list];
                 const copy = list.slice();
-                copy[idx] = order;
+                copy[idx] = { ...list[idx], ...order, kots: order.kots || list[idx].kots };
                 return copy;
             });
             setLastSyncAt(new Date());
             loadKotHistory();
         };
 
+        const onKotUpdated = (kot) => {
+            if (!kot) return;
+            const targetOrderId = Number(kot?.orderId || 0);
+            const kotStatus = String(kot?.status || "").toUpperCase();
+            if (targetOrderId) {
+                setOrders((prev) => {
+                    const list = Array.isArray(prev) ? prev : [];
+                    const idx = list.findIndex((o) => Number(o?.id || 0) === targetOrderId);
+                    if (idx === -1) return list;
+                    const copy = list.slice();
+                    const existingOrder = copy[idx];
+                    let nextOrderStatus = existingOrder.status;
+                    if (kotStatus === "SERVED" || kotStatus === "DELIVERED") {
+                        nextOrderStatus = "DELIVERED";
+                    } else if (kotStatus === "READY") {
+                        nextOrderStatus = "READY";
+                    } else if (kotStatus === "PREPARING") {
+                        nextOrderStatus = "PREPARING";
+                    }
+                    const updatedKots = Array.isArray(existingOrder.kots)
+                        ? existingOrder.kots.map((k) => (Number(k.id) === Number(kot.id) ? { ...k, ...kot } : k))
+                        : [kot];
+                    copy[idx] = {
+                        ...existingOrder,
+                        status: nextOrderStatus,
+                        kots: updatedKots,
+                    };
+                    return copy;
+                });
+            }
+            setLastSyncAt(new Date());
+            loadKotHistory();
+        };
+
+        const handleKitchenItemSync = () => {
+            loadLiveOrders({ silent: true });
+            loadKotHistory();
+        };
+
         socket.on("order:created", onCreated);
         socket.on("order:updated", onUpdated);
+        socket.on("kot:status_updated", onKotUpdated);
+        socket.on("kot:item_updated", handleKitchenItemSync);
+        socket.on("kitchen:item_served", handleKitchenItemSync);
+        socket.on("kitchen:item_ready", handleKitchenItemSync);
+        socket.on("food:delivered", handleKitchenItemSync);
         return () => {
             socket.off("order:created", onCreated);
             socket.off("order:updated", onUpdated);
+            socket.off("kot:status_updated", onKotUpdated);
+            socket.off("kot:item_updated", handleKitchenItemSync);
+            socket.off("kitchen:item_served", handleKitchenItemSync);
+            socket.off("kitchen:item_ready", handleKitchenItemSync);
+            socket.off("food:delivered", handleKitchenItemSync);
         };
     }, [socket]);
 

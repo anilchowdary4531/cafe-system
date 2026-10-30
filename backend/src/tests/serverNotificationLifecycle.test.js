@@ -423,6 +423,21 @@ test("TIFFZY COMPLETE KITCHEN -> SERVER NOTIFICATION FLOW AUDIT + FIX TEST SUITE
     assert.equal(deliveredNotifs.length, 1);
     assert.equal(deliveredNotifs[0].title, `Food Delivered — Table ${table5.tableNo}`);
     assert.equal(deliveredNotifs[0].idempotencyKey, `food_served_${rid1}_${createdKotItemId}_${serverA.id}_SERVED`);
+
+    const ownerDeliveredNotifs = await prisma.notification.findMany({
+      where: {
+        restaurantId: rid1,
+        notificationType: NOTIFICATION_TYPES.ORDER_DELIVERED,
+        recipientType: RECIPIENT_TYPES.RESTAURANT,
+        recipientId: rid1,
+      },
+    });
+    assert.equal(ownerDeliveredNotifs.length, 1);
+
+    const reloadedKot = await prisma.kitchenOrderTicket.findUnique({ where: { id: createdKotId } });
+    assert.equal(reloadedKot.status, "SERVED");
+    const reloadedOrder = await prisma.order.findUnique({ where: { id: createdOrderId } });
+    assert.equal(reloadedOrder.status, "DELIVERED");
   });
 
   // TEST 8: Server B cannot see Server A's private notifications

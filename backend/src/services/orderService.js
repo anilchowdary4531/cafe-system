@@ -2,6 +2,7 @@ import { computeBill, calculateBill, toPriceSubunitItems } from "./billingServic
 import { reserveStockForOrder, restoreStockForOrder, deductStockForOrder, reverseStockForOrder } from "./inventoryService.js";
 import { normalizePhone } from "./phoneService.js";
 import { createAndDispatchNotification } from "./notificationService.js";
+import { NOTIFICATION_TYPES, RECIPIENT_TYPES } from "../constants/notificationTypes.js";
 import { createKotsForOrder, dispatchKotPrint } from "./kotService.js";
 import { validateAndCalculateDiscount, applyAutomaticOffers, incrementPromotionUsageTx } from "./promotionService.js";
 import { validateAndCalculateLoyaltyRedemption, redeemPointsForOrder, earnPointsForOrder, reversePointsForRefund } from "./loyaltyService.js";
@@ -638,6 +639,16 @@ export const updateOrderStatus = async ({ prisma, actor, orderId, nextStatus, no
         orderId: order.id,
         actor,
       });
+
+      // Synchronize associated active KOTs and KOT items to SERVED when order is DELIVERED
+      await tx.kitchenOrderTicket.updateMany({
+        where: { orderId: id, status: { notIn: ["CANCELLED", "SERVED", "DELIVERED"] } },
+        data: { status: "SERVED" },
+      });
+      await tx.kitchenOrderTicketItem.updateMany({
+        where: { kot: { orderId: id }, status: { notIn: ["CANCELLED", "SERVED", "DELIVERED"] } },
+        data: { status: "SERVED" },
+      });
     }
 
     const updated = await tx.order.update({
@@ -657,6 +668,12 @@ export const updateOrderStatus = async ({ prisma, actor, orderId, nextStatus, no
       include: {
         items: true,
         customer: true,
+        kots: {
+          include: {
+            items: true,
+          },
+        },
+        tableSession: true,
         statusEvents: { orderBy: { createdAt: "asc" } },
       },
     });
@@ -737,6 +754,76 @@ export const updateOrderStatus = async ({ prisma, actor, orderId, nextStatus, no
           data: { orderId: id, orderNo: updated.orderNo, status: targetStatus, screen: "ORDER_TRACKING" },
           idempotencyKey: `ORDER_${id}_${targetStatus}`,
         }).catch(() => {});
+      }
+    }
+
+    // Trigger Server and Restaurant Notifications on Order DELIVERED
+    if (targetStatus === "DELIVERED") {
+      try {
+        const tableLabel = updated.tableNo ? `Table ${updated.tableNo}` : "Takeaway";
+        const orderNum = updated.orderNo || id;
+
+        // 1. Resolve responsible server ID
+        let responsibleServerId =
+          updated.waiterId ||
+          updated.kots?.[0]?.waiterId ||
+          updated.tableSession?.waiterId ||
+          updated.createdByUserId ||
+          null;
+
+        if (!responsibleServerId && updated.tableNo && updated.restaurantId) {
+          const dTable = await tx.diningTable.findFirst({
+            where: { restaurantId: updated.restaurantId, tableNo: String(updated.tableNo).trim() },
+            select: { assignedWaiterId: true },
+          });
+          if (dTable?.assignedWaiterId) responsibleServerId = dTable.assignedWaiterId;
+        }
+
+        if (responsibleServerId) {
+          await createAndDispatchNotification({
+            prisma,
+            recipientType: RECIPIENT_TYPES.USER,
+            recipientId: Number(responsibleServerId),
+            orderId: id,
+            restaurantId: updated.restaurantId,
+            notificationType: NOTIFICATION_TYPES.ORDER_DELIVERED,
+            title: `Food Delivered — ${tableLabel}`,
+            message: `Order #${orderNum} delivered to ${tableLabel}.`,
+            idempotencyKey: `order_delivered_srv_${updated.restaurantId}_${id}_${responsibleServerId}`,
+            data: {
+              restaurantId: updated.restaurantId,
+              orderId: id,
+              orderNo: updated.orderNo,
+              tableId: updated.tableId ? Number(updated.tableId) : null,
+              tableSessionId: updated.tableSessionId ? Number(updated.tableSessionId) : null,
+              tableNo: updated.tableNo || null,
+              recipientId: Number(responsibleServerId),
+            },
+          }).catch((e) => console.warn("[updateOrderStatus] Server delivery notification error:", e?.message));
+        }
+
+        // 2. Dispatch persistent delivery notification for Restaurant / Owner
+        await createAndDispatchNotification({
+          prisma,
+          recipientType: RECIPIENT_TYPES.RESTAURANT,
+          recipientId: updated.restaurantId,
+          orderId: id,
+          restaurantId: updated.restaurantId,
+          notificationType: NOTIFICATION_TYPES.ORDER_DELIVERED,
+          title: `Food Delivered — ${tableLabel}`,
+          message: `Order #${orderNum} delivered to ${tableLabel}.`,
+          idempotencyKey: `order_delivered_rest_${updated.restaurantId}_${id}`,
+          data: {
+            restaurantId: updated.restaurantId,
+            orderId: id,
+            orderNo: updated.orderNo,
+            tableId: updated.tableId ? Number(updated.tableId) : null,
+            tableSessionId: updated.tableSessionId ? Number(updated.tableSessionId) : null,
+            tableNo: updated.tableNo || null,
+          },
+        }).catch((e) => console.warn("[updateOrderStatus] Restaurant delivery notification error:", e?.message));
+      } catch (err) {
+        console.warn("[updateOrderStatus] Delivery notification dispatch warning:", err?.message);
       }
     }
 

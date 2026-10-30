@@ -1,4 +1,6 @@
 import { generateKotEscposBuffer, printToNetworkPrinter } from "./escposService.js";
+import { createAndDispatchNotification } from "./notificationService.js";
+import { NOTIFICATION_TYPES, RECIPIENT_TYPES } from "../constants/notificationTypes.js";
 
 /**
  * Generate sequential, concurrency-safe KOT number for a restaurant
@@ -273,7 +275,12 @@ export const syncParentOrderStatusFromKots = async ({ prisma, orderId }) => {
             const updatedOrder = await prisma.order.update({
                 where: { id: Number(orderId) },
                 data: { status: nextOrderStatus },
-                include: { items: true },
+                include: {
+                    items: true,
+                    customer: true,
+                    kots: { include: { items: true } },
+                    tableSession: true,
+                },
             });
             return updatedOrder;
         }

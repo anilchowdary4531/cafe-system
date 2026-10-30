@@ -2219,7 +2219,11 @@ export default function Server() {
                                     </div>
                                     <button
                                         type="button"
-                                        onClick={() => handleMarkItemServed(tableReadyItems[0])}
+                                        onClick={async () => {
+                                            for (const it of tableReadyItems) {
+                                                await handleMarkItemServed(it);
+                                            }
+                                        }}
                                         className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95 transition"
                                     >
                                         <Check className="h-3.5 w-3.5 stroke-[3]" /> Served / Distributed

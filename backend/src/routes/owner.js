@@ -3836,6 +3836,17 @@ export default async function ownerRoutes(app, deps = {}) {
 
       realtime?.emitOrderUpdated?.(updated);
 
+      if (req.body?.status === "DELIVERED" && Array.isArray(updated.kots)) {
+        const staff = req.server?.staff || realtime?.staff;
+        const io = req.server?.io || realtime?.io;
+        for (const k of updated.kots) {
+          staff?.to(`restaurant_${restaurantId}`)?.emit("kot:status_updated", k);
+          staff?.to(`restaurant:${restaurantId}`)?.emit("kot:status_updated", k);
+          io?.to(`restaurant_${restaurantId}`)?.emit("kot:status_updated", k);
+          io?.to(`restaurant:${restaurantId}`)?.emit("kot:status_updated", k);
+        }
+      }
+
       return { message: "Order status updated", order: updated };
     } catch (err) {
       console.log(err);
