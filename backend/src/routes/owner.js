@@ -99,7 +99,7 @@ import { NOTIFICATION_TYPES, RECIPIENT_TYPES } from "../constants/notificationTy
 export default async function ownerRoutes(app, deps = {}) {
   const prisma = deps?.prisma || defaultPrisma;
   const {
-    buildQrTargetUrl,
+    buildQrTargetUrl = (slug, tableNo) => `/r/${slug}?table=${tableNo}`,
     FRONTEND_URL,
     STAFF_ACCESS_MODULES = [
       "dashboard", "billing", "orders", "menu", "inventory", "tables", "kitchen",
@@ -448,6 +448,19 @@ export default async function ownerRoutes(app, deps = {}) {
             io.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo });
             io.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo });
             io.to(`restaurant_${restaurantId}`).emit("table:session_updated", { restaurantId, tableNo: order.tableNo });
+          }
+        }
+        if (staff) {
+          staff.to(`restaurant_${restaurantId}`).emit("new_order", order);
+          staff.to(`restaurant:${restaurantId}`).emit("new_order", order);
+          staff.to(`restaurant_${restaurantId}`).emit("order_created", { order, source: order.orderSource || "POS" });
+          staff.to(`restaurant:${restaurantId}`).emit("order_created", { order, source: order.orderSource || "POS" });
+          staff.to(`restaurant_${restaurantId}`).emit("order:created", { order, source: order.orderSource || "POS" });
+          staff.to(`restaurant:${restaurantId}`).emit("order:created", { order, source: order.orderSource || "POS" });
+          if (order.tableNo) {
+            staff.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo });
+            staff.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo });
+            staff.to(`restaurant_${restaurantId}`).emit("table:session_updated", { restaurantId, tableNo: order.tableNo });
           }
         }
 
@@ -879,8 +892,10 @@ export default async function ownerRoutes(app, deps = {}) {
       const activeOrdersByTable = {};
 
       for (const order of activeOrders) {
+        const targetTableId = order.tableSession?.tableId ? Number(order.tableSession.tableId) : null;
         const formattedOrder = {
           id: order.id,
+          targetTableId,
           tableSessionId: order.tableSessionId || null,
           orderNo: order.orderNo,
           status: order.status,
@@ -899,12 +914,13 @@ export default async function ownerRoutes(app, deps = {}) {
             : [],
         };
 
-        const targetTableId = order.tableSession?.tableId ? Number(order.tableSession.tableId) : null;
         if (targetTableId) {
           if (!activeOrdersByTableId.has(targetTableId)) {
             activeOrdersByTableId.set(targetTableId, []);
           }
-          activeOrdersByTableId.get(targetTableId).push(formattedOrder);
+          if (!activeOrdersByTableId.get(targetTableId).some((o) => o.id === formattedOrder.id)) {
+            activeOrdersByTableId.get(targetTableId).push(formattedOrder);
+          }
         }
 
         for (const k of getTableKeys(order.tableNo)) {
@@ -956,9 +972,15 @@ export default async function ownerRoutes(app, deps = {}) {
             : [];
           if (!tableActiveOrders.length) {
             for (const k of getTableKeys(table.tableNo)) {
-              if (activeOrdersByTable[k]?.length) {
-                tableActiveOrders = activeOrdersByTable[k];
-                break;
+              const candidateOrders = activeOrdersByTable[k];
+              if (candidateOrders?.length) {
+                const matchingOrders = candidateOrders.filter(
+                  (o) => !o.targetTableId || Number(o.targetTableId) === tid
+                );
+                if (matchingOrders.length) {
+                  tableActiveOrders = matchingOrders;
+                  break;
+                }
               }
             }
           }

@@ -459,7 +459,17 @@ const normalizeTableRows = (rows) => {
                 table?.activeSession?.status === "CLOSED" ||
                 table?.activeSession?.status === "CANCELLED");
             const isOccupied = !isExplicitlyFree && !isDirty && Boolean(table?.isOccupied || hasActiveOrders || hasActiveSession);
-            const activeOrders = isOccupied ? rawActiveOrders : [];
+            const seenActiveOrderIds = new Set();
+            const deduplicatedActiveOrders = [];
+            for (const ord of rawActiveOrders) {
+                const oid = ord?.id ? Number(ord.id) : null;
+                if (oid) {
+                    if (seenActiveOrderIds.has(oid)) continue;
+                    seenActiveOrderIds.add(oid);
+                }
+                deduplicatedActiveOrders.push(ord);
+            }
+            const activeOrders = isOccupied ? deduplicatedActiveOrders : [];
 
             return {
                 ...table,
@@ -2149,7 +2159,18 @@ export default function OwnerLayout() {
             }));
         });
 
-        return rows
+        const seenOrderIds = new Set();
+        const uniqueRows = [];
+        for (const order of rows) {
+            const oid = order.id ? Number(order.id) : null;
+            if (oid) {
+                if (seenOrderIds.has(oid)) continue;
+                seenOrderIds.add(oid);
+            }
+            uniqueRows.push(order);
+        }
+
+        return uniqueRows
             .sort((a, b) => b.sortTime - a.sortTime || Number(b.id || 0) - Number(a.id || 0))
             .slice(0, 8);
     }, [tableOverview.tables]);

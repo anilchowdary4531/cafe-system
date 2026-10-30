@@ -336,6 +336,7 @@ export default function Server() {
     const [activeCategory, setActiveCategory] = useState("ALL");
     const [customizingItem, setCustomizingItem] = useState(null);
     const [placingOrder, setPlacingOrder] = useState(false);
+    const placingOrderRef = useRef(false);
 
     // Authoritative table state overrides driven by realtime events & immediate releases
     const [tableOverrides, setTableOverrides] = useState({});
@@ -537,6 +538,24 @@ export default function Server() {
                     activeSession: null,
                     lastOrderStatus: null,
                     lastPaymentStatus: null,
+                };
+            }
+
+            if (Array.isArray(t.activeOrders)) {
+                const seenOids = new Set();
+                const uniqueOrders = [];
+                for (const ord of t.activeOrders) {
+                    const oid = ord?.id ? Number(ord.id) : null;
+                    if (oid) {
+                        if (seenOids.has(oid)) continue;
+                        seenOids.add(oid);
+                    }
+                    uniqueOrders.push(ord);
+                }
+                return {
+                    ...t,
+                    activeOrders: uniqueOrders,
+                    activeOrderCount: uniqueOrders.length,
                 };
             }
 
@@ -1198,19 +1217,27 @@ export default function Server() {
 
     const handleSendKOT = async () => {
         if (!selectedTable) return;
+        if (placingOrderRef.current || placingOrder) return;
+
         const itemsList = Object.values(cart);
         if (itemsList.length === 0) {
             showToast({ title: "Cart Empty", message: "Add menu items to place order.", variant: "warning" });
             return;
         }
 
+        placingOrderRef.current = true;
+        setPlacingOrder(true);
+
         try {
-            setPlacingOrder(true);
             const assignedId = selectedTable.assignedWaiterId || selectedTable.activeSession?.waiterId || (user?.role === "WAITER" || user?.role === "SERVER" ? user?.id : null);
             const assignedName = selectedTable.assignedWaiterName || selectedTable.activeSession?.waiterName || (user?.role === "WAITER" || user?.role === "SERVER" ? user?.name : null);
 
             const canonicalTableSessionId = selectedTable.tableSessionId || selectedTable.sessionId || selectedTable.activeSession?.id || null;
+            const clientOperationId = `srv_ord_${selectedTable.id || selectedTable.tableNo}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
             const payload = {
+                clientOperationId,
+                idempotencyKey: clientOperationId,
                 tableNo: selectedTable.tableNo,
                 tableId: selectedTable.id,
                 tableSessionId: canonicalTableSessionId,
@@ -1246,6 +1273,7 @@ export default function Server() {
         } catch (err) {
             showToast({ title: "Order Error", message: err.message || "Failed to send KOT.", variant: "error" });
         } finally {
+            placingOrderRef.current = false;
             setPlacingOrder(false);
         }
     };
@@ -2361,7 +2389,7 @@ export default function Server() {
                                 <button
                                     type="button"
                                     onClick={handleSendKOT}
-                                    disabled={placingOrder}
+                                    disabled={placingOrder || Object.keys(cart).length === 0}
                                     className="px-4 py-2 rounded-xl bg-orange-500 text-white text-xs font-bold hover:bg-orange-600 shadow-md flex items-center gap-1.5 disabled:opacity-50"
                                 >
                                     {placingOrder ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <ChefHat className="h-3.5 w-3.5" />}

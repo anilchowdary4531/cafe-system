@@ -108,6 +108,35 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
   }
 
   const body = input || {};
+  const clientOperationId = body.clientOperationId
+    ? String(body.clientOperationId).trim()
+    : body.idempotencyKey
+      ? String(body.idempotencyKey).trim()
+      : null;
+
+  if (clientOperationId) {
+    const existingOrder = await prisma.order.findFirst({
+      where: {
+        restaurantId,
+        clientOperationId,
+      },
+      include: {
+        items: true,
+        customer: true,
+        tableSession: true,
+        kots: {
+          include: {
+            items: true,
+          },
+        },
+        statusEvents: { orderBy: { createdAt: "asc" } },
+      },
+    });
+    if (existingOrder) {
+      return existingOrder;
+    }
+  }
+
   const tableNo = body.tableNo ? String(body.tableNo).trim() : body.tableNumber ? String(body.tableNumber).trim() : null;
   const notes = body.notes ? String(body.notes).trim() : null;
   const customerName = body.customerName ? String(body.customerName).trim() : null;
@@ -295,8 +324,29 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
 
   const branchId = actor?.branchId ? Number(actor.branchId) : null;
 
-  return prisma.$transaction(async (tx) => {
-    await reserveStockForOrder({ tx, restaurantId, items: normalizedItems });
+  try {
+    return await prisma.$transaction(async (tx) => {
+      if (clientOperationId) {
+        const existingOrder = await tx.order.findFirst({
+          where: { restaurantId, clientOperationId },
+          include: {
+            items: true,
+            customer: true,
+            tableSession: true,
+            kots: {
+              include: {
+                items: true,
+              },
+            },
+            statusEvents: { orderBy: { createdAt: "asc" } },
+          },
+        });
+        if (existingOrder) {
+          return existingOrder;
+        }
+      }
+
+      await reserveStockForOrder({ tx, restaurantId, items: normalizedItems });
 
     let inputTableSessionId = body.tableSessionId ? Number(body.tableSessionId) : null;
     if (!inputTableSessionId && tableNo) {
@@ -374,6 +424,7 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
         loyaltyPointsEarned: 0,
         status: "PLACED",
         paymentStatus: "PENDING",
+        clientOperationId: clientOperationId ? String(clientOperationId) : null,
         items: {
           create: normalizedItems.map((item) => ({
             menuItemId: item.menuItemId,
@@ -465,12 +516,39 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
       tx,
       order,
       actor,
-      idempotencyKey: body.idempotencyKey || null,
+      idempotencyKey: clientOperationId || body.idempotencyKey || null,
     });
     order.kots = kots;
 
     return order;
   });
+  } catch (err) {
+    if (
+      clientOperationId &&
+      (err?.code === "P2002" ||
+        String(err?.message || "").includes("client_operation_id") ||
+        String(err?.message || "").includes("clientOperationId"))
+    ) {
+      const existing = await prisma.order.findFirst({
+        where: { restaurantId, clientOperationId: String(clientOperationId) },
+        include: {
+          items: true,
+          customer: true,
+          tableSession: true,
+          kots: {
+            include: {
+              items: true,
+            },
+          },
+          statusEvents: { orderBy: { createdAt: "asc" } },
+        },
+      });
+      if (existing) {
+        return existing;
+      }
+    }
+    throw err;
+  }
 };
 
 export const updateOrderStatus = async ({ prisma, actor, orderId, nextStatus, notes, changedByName } = {}) => {
