@@ -815,10 +815,12 @@ export default async function staffTaskRoutes(app, deps = {}) {
       const staff = realtime?.staff || null;
       const io = realtime?.io || null;
       const rid = updatedItem.kot?.restaurantId || restaurantId;
+      const kotTableId = updatedItem.kot?.tableId ? Number(updatedItem.kot.tableId) : (updatedOrder?.tableId ? Number(updatedOrder.tableId) : null);
 
       if (rid) {
         const payload = {
           itemId,
+          tableId: kotTableId,
           tableNo: updatedItem.kot?.tableNo,
           deliveredBy: req.staffActor?.name || req.staffActor?.userName || "Steward",
           item: updatedItem,
@@ -838,9 +840,9 @@ export default async function staffTaskRoutes(app, deps = {}) {
             staff.to(`restaurant_${rid}`).emit("order:updated", updatedOrder);
             staff.to(`restaurant:${rid}`).emit("order:updated", updatedOrder);
           }
-          if (updatedItem.kot?.tableNo) {
-            staff.to(`restaurant_${rid}`).emit("table:updated", { restaurantId: rid, tableNo: updatedItem.kot.tableNo });
-            staff.to(`restaurant:${rid}`).emit("table:updated", { restaurantId: rid, tableNo: updatedItem.kot.tableNo });
+          if (updatedItem.kot?.tableNo || kotTableId) {
+            staff.to(`restaurant_${rid}`).emit("table:updated", { restaurantId: rid, tableId: kotTableId, tableNo: updatedItem.kot?.tableNo });
+            staff.to(`restaurant:${rid}`).emit("table:updated", { restaurantId: rid, tableId: kotTableId, tableNo: updatedItem.kot?.tableNo });
           }
         }
 
@@ -857,9 +859,9 @@ export default async function staffTaskRoutes(app, deps = {}) {
             io.to(`restaurant_${rid}`).emit("order:updated", updatedOrder);
             io.to(`restaurant:${rid}`).emit("order:updated", updatedOrder);
           }
-          if (updatedItem.kot?.tableNo) {
-            io.to(`restaurant_${rid}`).emit("table:updated", { restaurantId: rid, tableNo: updatedItem.kot.tableNo });
-            io.to(`restaurant:${rid}`).emit("table:updated", { restaurantId: rid, tableNo: updatedItem.kot.tableNo });
+          if (updatedItem.kot?.tableNo || kotTableId) {
+            io.to(`restaurant_${rid}`).emit("table:updated", { restaurantId: rid, tableId: kotTableId, tableNo: updatedItem.kot?.tableNo });
+            io.to(`restaurant:${rid}`).emit("table:updated", { restaurantId: rid, tableId: kotTableId, tableNo: updatedItem.kot?.tableNo });
           }
         }
 

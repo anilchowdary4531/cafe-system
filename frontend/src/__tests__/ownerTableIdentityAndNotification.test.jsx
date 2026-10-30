@@ -17,13 +17,17 @@ const normalizeTableRows = (rows) => {
     return list.map((table, index) => {
         const sessionMatchesTable = Boolean(
             table?.activeSession &&
-            (!table.activeSession.tableId || String(table.activeSession.tableId) === String(table.id))
+            table.activeSession.tableId &&
+            String(table.activeSession.tableId) === String(table.id)
         );
         const activeSessionForTable = sessionMatchesTable ? table.activeSession : null;
 
         const rawActiveOrders = Array.isArray(table?.activeOrders)
             ? table.activeOrders
-                  .filter((order) => !order?.targetTableId || String(order.targetTableId) === String(table?.id))
+                  .filter((order) => {
+                      const orderTableId = order?.targetTableId || order?.tableId;
+                      return Boolean(orderTableId && String(orderTableId) === String(table?.id));
+                  })
                   .map((order) => ({
                       id: order?.id,
                       orderNo: order?.orderNo || "",
@@ -197,7 +201,7 @@ describe("Owner Panel — Strict Table Identity and Server Isolation", () => {
         const updated = tables.map((t) => {
             const match = targetId
                 ? String(t.id) === String(targetId)
-                : (targetNo && String(t.tableNo).trim().toLowerCase() === String(targetNo).trim().toLowerCase());
+                : Boolean(targetNo && String(t.tableNo).trim() === String(targetNo).trim());
             if (match) {
                 return { ...t, status: "AVAILABLE", isOccupied: false };
             }
@@ -210,6 +214,29 @@ describe("Owner Panel — Strict Table Identity and Server Isolation", () => {
         // Table 25 was unchanged
         expect(updated[1].id).toBe(25);
         expect(updated[1].status).toBe("AVAILABLE");
+    });
+
+    it("6. Orders and sessions without tableId are rejected and never act as wildcards", () => {
+        const rawTables = [
+            {
+                id: 10,
+                tableNo: "1",
+                section: "Main Hall",
+                isOccupied: false,
+                status: "AVAILABLE",
+                activeSession: { id: 700, waiterId: 101, waiterName: "Anil", status: "OPEN" }, // Missing tableId
+                activeOrders: [{ id: 9999, total: 200 }], // Missing targetTableId and tableId
+            },
+        ];
+
+        const normalized = normalizeTableRows(rawTables);
+        const table = normalized[0];
+
+        // Should NOT inherit the session or order
+        expect(table.isOccupied).toBe(false);
+        expect(table.status).toBe("AVAILABLE");
+        expect(table.activeSession).toBeNull();
+        expect(table.activeOrders).toHaveLength(0);
     });
 });
 

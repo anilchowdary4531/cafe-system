@@ -346,20 +346,21 @@ export const updateStatus = async (req, res) => {
     }
 
     if (updatedOrder) {
+      const orderTableId = updatedKot?.tableId ? Number(updatedKot.tableId) : (updatedOrder.tableId ? Number(updatedOrder.tableId) : (updatedOrder.tableSession?.tableId ? Number(updatedOrder.tableSession.tableId) : null));
       if (staff) {
         staff.to(`restaurant_${restaurantId}`).emit("order:updated", updatedOrder);
         staff.to(`restaurant:${restaurantId}`).emit("order:updated", updatedOrder);
-        if (updatedOrder.tableNo) {
-          staff.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableNo: updatedOrder.tableNo });
-          staff.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableNo: updatedOrder.tableNo });
+        if (updatedOrder.tableNo || orderTableId) {
+          staff.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableId: orderTableId, tableNo: updatedOrder.tableNo });
+          staff.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableId: orderTableId, tableNo: updatedOrder.tableNo });
         }
       }
       if (io) {
         io.to(`restaurant_${restaurantId}`).emit("order:updated", updatedOrder);
         io.to(`restaurant:${restaurantId}`).emit("order:updated", updatedOrder);
-        if (updatedOrder.tableNo) {
-          io.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableNo: updatedOrder.tableNo });
-          io.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableNo: updatedOrder.tableNo });
+        if (updatedOrder.tableNo || orderTableId) {
+          io.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableId: orderTableId, tableNo: updatedOrder.tableNo });
+          io.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableId: orderTableId, tableNo: updatedOrder.tableNo });
         }
       }
     }
@@ -559,20 +560,21 @@ export const updateItemStatus = async (req, res) => {
     });
 
     if (order) {
+      const orderTableId = kot?.tableId ? Number(kot.tableId) : (order.tableId ? Number(order.tableId) : (order.tableSession?.tableId ? Number(order.tableSession.tableId) : null));
       if (staff) {
         staff.to(`restaurant_${restaurantId}`).emit("order:updated", order);
         staff.to(`restaurant:${restaurantId}`).emit("order:updated", order);
-        if (order.tableNo) {
-          staff.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo });
-          staff.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo });
+        if (order.tableNo || orderTableId) {
+          staff.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableId: orderTableId, tableNo: order.tableNo });
+          staff.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableId: orderTableId, tableNo: order.tableNo });
         }
       }
       if (io) {
         io.to(`restaurant_${restaurantId}`).emit("order:updated", order);
         io.to(`restaurant:${restaurantId}`).emit("order:updated", order);
-        if (order.tableNo) {
-          io.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo });
-          io.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo });
+        if (order.tableNo || orderTableId) {
+          io.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableId: orderTableId, tableNo: order.tableNo });
+          io.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableId: orderTableId, tableNo: order.tableNo });
         }
       }
     }

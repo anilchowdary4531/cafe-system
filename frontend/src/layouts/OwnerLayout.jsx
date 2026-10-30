@@ -436,13 +436,17 @@ const normalizeTableRows = (rows) => {
     return list.map((table, index) => {
             const sessionMatchesTable = Boolean(
                 table?.activeSession &&
-                (!table.activeSession.tableId || String(table.activeSession.tableId) === String(table.id))
+                table.activeSession.tableId &&
+                String(table.activeSession.tableId) === String(table.id)
             );
             const activeSessionForTable = sessionMatchesTable ? table.activeSession : null;
 
             const rawActiveOrders = Array.isArray(table?.activeOrders)
                 ? table.activeOrders
-                      .filter((order) => !order?.targetTableId || String(order.targetTableId) === String(table?.id))
+                      .filter((order) => {
+                          const orderTableId = order?.targetTableId || order?.tableId;
+                          return Boolean(orderTableId && String(orderTableId) === String(table?.id));
+                      })
                       .map((order) => ({
                       id: order?.id,
                       orderNo: order?.orderNo || "",
@@ -1239,7 +1243,7 @@ export default function OwnerLayout() {
                     const updatedTables = (prev.tables || []).map((t) => {
                         const match = targetId
                             ? String(t.id) === String(targetId)
-                            : (targetNo && String(t.tableNo).trim().toLowerCase() === String(targetNo).trim().toLowerCase());
+                            : Boolean(targetNo && String(t.tableNo).trim() === String(targetNo).trim());
                         if (match) {
                             return {
                                 ...t,
@@ -1288,7 +1292,7 @@ export default function OwnerLayout() {
                     const updatedTables = (prev.tables || []).map((t) => {
                         const match = targetId
                             ? String(t.id) === String(targetId)
-                            : (targetNo && String(t.tableNo).trim().toLowerCase() === String(targetNo).trim().toLowerCase());
+                            : Boolean(targetNo && String(t.tableNo).trim() === String(targetNo).trim());
                         if (match) {
                             return {
                                 ...t,
@@ -1330,7 +1334,7 @@ export default function OwnerLayout() {
                     const updatedTables = (prev.tables || []).map((t) => {
                         const match = targetId
                             ? String(t.id) === String(targetId)
-                            : (targetNo && String(t.tableNo).trim().toLowerCase() === String(targetNo).trim().toLowerCase());
+                            : Boolean(targetNo && String(t.tableNo).trim() === String(targetNo).trim());
                         if (match) {
                             return {
                                 ...t,
@@ -1906,8 +1910,8 @@ export default function OwnerLayout() {
                 const matches = targetTableId
                     ? String(t.id) === String(targetTableId)
                     : (assignmentKey && t.assignmentKey === assignmentKey) ||
-                      (table?.tableNo && String(t.tableNo).toLowerCase() === String(table.tableNo).toLowerCase()) ||
-                      (t.tableNo && String(t.tableNo).toLowerCase() === String(tableNoLabel).toLowerCase());
+                      Boolean(table?.tableNo && String(t.tableNo).trim() === String(table.tableNo).trim()) ||
+                      Boolean(t.tableNo && String(t.tableNo).trim() === String(tableNoLabel).trim());
                 if (matches) {
                     return {
                         ...t,

@@ -878,29 +878,30 @@ export default async function ownerRoutes(app, deps = {}) {
         }),
       ]);
 
-      const getTableKeys = (value) => {
-        const raw = String(value || "").trim().toLowerCase();
-        if (!raw) return [];
-        const stripped = raw.replace(/^(table|tbl)[-\s]*/i, "").trim();
-        const keys = new Set([raw]);
-        if (stripped) {
-          keys.add(stripped);
-          keys.add(`table ${stripped}`);
-          keys.add(`table-${stripped}`);
+      // Authoritative mapping of tables by primary key and exact tableNo
+      const tablesById = new Map();
+      const tableIdsByExactNo = new Map();
+      for (const t of tables) {
+        const tid = Number(t.id);
+        tablesById.set(tid, t);
+        const exactNo = String(t.tableNo || "").trim();
+        if (exactNo) {
+          if (!tableIdsByExactNo.has(exactNo)) tableIdsByExactNo.set(exactNo, []);
+          tableIdsByExactNo.get(exactNo).push(tid);
         }
-        return Array.from(keys);
-      };
+      }
 
       const activeSessionsByTableId = new Map();
-      const activeSessionsByTable = {};
       for (const session of activeSessions) {
-        if (session.tableId) {
-          activeSessionsByTableId.set(Number(session.tableId), session);
-        }
-        for (const k of getTableKeys(session.tableNo)) {
-          if (!activeSessionsByTable[k]) {
-            activeSessionsByTable[k] = session;
+        let targetTableId = session.tableId ? Number(session.tableId) : null;
+        if (!targetTableId && session.tableNo) {
+          const exactMatches = tableIdsByExactNo.get(String(session.tableNo).trim()) || [];
+          if (exactMatches.length === 1) {
+            targetTableId = exactMatches[0];
           }
+        }
+        if (targetTableId) {
+          activeSessionsByTableId.set(targetTableId, session);
         }
       }
 
@@ -915,20 +916,31 @@ export default async function ownerRoutes(app, deps = {}) {
         }
         const tNo = res.table?.tableNo || res.tableNo;
         if (tNo) {
-          const tKey = String(tNo).trim().toLowerCase();
+          const tKey = String(tNo).trim();
           if (!reservationsByTableNo.has(tKey)) reservationsByTableNo.set(tKey, []);
           reservationsByTableNo.get(tKey).push(res);
         }
       }
 
       const activeOrdersByTableId = new Map();
-      const activeOrdersByTable = {};
 
       for (const order of activeOrders) {
-        const targetTableId = order.tableSession?.tableId ? Number(order.tableSession.tableId) : null;
+        let targetTableId = order.tableId
+          ? Number(order.tableId)
+          : (order.tableSession?.tableId ? Number(order.tableSession.tableId) : null);
+
+        if (!targetTableId && order.tableNo) {
+          const exactMatches = tableIdsByExactNo.get(String(order.tableNo).trim()) || [];
+          if (exactMatches.length === 1) {
+            targetTableId = exactMatches[0];
+          }
+        }
+
         const formattedOrder = {
           id: order.id,
-          targetTableId,
+          targetTableId: targetTableId || null,
+          tableId: targetTableId || null,
+          tableNo: order.tableNo || null,
           tableSessionId: order.tableSessionId || null,
           orderNo: order.orderNo,
           status: order.status,
@@ -955,26 +967,22 @@ export default async function ownerRoutes(app, deps = {}) {
             activeOrdersByTableId.get(targetTableId).push(formattedOrder);
           }
         }
-
-        for (const k of getTableKeys(order.tableNo)) {
-          if (!activeOrdersByTable[k]) activeOrdersByTable[k] = [];
-          if (!activeOrdersByTable[k].some((o) => o.id === formattedOrder.id)) {
-            activeOrdersByTable[k].push(formattedOrder);
-          }
-        }
       }
 
       const latestOrderByTableId = new Map();
-      const latestOrderByTable = {};
       for (const order of latestTableOrders) {
-        const targetTableId = order.tableSession?.tableId ? Number(order.tableSession.tableId) : null;
+        let targetTableId = order.tableId
+          ? Number(order.tableId)
+          : (order.tableSession?.tableId ? Number(order.tableSession.tableId) : null);
+
+        if (!targetTableId && order.tableNo) {
+          const exactMatches = tableIdsByExactNo.get(String(order.tableNo).trim()) || [];
+          if (exactMatches.length === 1) {
+            targetTableId = exactMatches[0];
+          }
+        }
         if (targetTableId && !latestOrderByTableId.has(targetTableId)) {
           latestOrderByTableId.set(targetTableId, order);
-        }
-        for (const k of getTableKeys(order.tableNo)) {
-          if (!latestOrderByTable[k]) {
-            latestOrderByTable[k] = order;
-          }
         }
       }
 
@@ -1005,68 +1013,22 @@ export default async function ownerRoutes(app, deps = {}) {
           qrTargetUrl: `/order/table/${token}`,
           ...(function buildTableState() {
           const tid = Number(table.id);
-          let tableActiveOrders = activeOrdersByTableId.has(tid)
+          const tableActiveOrders = activeOrdersByTableId.has(tid)
             ? activeOrdersByTableId.get(tid)
             : [];
-          if (!tableActiveOrders.length) {
-            for (const k of getTableKeys(table.tableNo)) {
-              const candidateOrders = activeOrdersByTable[k];
-              if (candidateOrders?.length) {
-                const matchingOrders = candidateOrders.filter((o) => {
-                  if (o.targetTableId) {
-                    return Number(o.targetTableId) === tid;
-                  }
-                  return String(o.tableNo || "").trim().toLowerCase() === String(table.tableNo || "").trim().toLowerCase();
-                });
-                if (matchingOrders.length) {
-                  tableActiveOrders = matchingOrders;
-                  break;
-                }
-              }
-            }
-          }
 
-          let latestOrder = latestOrderByTableId.get(tid) || null;
-          if (!latestOrder) {
-            for (const k of getTableKeys(table.tableNo)) {
-              const candidate = latestOrderByTable[k];
-              if (candidate) {
-                const candTableId = candidate.tableSession?.tableId ? Number(candidate.tableSession.tableId) : null;
-                if (candTableId) {
-                  if (candTableId === tid) {
-                    latestOrder = candidate;
-                    break;
-                  }
-                } else if (String(candidate.tableNo || "").trim().toLowerCase() === String(table.tableNo || "").trim().toLowerCase()) {
-                  latestOrder = candidate;
-                  break;
-                }
-              }
-            }
-          }
+          const latestOrder = latestOrderByTableId.get(tid) || null;
+          const activeSession = activeSessionsByTableId.get(tid) || null;
 
-          let activeSession = activeSessionsByTableId.get(tid) || null;
-          if (!activeSession) {
-            for (const k of getTableKeys(table.tableNo)) {
-              const candidateSession = activeSessionsByTable[k];
-              if (candidateSession) {
-                if (candidateSession.tableId) {
-                  if (Number(candidateSession.tableId) === tid) {
-                    activeSession = candidateSession;
-                    break;
-                  }
-                } else if (String(candidateSession.tableNo || "").trim().toLowerCase() === String(table.tableNo || "").trim().toLowerCase()) {
-                  activeSession = candidateSession;
-                  break;
-                }
-              }
+          const resById = reservationsByTableId.get(tid) || [];
+          let tableResList = resById;
+          if (!tableResList.length) {
+            const exactMatches = tableIdsByExactNo.get(String(table.tableNo || "").trim()) || [];
+            if (exactMatches.length === 1 && exactMatches[0] === tid) {
+              const resByNo = reservationsByTableNo.get(String(table.tableNo || "").trim()) || [];
+              tableResList = resByNo.filter((r) => !r.tableId || Number(r.tableId) === tid);
             }
           }
-          
-          const resById = reservationsByTableId.get(Number(table.id)) || [];
-          const resByNo = reservationsByTableNo.get(String(table.tableNo || "").trim().toLowerCase()) || [];
-          const combinedRes = [...resById, ...resByNo];
-          const tableResList = Array.from(new Map(combinedRes.map((r) => [r.id, r])).values());
 
           const now = new Date();
           const localYear = now.getFullYear();
