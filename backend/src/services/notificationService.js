@@ -143,13 +143,19 @@ export const createAndDispatchNotification = async ({
           emitToTargetRooms(realtime.io.of("/staff"), [`user:${recipientId}`, `user_${recipientId}`], "notification:new", payload);
         }
       } else if (recipientType === RECIPIENT_TYPES.RESTAURANT) {
-        // Restaurant-wide notification: broadcast to restaurant rooms
+        // Restaurant-wide notification: broadcast to root restaurant rooms and staff Owner/Manager rooms
         if (restaurantId) {
           emitToTargetRooms(realtime.io, [`restaurant:${restaurantId}`, `restaurant_${restaurantId}`], "notification:new", payload);
+          const ownerManagerRooms = [
+            `restaurant:${restaurantId}:role:OWNER`,
+            `restaurant_${restaurantId}_role_OWNER`,
+            `restaurant:${restaurantId}:role:MANAGER`,
+            `restaurant_${restaurantId}_role_MANAGER`,
+          ];
           if (realtime?.staff) {
-            emitToTargetRooms(realtime.staff, [`restaurant:${restaurantId}`, `restaurant_${restaurantId}`], "notification:new", payload);
+            emitToTargetRooms(realtime.staff, ownerManagerRooms, "notification:new", payload);
           } else if (typeof realtime?.io?.of === "function") {
-            emitToTargetRooms(realtime.io.of("/staff"), [`restaurant:${restaurantId}`, `restaurant_${restaurantId}`], "notification:new", payload);
+            emitToTargetRooms(realtime.io.of("/staff"), ownerManagerRooms, "notification:new", payload);
           }
         }
       } else if (["OWNER", "MANAGER", "CLEANER", "STEWARD", "WAITER", "CHEF", "CASHIER", "SWIPER"].includes(String(recipientType).toUpperCase())) {

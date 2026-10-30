@@ -439,15 +439,16 @@ export default async function ownerRoutes(app, deps = {}) {
       try {
         const io = req.server?.io || realtime?.io;
         const staff = req.server?.staff || realtime?.staff;
+        const orderTableId = order.tableId ? Number(order.tableId) : (req.body?.tableId ? Number(req.body.tableId) : null);
         if (io) {
           io.to(`restaurant_${restaurantId}`).emit("new_order", order);
           io.to(`restaurant:${restaurantId}`).emit("new_order", order);
           io.to(`restaurant_${restaurantId}`).emit("order_created", { order, source: order.orderSource || "POS" });
           io.to(`restaurant:${restaurantId}`).emit("order_created", { order, source: order.orderSource || "POS" });
           if (order.tableNo) {
-            io.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo });
-            io.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo });
-            io.to(`restaurant_${restaurantId}`).emit("table:session_updated", { restaurantId, tableNo: order.tableNo });
+            io.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo, tableId: orderTableId });
+            io.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo, tableId: orderTableId });
+            io.to(`restaurant_${restaurantId}`).emit("table:session_updated", { restaurantId, tableNo: order.tableNo, tableId: orderTableId });
           }
         }
         if (staff) {
@@ -458,11 +459,40 @@ export default async function ownerRoutes(app, deps = {}) {
           staff.to(`restaurant_${restaurantId}`).emit("order:created", { order, source: order.orderSource || "POS" });
           staff.to(`restaurant:${restaurantId}`).emit("order:created", { order, source: order.orderSource || "POS" });
           if (order.tableNo) {
-            staff.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo });
-            staff.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo });
-            staff.to(`restaurant_${restaurantId}`).emit("table:session_updated", { restaurantId, tableNo: order.tableNo });
+            staff.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo, tableId: orderTableId });
+            staff.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo, tableId: orderTableId });
+            staff.to(`restaurant_${restaurantId}`).emit("table:session_updated", { restaurantId, tableNo: order.tableNo, tableId: orderTableId });
           }
         }
+
+        // Phase 2: Create and dispatch persistent notification for the Restaurant/Owner
+        const totalFormatted = order.total ? `₹${Math.round(order.total)}` : "";
+        const tableInfo = order.tableNo ? `Table ${order.tableNo}` : "Takeaway / POS";
+        const ownerSummaryText = `New order #${order.orderNo || order.id} (${tableInfo})${totalFormatted ? ` for ${totalFormatted}` : ""}.`;
+
+        await createAndDispatchNotification({
+          prisma,
+          realtime: { io, staff },
+          recipientType: RECIPIENT_TYPES.RESTAURANT,
+          recipientId: restaurantId,
+          restaurantId,
+          orderId: order.id,
+          notificationType: NOTIFICATION_TYPES.NEW_ORDER,
+          title: "🔔 New Order Received!",
+          message: ownerSummaryText,
+          data: {
+            restaurantId,
+            orderId: order.id,
+            orderNo: order.orderNo,
+            total: order.total,
+            tableId: orderTableId,
+            tableSessionId: order.tableSessionId ? Number(order.tableSessionId) : null,
+            tableNo: order.tableNo || null,
+          },
+          idempotencyKey: `order_received_${restaurantId}_${order.id}`,
+        }).catch((notifErr) => {
+          console.warn("[owner:orders] Failed to create owner order notification:", notifErr?.message);
+        });
 
         // Phase 2.A: Create and dispatch persistent notification for the responsible Server / Waiter
         const responsibleServerId =
@@ -490,7 +520,7 @@ export default async function ownerRoutes(app, deps = {}) {
               restaurantId,
               orderId: order.id,
               orderNo: order.orderNo,
-              tableId: order.tableId ? Number(order.tableId) : null,
+              tableId: orderTableId,
               tableSessionId: order.tableSessionId ? Number(order.tableSessionId) : null,
               tableNo: order.tableNo || null,
               recipientId: Number(responsibleServerId),
@@ -826,6 +856,9 @@ export default async function ownerRoutes(app, deps = {}) {
             orderNo: true,
             createdAt: true,
             updatedAt: true,
+            tableSession: {
+              select: { tableId: true },
+            },
           },
           orderBy: { createdAt: "desc" },
         }),
@@ -931,8 +964,13 @@ export default async function ownerRoutes(app, deps = {}) {
         }
       }
 
+      const latestOrderByTableId = new Map();
       const latestOrderByTable = {};
       for (const order of latestTableOrders) {
+        const targetTableId = order.tableSession?.tableId ? Number(order.tableSession.tableId) : null;
+        if (targetTableId && !latestOrderByTableId.has(targetTableId)) {
+          latestOrderByTableId.set(targetTableId, order);
+        }
         for (const k of getTableKeys(order.tableNo)) {
           if (!latestOrderByTable[k]) {
             latestOrderByTable[k] = order;
@@ -974,9 +1012,12 @@ export default async function ownerRoutes(app, deps = {}) {
             for (const k of getTableKeys(table.tableNo)) {
               const candidateOrders = activeOrdersByTable[k];
               if (candidateOrders?.length) {
-                const matchingOrders = candidateOrders.filter(
-                  (o) => !o.targetTableId || Number(o.targetTableId) === tid
-                );
+                const matchingOrders = candidateOrders.filter((o) => {
+                  if (o.targetTableId) {
+                    return Number(o.targetTableId) === tid;
+                  }
+                  return String(o.tableNo || "").trim().toLowerCase() === String(table.tableNo || "").trim().toLowerCase();
+                });
                 if (matchingOrders.length) {
                   tableActiveOrders = matchingOrders;
                   break;
@@ -985,20 +1026,39 @@ export default async function ownerRoutes(app, deps = {}) {
             }
           }
 
-          let latestOrder = null;
-          for (const k of getTableKeys(table.tableNo)) {
-            if (latestOrderByTable[k]) {
-              latestOrder = latestOrderByTable[k];
-              break;
+          let latestOrder = latestOrderByTableId.get(tid) || null;
+          if (!latestOrder) {
+            for (const k of getTableKeys(table.tableNo)) {
+              const candidate = latestOrderByTable[k];
+              if (candidate) {
+                const candTableId = candidate.tableSession?.tableId ? Number(candidate.tableSession.tableId) : null;
+                if (candTableId) {
+                  if (candTableId === tid) {
+                    latestOrder = candidate;
+                    break;
+                  }
+                } else if (String(candidate.tableNo || "").trim().toLowerCase() === String(table.tableNo || "").trim().toLowerCase()) {
+                  latestOrder = candidate;
+                  break;
+                }
+              }
             }
           }
 
           let activeSession = activeSessionsByTableId.get(tid) || null;
           if (!activeSession) {
             for (const k of getTableKeys(table.tableNo)) {
-              if (activeSessionsByTable[k]) {
-                activeSession = activeSessionsByTable[k];
-                break;
+              const candidateSession = activeSessionsByTable[k];
+              if (candidateSession) {
+                if (candidateSession.tableId) {
+                  if (Number(candidateSession.tableId) === tid) {
+                    activeSession = candidateSession;
+                    break;
+                  }
+                } else if (String(candidateSession.tableNo || "").trim().toLowerCase() === String(table.tableNo || "").trim().toLowerCase()) {
+                  activeSession = candidateSession;
+                  break;
+                }
               }
             }
           }

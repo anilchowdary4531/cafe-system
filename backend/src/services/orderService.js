@@ -348,12 +348,26 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
 
       await reserveStockForOrder({ tx, restaurantId, items: normalizedItems });
 
+    let dTable = null;
     let inputTableSessionId = body.tableSessionId ? Number(body.tableSessionId) : null;
-    if (!inputTableSessionId && tableNo) {
-      const dTable = await tx.diningTable.findFirst({
-        where: { restaurantId, tableNo: String(tableNo).trim() },
-        select: { id: true, tableNo: true, assignedWaiterId: true, assignedWaiterName: true },
+    if (inputTableSessionId) {
+      const existingSession = await tx.tableSession.findUnique({
+        where: { id: inputTableSessionId },
+        select: { id: true, tableId: true, tableNo: true },
       });
+      if (existingSession?.tableId) {
+        dTable = { id: existingSession.tableId, tableNo: existingSession.tableNo };
+      }
+    } else if (body.tableId || tableNo) {
+      dTable = body.tableId
+        ? await tx.diningTable.findFirst({
+            where: { id: Number(body.tableId), restaurantId },
+            select: { id: true, tableNo: true, assignedWaiterId: true, assignedWaiterName: true },
+          })
+        : await tx.diningTable.findFirst({
+            where: { restaurantId, tableNo: String(tableNo).trim() },
+            select: { id: true, tableNo: true, assignedWaiterId: true, assignedWaiterName: true },
+          });
       if (dTable) {
         let activeSession = await tx.tableSession.findFirst({
           where: {
@@ -407,7 +421,7 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
         customerName,
         phone,
         email,
-        tableNo,
+        tableNo: dTable?.tableNo || tableNo || null,
         notes,
         subtotal: bill.subtotal,
         taxAmount: bill.taxAmount,
@@ -519,6 +533,7 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
       idempotencyKey: clientOperationId || body.idempotencyKey || null,
     });
     order.kots = kots;
+    order.tableId = dTable ? dTable.id : (body.tableId ? Number(body.tableId) : null);
 
     return order;
   });
@@ -544,6 +559,9 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
         },
       });
       if (existing) {
+        if (existing.tableSession?.tableId) {
+          existing.tableId = existing.tableSession.tableId;
+        }
         return existing;
       }
     }

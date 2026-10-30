@@ -339,4 +339,102 @@ test("SERVER ORDER DUPLICATE PREVENTION & LIVE ORDER INTEGRITY TEST SUITE", asyn
     assert.ok(Array.isArray(notifs.notifications));
     assert.ok(notifs.notifications.some((n) => n.notificationType === NOTIFICATION_TYPES.ORDER_PLACED));
   });
+
+  // TEST 8: Server order creation generates persistent NEW_ORDER notification for Owner/Restaurant
+  await t.test("TEST 8: Server order creation generates persistent NEW_ORDER notification for Owner/Restaurant", async () => {
+    const ownerNotifs = await getUserNotifications({
+      prisma,
+      recipientId: owner.id,
+      userId: owner.id,
+      restaurantId: restaurant.id,
+      effectiveRole: "OWNER",
+      designation: "Owner",
+      role: "OWNER",
+    });
+
+    assert.ok(Array.isArray(ownerNotifs.notifications), "Owner notifications must be an array");
+    const orderNotif = ownerNotifs.notifications.find(
+      (n) => n.notificationType === NOTIFICATION_TYPES.NEW_ORDER && n.orderId === firstOrder.id
+    );
+    assert.ok(orderNotif, "Owner notification log must contain NEW_ORDER notification for firstOrder");
+    assert.equal(orderNotif.title, "🔔 New Order Received!");
+    assert.ok(orderNotif.message.includes(`Table ${table1.tableNo}`), "Message must reference Table 1");
+
+    // Also verify directly in DB table
+    const dbNotifs = await prisma.notification.findMany({
+      where: {
+        restaurantId: restaurant.id,
+        recipientType: RECIPIENT_TYPES.RESTAURANT,
+        recipientId: restaurant.id,
+        notificationType: NOTIFICATION_TYPES.NEW_ORDER,
+      },
+    });
+    assert.ok(dbNotifs.length >= 1, "At least 1 NEW_ORDER notification exists in DB for restaurant");
+  });
+
+  // TEST 9: Idempotent retries do NOT duplicate Owner NEW_ORDER notifications, while subsequent order creates distinct notification
+  await t.test("TEST 9: Owner NEW_ORDER notification idempotency and distinct subsequent order notification", async () => {
+    // Check notifications for order 1
+    const order1Notifs = await prisma.notification.findMany({
+      where: {
+        restaurantId: restaurant.id,
+        orderId: firstOrder.id,
+        recipientType: RECIPIENT_TYPES.RESTAURANT,
+        notificationType: NOTIFICATION_TYPES.NEW_ORDER,
+      },
+    });
+    assert.equal(order1Notifs.length, 1, "Exactly 1 NEW_ORDER notification must exist for firstOrder");
+
+    // Check notifications for order 2
+    const order2Notifs = await prisma.notification.findMany({
+      where: {
+        restaurantId: restaurant.id,
+        orderId: secondOrder.id,
+        recipientType: RECIPIENT_TYPES.RESTAURANT,
+        notificationType: NOTIFICATION_TYPES.NEW_ORDER,
+      },
+    });
+    assert.equal(order2Notifs.length, 1, "Exactly 1 NEW_ORDER notification must exist for secondOrder");
+    assert.notEqual(order1Notifs[0].id, order2Notifs[0].id, "Order 1 and Order 2 must have distinct notifications");
+  });
+
+  // TEST 10: Strict Table Identity & Session Isolation — Table with similar number in another section
+  await t.test("TEST 10: Strict Table Identity & Session Isolation across sections with similar numbers", async () => {
+    // Create Table B with tableNo "table 1" in Section "TABLE" (Table 1 has tableNo "1" in "Main Hall")
+    const tableB = await prisma.diningTable.create({
+      data: {
+        restaurantId: restaurant.id,
+        tableNo: "table 1",
+        section: "TABLE",
+        seats: 4,
+      },
+    });
+
+    const resTables = await app.inject({
+      method: "GET",
+      url: `/owner/${restaurant.id}/tables`,
+      headers: { authorization: `Bearer ${ownerToken}` },
+    });
+    assert.equal(resTables.statusCode, 200);
+    const tables = JSON.parse(resTables.payload);
+
+    const fetchedTable1 = tables.find((t) => t.id === table1.id);
+    const fetchedTableB = tables.find((t) => t.id === tableB.id);
+
+    assert.ok(fetchedTable1, "Table 1 must exist");
+    assert.ok(fetchedTableB, "Table B must exist");
+
+    // Table 1 has active orders and active session
+    assert.equal(fetchedTable1.isOccupied, true, "Table 1 must be occupied");
+    assert.equal(fetchedTable1.activeOrders.length, 2, "Table 1 must have 2 active orders");
+    assert.equal(fetchedTable1.assignedWaiterName, server.name, "Table 1 has Server Ramesh");
+
+    // Table B MUST BE AVAILABLE with 0 active orders and NO assigned server
+    assert.equal(fetchedTableB.isOccupied, false, "Table B must NOT be occupied");
+    assert.equal(fetchedTableB.status, "AVAILABLE", "Table B status must be AVAILABLE");
+    assert.equal(fetchedTableB.activeOrders.length, 0, "Table B must have 0 active orders");
+    assert.equal(fetchedTableB.activeSession, null, "Table B must NOT inherit Table 1 activeSession");
+    assert.equal(fetchedTableB.assignedWaiterName, null, "Table B must NOT inherit Table 1 assigned server");
+    assert.equal(fetchedTableB.assignedServer, null, "Table B assignedServer must be null");
+  });
 });

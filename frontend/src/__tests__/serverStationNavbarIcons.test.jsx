@@ -38,6 +38,24 @@ vi.mock("../context/StaffSocketContext", () => ({
   }),
 }));
 
+vi.mock("axios", () => {
+  const mockAxiosInstance = {
+    get: vi.fn().mockResolvedValue({ data: [] }),
+    post: vi.fn().mockResolvedValue({ data: { success: true } }),
+    put: vi.fn().mockResolvedValue({ data: { success: true } }),
+    delete: vi.fn().mockResolvedValue({ data: { success: true } }),
+    interceptors: {
+      request: { use: vi.fn() },
+      response: { use: vi.fn() },
+    },
+  };
+  mockAxiosInstance.create = vi.fn(() => mockAxiosInstance);
+  return {
+    default: mockAxiosInstance,
+    ...mockAxiosInstance,
+  };
+});
+
 vi.mock("../utils/apiClient", async (importOriginal) => {
   const actual = await importOriginal();
   return {
