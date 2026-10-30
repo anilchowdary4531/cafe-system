@@ -42,12 +42,12 @@ jobs:
               fi
             fi
 
-            echo "=== Step 3: Configuring Tiffzy repository remote ==="
+            echo "=== Step 3: Configuring canonical repository remote ==="
             CURRENT_ORIGIN=$(git remote get-url origin 2>/dev/null || true)
             echo "Current origin: $CURRENT_ORIGIN"
-            if [ "$CURRENT_ORIGIN" != "https://github.com/anilchowdary4531/tiffzy.git" ] && [ "$CURRENT_ORIGIN" != "git@github.com:anilchowdary4531/tiffzy.git" ]; then
-              echo "Updating git origin to https://github.com/anilchowdary4531/tiffzy.git"
-              git remote set-url origin https://github.com/anilchowdary4531/tiffzy.git
+            if [ "$CURRENT_ORIGIN" != "https://github.com/anilchowdary4531/cafe-system.git" ] && [ "$CURRENT_ORIGIN" != "git@github.com:anilchowdary4531/cafe-system.git" ]; then
+              echo "Updating git origin to https://github.com/anilchowdary4531/cafe-system.git"
+              git remote set-url origin https://github.com/anilchowdary4531/cafe-system.git
             fi
 
             echo "=== Step 4: Fetching main and checking out target commit ==="

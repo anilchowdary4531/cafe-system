@@ -38,20 +38,6 @@ const normalizeTableRows = (rows) => {
                   }))
             : [];
 
-        const hasActiveOrders = rawActiveOrders.length > 0;
-        const hasActiveSession = Boolean(
-            activeSessionForTable &&
-            activeSessionForTable.status !== "CLOSED" &&
-            activeSessionForTable.status !== "CANCELLED"
-        );
-        const isDirty = table?.cleaningStatus === "DIRTY" || table?.status === "DIRTY";
-        const isExplicitlyFree =
-            !isDirty && (
-            table?.isOccupied === false ||
-            table?.status === "AVAILABLE" ||
-            activeSessionForTable?.status === "CLOSED" ||
-            activeSessionForTable?.status === "CANCELLED");
-        const isOccupied = !isExplicitlyFree && !isDirty && Boolean(table?.isOccupied || hasActiveOrders || hasActiveSession);
         const seenActiveOrderIds = new Set();
         const deduplicatedActiveOrders = [];
         for (const ord of rawActiveOrders) {
@@ -62,17 +48,41 @@ const normalizeTableRows = (rows) => {
             }
             deduplicatedActiveOrders.push(ord);
         }
+
+        const hasActiveOrders = deduplicatedActiveOrders.length > 0;
+        const hasActiveSession = Boolean(
+            activeSessionForTable &&
+            activeSessionForTable.status !== "CLOSED" &&
+            activeSessionForTable.status !== "CANCELLED"
+        );
+        const isDirty = table?.cleaningStatus === "DIRTY" || table?.status === "DIRTY";
+        const isOccupied = !isDirty && (hasActiveOrders || hasActiveSession);
         const activeOrders = isOccupied ? deduplicatedActiveOrders : [];
+        const activeOrderCount = isOccupied ? activeOrders.length : 0;
+        const activeOrderStatus = isOccupied ? (activeOrders[0]?.status || null) : null;
+
+        const serverNameFromSession = isOccupied ? activeSessionForTable?.waiterName : null;
+        const serverIdFromSession = isOccupied ? activeSessionForTable?.waiterId : null;
+        const assignedServer = serverNameFromSession || (table?.assignedWaiterId ? (table?.assignedWaiterName || table?.assignedServer || null) : null);
+        const assignedWaiterName = serverNameFromSession || (table?.assignedWaiterId ? (table?.assignedWaiterName || null) : null);
+        const assignedWaiterId = serverIdFromSession || (table?.assignedWaiterId ? Number(table.assignedWaiterId) : null);
+
+        const occupiedSince = isOccupied
+            ? (activeSessionForTable?.createdAt || activeOrders[0]?.createdAt || null)
+            : null;
 
         return {
             ...table,
             tableNo: String(table?.tableNo || "").trim(),
             cleaningStatus: isDirty ? "DIRTY" : (table?.cleaningStatus || "CLEAN"),
-            status: isDirty ? "DIRTY" : (isExplicitlyFree ? "AVAILABLE" : (table?.status || (isOccupied ? "OCCUPIED" : "AVAILABLE"))),
-            assignedWaiterId: table?.assignedWaiterId || (isOccupied ? activeSessionForTable?.waiterId : null) || null,
-            assignedWaiterName: table?.assignedWaiterName || (isOccupied ? activeSessionForTable?.waiterName : null) || null,
-            assignedServer: table?.assignedServer || table?.assignedWaiterName || (isOccupied ? activeSessionForTable?.waiterName : null) || null,
+            status: isDirty ? "DIRTY" : (isOccupied ? "OCCUPIED" : "AVAILABLE"),
+            assignedWaiterId,
+            assignedWaiterName,
+            assignedServer,
             isOccupied,
+            occupiedSince,
+            activeOrderCount,
+            activeOrderStatus,
             activeOrders,
             activeSession: activeSessionForTable,
             assignmentKey: table?.id
@@ -237,6 +247,95 @@ describe("Owner Panel — Strict Table Identity and Server Isolation", () => {
         expect(table.status).toBe("AVAILABLE");
         expect(table.activeSession).toBeNull();
         expect(table.activeOrders).toHaveLength(0);
+        expect(table.activeOrderCount).toBe(0);
+        expect(table.assignedServer).toBeNull();
+    });
+
+    it("7. Exact Production Scenario: Table 1 (Main Hall, id:1) vs Table 1 (Section TABLE, id:2)", () => {
+        const rawTables = [
+            {
+                id: 1,
+                tableNo: "1",
+                section: "Main Hall",
+                isOccupied: true,
+                status: "OCCUPIED",
+                activeOrderCount: 1,
+                activeOrderStatus: "READY",
+                assignedWaiterName: "saimohan",
+                assignedServer: "saimohan",
+                occupiedSince: "2026-10-30T05:57:00.000Z",
+                activeSession: {
+                    id: 128,
+                    tableId: 1,
+                    tableNo: "1",
+                    waiterName: "saimohan",
+                    status: "OPEN",
+                    createdAt: "2026-10-30T05:57:00.000Z",
+                },
+                activeOrders: [
+                    {
+                        id: 1281,
+                        targetTableId: 1,
+                        orderNo: "CK-202610300557-1-1281",
+                        status: "READY",
+                    },
+                ],
+            },
+            {
+                id: 2,
+                tableNo: "table 1",
+                section: "TABLE",
+                // Stale backend leaked properties:
+                isOccupied: true,
+                status: "OCCUPIED",
+                activeOrderCount: 1,
+                activeOrderStatus: "READY",
+                assignedWaiterName: "saimohan",
+                assignedServer: "saimohan",
+                occupiedSince: "2026-10-30T05:57:00.000Z",
+                activeSession: {
+                    id: 128,
+                    tableId: 1, // Belongs to Table 1, NOT Table 2!
+                    tableNo: "1",
+                    waiterName: "saimohan",
+                    status: "OPEN",
+                    createdAt: "2026-10-30T05:57:00.000Z",
+                },
+                activeOrders: [
+                    {
+                        id: 1281,
+                        targetTableId: 1, // Belongs to Table 1, NOT Table 2!
+                        orderNo: "CK-202610300557-1-1281",
+                        status: "READY",
+                    },
+                ],
+            },
+        ];
+
+        const normalized = normalizeTableRows(rawTables);
+        expect(normalized).toHaveLength(2);
+
+        const tableA = normalized.find((t) => t.id === 1);
+        const tableB = normalized.find((t) => t.id === 2);
+
+        // Table A owns the order and session
+        expect(tableA.isOccupied).toBe(true);
+        expect(tableA.status).toBe("OCCUPIED");
+        expect(tableA.activeOrderCount).toBe(1);
+        expect(tableA.activeOrders).toHaveLength(1);
+        expect(tableA.activeOrders[0].orderNo).toBe("CK-202610300557-1-1281");
+        expect(tableA.assignedServer).toBe("saimohan");
+        expect(tableA.occupiedSince).toBe("2026-10-30T05:57:00.000Z");
+
+        // Table B MUST be completely free and isolated despite stale raw backend fields
+        expect(tableB.isOccupied).toBe(false);
+        expect(tableB.status).toBe("AVAILABLE");
+        expect(tableB.activeOrderCount).toBe(0);
+        expect(tableB.activeOrders).toHaveLength(0);
+        expect(tableB.activeSession).toBeNull();
+        expect(tableB.assignedServer).toBeNull();
+        expect(tableB.assignedWaiterName).toBeNull();
+        expect(tableB.occupiedSince).toBeNull();
     });
 });
 

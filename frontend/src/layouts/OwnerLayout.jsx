@@ -467,20 +467,6 @@ const normalizeTableRows = (rows) => {
                   }))
                 : [];
 
-            const hasActiveOrders = rawActiveOrders.length > 0;
-            const hasActiveSession = Boolean(
-                activeSessionForTable &&
-                activeSessionForTable.status !== "CLOSED" &&
-                activeSessionForTable.status !== "CANCELLED"
-            );
-            const isDirty = table?.cleaningStatus === "DIRTY" || table?.status === "DIRTY";
-            const isExplicitlyFree =
-                !isDirty && (
-                table?.isOccupied === false ||
-                table?.status === "AVAILABLE" ||
-                activeSessionForTable?.status === "CLOSED" ||
-                activeSessionForTable?.status === "CANCELLED");
-            const isOccupied = !isExplicitlyFree && !isDirty && Boolean(table?.isOccupied || hasActiveOrders || hasActiveSession);
             const seenActiveOrderIds = new Set();
             const deduplicatedActiveOrders = [];
             for (const ord of rawActiveOrders) {
@@ -491,29 +477,50 @@ const normalizeTableRows = (rows) => {
                 }
                 deduplicatedActiveOrders.push(ord);
             }
+
+            const hasActiveOrders = deduplicatedActiveOrders.length > 0;
+            const hasActiveSession = Boolean(
+                activeSessionForTable &&
+                activeSessionForTable.status !== "CLOSED" &&
+                activeSessionForTable.status !== "CANCELLED"
+            );
+            const isDirty = table?.cleaningStatus === "DIRTY" || table?.status === "DIRTY";
+            const isOccupied = !isDirty && (hasActiveOrders || hasActiveSession);
             const activeOrders = isOccupied ? deduplicatedActiveOrders : [];
+            const activeOrderCount = isOccupied ? activeOrders.length : 0;
+            const activeOrderStatus = isOccupied ? (activeOrders[0]?.status || null) : null;
+
+            const serverNameFromSession = isOccupied ? activeSessionForTable?.waiterName : null;
+            const serverIdFromSession = isOccupied ? activeSessionForTable?.waiterId : null;
+            const assignedServer = serverNameFromSession || (table?.assignedWaiterId ? (table?.assignedWaiterName || table?.assignedServer || null) : null);
+            const assignedWaiterName = serverNameFromSession || (table?.assignedWaiterId ? (table?.assignedWaiterName || null) : null);
+            const assignedWaiterId = serverIdFromSession || (table?.assignedWaiterId ? Number(table.assignedWaiterId) : null);
+
+            const occupiedSince = isOccupied
+                ? (activeSessionForTable?.createdAt || activeOrders[0]?.createdAt || null)
+                : null;
 
             return {
                 ...table,
                 tableNo: String(table?.tableNo || "").trim(),
                 cleaningStatus: isDirty ? "DIRTY" : (table?.cleaningStatus || "CLEAN"),
-                status: isDirty ? "DIRTY" : (isExplicitlyFree ? "AVAILABLE" : (table?.status || (isOccupied ? "OCCUPIED" : "AVAILABLE"))),
-                assignedWaiterId: table?.assignedWaiterId || (isOccupied ? activeSessionForTable?.waiterId : null) || null,
-                assignedWaiterName: table?.assignedWaiterName || (isOccupied ? activeSessionForTable?.waiterName : null) || null,
-                assignedServer: table?.assignedServer || table?.assignedWaiterName || (isOccupied ? activeSessionForTable?.waiterName : null) || null,
+                status: isDirty ? "DIRTY" : (isOccupied ? "OCCUPIED" : "AVAILABLE"),
+                assignedWaiterId,
+                assignedWaiterName,
+                assignedServer,
                 isOccupied,
                 isReserved: Boolean(table?.isReserved || table?.is_reserved || table?.activeReservation || table?.upcomingReservation),
                 activeReservation: table?.activeReservation || null,
                 upcomingReservation: table?.upcomingReservation || null,
-                occupiedSince: isOccupied ? (table?.occupiedSince || activeSessionForTable?.createdAt || null) : null,
-                activeOrderCount: isOccupied ? Number(table?.activeOrderCount || activeOrders.length) : 0,
-                activeItemCount: isOccupied ? Number(table?.activeItemCount || 0) : 0,
-                activeOrderStatus: isOccupied ? (table?.activeOrderStatus || null) : null,
-                paymentStatus: isOccupied ? (table?.paymentStatus || null) : null,
-                lastOrderStatus: isOccupied ? String(table?.lastOrderStatus || "").toUpperCase() : null,
-                lastPaymentStatus: isOccupied ? String(table?.lastPaymentStatus || "").toUpperCase() : null,
-                lastOrderNo: isOccupied ? (table?.lastOrderNo || "") : "",
-                lastOrderAt: isOccupied ? (table?.lastOrderAt || null) : null,
+                occupiedSince,
+                activeOrderCount,
+                activeItemCount: isOccupied ? activeOrders.reduce((sum, o) => sum + (Array.isArray(o.items) ? o.items.reduce((s, it) => s + Number(it.qty || 0), 0) : 0), 0) : 0,
+                activeOrderStatus,
+                paymentStatus: isOccupied ? (activeOrders[0]?.paymentStatus || null) : null,
+                lastOrderStatus: isOccupied ? String(activeOrders[activeOrders.length - 1]?.status || "").toUpperCase() : null,
+                lastPaymentStatus: isOccupied ? String(activeOrders[activeOrders.length - 1]?.paymentStatus || "").toUpperCase() : null,
+                lastOrderNo: isOccupied ? (activeOrders[activeOrders.length - 1]?.orderNo || "") : "",
+                lastOrderAt: isOccupied ? (activeOrders[activeOrders.length - 1]?.createdAt || null) : null,
                 activeOrders,
                 activeSession: activeSessionForTable,
                 assignmentKey: table?.id
