@@ -2181,7 +2181,7 @@ export default async function ownerRoutes(app, deps = {}) {
         }).catch(() => []),
         prisma.kitchenOrderTicket.findMany({
           where: { restaurantId, createdAt: { gte: seriesStart, lte: seriesEnd } },
-          select: { id: true, status: true, reprintsCount: true },
+          select: { id: true, status: true, reprintCount: true },
         }).catch(() => []),
       ]);
 

@@ -776,9 +776,34 @@ export default async function staffTaskRoutes(app, deps = {}) {
         include: {
           kot: {
             include: {
-              tableSession: { select: { id: true, tableId: true, tableNo: true } },
-              table: { select: { id: true, tableNo: true, section: true } },
-              order: { select: { id: true, tableId: true, tableNo: true } },
+              tableSession: {
+                select: {
+                  id: true,
+                  tableId: true,
+                  tableNo: true,
+                  table: {
+                    select: { id: true, tableNo: true, section: true },
+                  },
+                },
+              },
+              order: {
+                select: {
+                  id: true,
+                  orderNo: true,
+                  tableNo: true,
+                  tableSessionId: true,
+                  tableSession: {
+                    select: {
+                      id: true,
+                      tableId: true,
+                      tableNo: true,
+                      table: {
+                        select: { id: true, tableNo: true, section: true },
+                      },
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -788,6 +813,11 @@ export default async function staffTaskRoutes(app, deps = {}) {
         return reply.code(404).send({ message: "Item not found in this restaurant" });
       }
 
+      const existingTable = existing.kot?.tableSession?.table || existing.kot?.order?.tableSession?.table || null;
+      const existingTableId = existing.kot?.tableSession?.tableId || existingTable?.id || null;
+      const existingSection = existingTable?.section || null;
+      const existingTableNo = existingTable?.tableNo || existing.kot?.tableSession?.tableNo || existing.kot?.tableNo || existing.kot?.order?.tableNo || null;
+
       // Idempotency: If item is already SERVED or DELIVERED, treat as successful idempotent operation
       if (existing.status === "SERVED" || existing.status === "DELIVERED") {
         return reply.send({
@@ -796,6 +826,10 @@ export default async function staffTaskRoutes(app, deps = {}) {
           message: `Item already marked ${existing.status}`,
           item: existing,
           kot: existing.kot,
+          order: existing.kot?.order || null,
+          tableId: existingTableId,
+          tableNo: existingTableNo,
+          section: existingSection,
           alreadyServed: true,
         });
       }
@@ -808,85 +842,151 @@ export default async function staffTaskRoutes(app, deps = {}) {
         });
       }
 
-      const updatedItem = await prisma.kitchenOrderTicketItem.update({
-        where: { id: itemId },
-        data: { status: "SERVED" },
-        include: {
-          kot: {
-            include: {
-              tableSession: { select: { id: true, tableId: true, tableNo: true } },
-              table: { select: { id: true, tableNo: true, section: true } },
-              order: { select: { id: true, tableId: true, tableNo: true } },
+      const nowTimestamp = Date.now();
+      const nowIso = new Date(nowTimestamp).toISOString();
+
+      // Execute authoritative state mutations inside transaction
+      const { updatedItem, finalKot, updatedOrder, kotTableId, kotSection, kotTableNo } = await prisma.$transaction(async (tx) => {
+        const updated = await tx.kitchenOrderTicketItem.update({
+          where: { id: itemId },
+          data: { status: "SERVED" },
+          include: {
+            kot: {
+              include: {
+                tableSession: {
+                  select: {
+                    id: true,
+                    tableId: true,
+                    tableNo: true,
+                    table: {
+                      select: { id: true, tableNo: true, section: true },
+                    },
+                  },
+                },
+                order: {
+                  select: {
+                    id: true,
+                    orderNo: true,
+                    tableNo: true,
+                    tableSessionId: true,
+                    tableSession: {
+                      select: {
+                        id: true,
+                        tableId: true,
+                        tableNo: true,
+                        table: {
+                          select: { id: true, tableNo: true, section: true },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
           },
-        },
-      });
+        });
 
-      // Synchronize KOT status if all items are now SERVED
-      const kId = updatedItem.kotId;
-      const reloadedKot = await prisma.kitchenOrderTicket.findUnique({
-        where: { id: kId },
-        include: { items: true, station: { include: { printer: true } } },
-      });
-
-      const activeItems = (reloadedKot?.items || []).filter((it) => it.status !== "CANCELLED");
-      let autoKotStatus = reloadedKot?.status;
-      if (activeItems.length > 0 && activeItems.every((it) => it.status === "SERVED")) {
-        autoKotStatus = "SERVED";
-      } else if (activeItems.length > 0 && activeItems.every((it) => it.status === "READY" || it.status === "SERVED")) {
-        autoKotStatus = "READY";
-      }
-
-      let finalKot = reloadedKot;
-      if (autoKotStatus && autoKotStatus !== reloadedKot.status) {
-        finalKot = await prisma.kitchenOrderTicket.update({
+        // Synchronize KOT status if all items are now SERVED
+        const kId = updated.kotId;
+        const reloadedKot = await tx.kitchenOrderTicket.findUnique({
           where: { id: kId },
-          data: { status: autoKotStatus },
           include: { items: true, station: { include: { printer: true } } },
         });
-      }
 
-      // Synchronize parent Order status from KOTs
-      let updatedOrder = null;
-      if (updatedItem.kot?.orderId) {
-        updatedOrder = await syncParentOrderStatusFromKots({
-          prisma,
-          orderId: updatedItem.kot.orderId,
-        });
-      }
+        const activeItems = (reloadedKot?.items || []).filter((it) => it.status !== "CANCELLED");
+        let autoKotStatus = reloadedKot?.status;
+        if (activeItems.length > 0 && activeItems.every((it) => it.status === "SERVED")) {
+          autoKotStatus = "SERVED";
+        } else if (activeItems.length > 0 && activeItems.every((it) => it.status === "READY" || it.status === "SERVED")) {
+          autoKotStatus = "READY";
+        }
+
+        let kotResult = reloadedKot;
+        if (autoKotStatus && autoKotStatus !== reloadedKot.status) {
+          kotResult = await tx.kitchenOrderTicket.update({
+            where: { id: kId },
+            data: { status: autoKotStatus },
+            include: { items: true, station: { include: { printer: true } } },
+          });
+        }
+
+        // Synchronize parent Order status from KOTs
+        let orderResult = null;
+        if (updated.kot?.orderId) {
+          orderResult = await syncParentOrderStatusFromKots({
+            prisma: tx,
+            orderId: updated.kot.orderId,
+          });
+        }
+
+        const resolvedTable = updated.kot?.tableSession?.table || updated.kot?.order?.tableSession?.table || null;
+        const resolvedTid = updated.kot?.tableSession?.tableId || resolvedTable?.id || orderResult?.tableSession?.tableId || null;
+        const resolvedSec = resolvedTable?.section || null;
+        const resolvedTno = resolvedTable?.tableNo || updated.kot?.tableSession?.tableNo || updated.kot?.tableNo || updated.kot?.order?.tableNo || null;
+
+        // Advance authoritative table/session timestamps for canonical sync
+        if (resolvedTid) {
+          await tx.diningTable.update({
+            where: { id: resolvedTid },
+            data: { updatedAt: new Date(nowTimestamp) },
+          }).catch(() => {});
+        }
+        if (updated.kot?.tableSessionId) {
+          await tx.tableSession.update({
+            where: { id: updated.kot.tableSessionId },
+            data: { updatedAt: new Date(nowTimestamp) },
+          }).catch(() => {});
+        }
+
+        return {
+          updatedItem: updated,
+          finalKot: kotResult,
+          updatedOrder: orderResult,
+          kotTableId: resolvedTid,
+          kotSection: resolvedSec,
+          kotTableNo: resolvedTno,
+        };
+      });
 
       const staff = realtime?.staff || null;
       const io = realtime?.io || null;
       const rid = updatedItem.kot?.restaurantId || restaurantId;
-      const kotTableId = updatedItem.kot?.tableId ? Number(updatedItem.kot.tableId) : (
-        updatedItem.kot?.table?.id ? Number(updatedItem.kot.table.id) : (
-          updatedItem.kot?.tableSession?.tableId ? Number(updatedItem.kot.tableSession.tableId) : (
-            updatedOrder?.tableId ? Number(updatedOrder.tableId) : null
-          )
-        )
-      );
-      const kotSection = updatedItem.kot?.table?.section || null;
-      const kotTableNo = updatedItem.kot?.tableNo || updatedItem.kot?.table?.tableNo || updatedItem.kot?.order?.tableNo || null;
       const tableLabel = formatTableDisplayLabel({ section: kotSection, tableNo: kotTableNo });
 
       if (rid) {
         const payload = {
           itemId,
           tableId: kotTableId,
+          id: kotTableId,
           section: kotSection,
           tableNo: kotTableNo,
           deliveredBy: req.staffActor?.name || req.staffActor?.userName || "Steward",
           item: updatedItem,
           kot: finalKot,
+          order: updatedOrder,
+          version: nowTimestamp,
+          updatedAt: nowIso,
+        };
+
+        const tableUpdatePayload = {
+          restaurantId: rid,
+          tableId: kotTableId,
+          id: kotTableId,
+          section: kotSection,
+          tableNo: kotTableNo,
+          version: nowTimestamp,
+          updatedAt: nowIso,
         };
 
         if (staff) {
           staff.to(`restaurant_${rid}`).emit("food:delivered", payload);
           staff.to(`restaurant:${rid}`).emit("food:delivered", payload);
-          staff.to(`restaurant_${rid}`).emit("kot:item_updated", { kotId: kId, itemId, status: "SERVED", kot: finalKot, item: updatedItem });
-          staff.to(`restaurant:${rid}`).emit("kot:item_updated", { kotId: kId, itemId, status: "SERVED", kot: finalKot, item: updatedItem });
-          staff.to(`restaurant_${rid}`).emit("kitchen:item_status_updated", { kotId: kId, itemId, status: "SERVED", kot: finalKot, item: updatedItem });
-          staff.to(`restaurant:${rid}`).emit("kitchen:item_status_updated", { kotId: kId, itemId, status: "SERVED", kot: finalKot, item: updatedItem });
+          staff.to(`restaurant_${rid}`).emit("kot:item_updated", { kotId: updatedItem.kotId, itemId, status: "SERVED", kot: finalKot, item: updatedItem });
+          staff.to(`restaurant:${rid}`).emit("kot:item_updated", { kotId: updatedItem.kotId, itemId, status: "SERVED", kot: finalKot, item: updatedItem });
+          staff.to(`restaurant_${rid}`).emit("kitchen:item_status_updated", { kotId: updatedItem.kotId, itemId, status: "SERVED", kot: finalKot, item: updatedItem });
+          staff.to(`restaurant:${rid}`).emit("kitchen:item_status_updated", { kotId: updatedItem.kotId, itemId, status: "SERVED", kot: finalKot, item: updatedItem });
+          staff.to(`restaurant_${rid}`).emit("kitchen:item_served", { kotId: updatedItem.kotId, itemId, status: "SERVED", kot: finalKot, item: updatedItem });
+          staff.to(`restaurant:${rid}`).emit("kitchen:item_served", { kotId: updatedItem.kotId, itemId, status: "SERVED", kot: finalKot, item: updatedItem });
           staff.to(`restaurant_${rid}`).emit("kot:status_updated", finalKot);
           staff.to(`restaurant:${rid}`).emit("kot:status_updated", finalKot);
           if (updatedOrder) {
@@ -894,18 +994,20 @@ export default async function staffTaskRoutes(app, deps = {}) {
             staff.to(`restaurant:${rid}`).emit("order:updated", updatedOrder);
           }
           if (kotTableNo || kotTableId) {
-            staff.to(`restaurant_${rid}`).emit("table:updated", { restaurantId: rid, tableId: kotTableId, id: kotTableId, section: kotSection, tableNo: kotTableNo });
-            staff.to(`restaurant:${rid}`).emit("table:updated", { restaurantId: rid, tableId: kotTableId, id: kotTableId, section: kotSection, tableNo: kotTableNo });
+            staff.to(`restaurant_${rid}`).emit("table:updated", tableUpdatePayload);
+            staff.to(`restaurant:${rid}`).emit("table:updated", tableUpdatePayload);
           }
         }
 
         if (io) {
           io.to(`restaurant_${rid}`).emit("food:delivered", payload);
           io.to(`restaurant:${rid}`).emit("food:delivered", payload);
-          io.to(`restaurant_${rid}`).emit("kot:item_updated", { kotId: kId, itemId, status: "SERVED", kot: finalKot, item: updatedItem });
-          io.to(`restaurant:${rid}`).emit("kot:item_updated", { kotId: kId, itemId, status: "SERVED", kot: finalKot, item: updatedItem });
-          io.to(`restaurant_${rid}`).emit("kitchen:item_status_updated", { kotId: kId, itemId, status: "SERVED", kot: finalKot, item: updatedItem });
-          io.to(`restaurant:${rid}`).emit("kitchen:item_status_updated", { kotId: kId, itemId, status: "SERVED", kot: finalKot, item: updatedItem });
+          io.to(`restaurant_${rid}`).emit("kot:item_updated", { kotId: updatedItem.kotId, itemId, status: "SERVED", kot: finalKot, item: updatedItem });
+          io.to(`restaurant:${rid}`).emit("kot:item_updated", { kotId: updatedItem.kotId, itemId, status: "SERVED", kot: finalKot, item: updatedItem });
+          io.to(`restaurant_${rid}`).emit("kitchen:item_status_updated", { kotId: updatedItem.kotId, itemId, status: "SERVED", kot: finalKot, item: updatedItem });
+          io.to(`restaurant:${rid}`).emit("kitchen:item_status_updated", { kotId: updatedItem.kotId, itemId, status: "SERVED", kot: finalKot, item: updatedItem });
+          io.to(`restaurant_${rid}`).emit("kitchen:item_served", { kotId: updatedItem.kotId, itemId, status: "SERVED", kot: finalKot, item: updatedItem });
+          io.to(`restaurant:${rid}`).emit("kitchen:item_served", { kotId: updatedItem.kotId, itemId, status: "SERVED", kot: finalKot, item: updatedItem });
           io.to(`restaurant_${rid}`).emit("kot:status_updated", finalKot);
           io.to(`restaurant:${rid}`).emit("kot:status_updated", finalKot);
           if (updatedOrder) {
@@ -913,8 +1015,8 @@ export default async function staffTaskRoutes(app, deps = {}) {
             io.to(`restaurant:${rid}`).emit("order:updated", updatedOrder);
           }
           if (kotTableNo || kotTableId) {
-            io.to(`restaurant_${rid}`).emit("table:updated", { restaurantId: rid, tableId: kotTableId, id: kotTableId, section: kotSection, tableNo: kotTableNo });
-            io.to(`restaurant:${rid}`).emit("table:updated", { restaurantId: rid, tableId: kotTableId, id: kotTableId, section: kotSection, tableNo: kotTableNo });
+            io.to(`restaurant_${rid}`).emit("table:updated", tableUpdatePayload);
+            io.to(`restaurant:${rid}`).emit("table:updated", tableUpdatePayload);
           }
         }
 
@@ -961,7 +1063,7 @@ export default async function staffTaskRoutes(app, deps = {}) {
               data: {
                 restaurantId: rid,
                 orderId: updatedItem.kot?.orderId ? Number(updatedItem.kot.orderId) : null,
-                kotId: Number(kId),
+                kotId: Number(updatedItem.kotId),
                 kotItemId: Number(itemId),
                 tableId: kotTableId,
                 section: kotSection,
@@ -988,7 +1090,7 @@ export default async function staffTaskRoutes(app, deps = {}) {
               data: {
                 restaurantId: rid,
                 orderId: updatedItem.kot?.orderId ? Number(updatedItem.kot.orderId) : null,
-                kotId: Number(kId),
+                kotId: Number(updatedItem.kotId),
                 kotItemId: Number(itemId),
                 tableId: kotTableId,
                 section: kotSection,
@@ -1002,7 +1104,18 @@ export default async function staffTaskRoutes(app, deps = {}) {
         }
       }
 
-      return reply.send({ success: true, message: "Item delivered to table", item: updatedItem, kot: finalKot });
+      return reply.send({
+        success: true,
+        ok: true,
+        message: "Item delivered to table",
+        item: updatedItem,
+        kot: finalKot,
+        order: updatedOrder,
+        tableId: kotTableId,
+        tableNo: kotTableNo,
+        section: kotSection,
+        alreadyServed: false,
+      });
     } catch (err) {
       return reply.code(500).send({ message: err.message || "Failed to mark item delivered" });
     }

@@ -116,7 +116,11 @@ export default function StewardStation() {
         socket.on("task:updated", fetchTasks);
         socket.on("task:completed", fetchTasks);
         socket.on("kitchen:item_ready", onFoodReady);
+        socket.on("kitchen:item_served", fetchFoodRunnerItems);
+        socket.on("food:delivered", fetchFoodRunnerItems);
         socket.on("kot:updated", fetchFoodRunnerItems);
+        socket.on("kot:item_updated", fetchFoodRunnerItems);
+        socket.on("kot:status_updated", fetchFoodRunnerItems);
 
         return () => {
             socket.off("steward:assistance_requested", onStewardEvent);
@@ -125,7 +129,11 @@ export default function StewardStation() {
             socket.off("task:updated", fetchTasks);
             socket.off("task:completed", fetchTasks);
             socket.off("kitchen:item_ready", onFoodReady);
+            socket.off("kitchen:item_served", fetchFoodRunnerItems);
+            socket.off("food:delivered", fetchFoodRunnerItems);
             socket.off("kot:updated", fetchFoodRunnerItems);
+            socket.off("kot:item_updated", fetchFoodRunnerItems);
+            socket.off("kot:status_updated", fetchFoodRunnerItems);
         };
     }, [socket, fetchTasks, fetchFoodRunnerItems]);
 

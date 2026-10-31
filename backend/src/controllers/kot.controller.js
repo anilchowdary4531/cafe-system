@@ -203,22 +203,79 @@ export const getKots = async (req, res) => {
   }
 };
 
+const resolveKotTableDetails = async ({ prisma: db, kot, order }) => {
+  let tableId = kot?.tableId || kot?.tableSession?.tableId || kot?.tableSession?.table?.id || order?.tableId || order?.tableSession?.tableId || order?.tableSession?.table?.id || null;
+  let section = kot?.tableSession?.table?.section || order?.tableSession?.table?.section || null;
+  let tableNo = kot?.tableSession?.table?.tableNo || order?.tableSession?.table?.tableNo || kot?.tableNo || order?.tableNo || null;
+
+  if (!tableId && kot?.tableSessionId) {
+    const session = await db.tableSession.findUnique({
+      where: { id: Number(kot.tableSessionId) },
+      select: { tableId: true, table: { select: { id: true, tableNo: true, section: true } } },
+    });
+    if (session?.table) {
+      tableId = session.table.id;
+      tableNo = session.table.tableNo;
+      section = session.table.section;
+    } else if (session?.tableId) {
+      tableId = session.tableId;
+    }
+  }
+
+  if (!tableId && (kot?.orderId || order?.id)) {
+    const ordId = Number(kot?.orderId || order?.id);
+    const ord = await db.order.findUnique({
+      where: { id: ordId },
+      select: { tableId: true, tableNo: true, tableSession: { select: { tableId: true, table: { select: { id: true, tableNo: true, section: true } } } } },
+    });
+    if (ord?.tableSession?.table) {
+      tableId = ord.tableSession.table.id;
+      tableNo = ord.tableSession.table.tableNo;
+      section = ord.tableSession.table.section;
+    } else if (ord?.tableId) {
+      tableId = ord.tableId;
+      tableNo = ord.tableNo || tableNo;
+    }
+  }
+
+  if (tableId && (!section || !tableNo)) {
+    const tbl = await db.diningTable.findUnique({
+      where: { id: Number(tableId) },
+      select: { tableNo: true, section: true },
+    });
+    if (tbl) {
+      tableNo = tbl.tableNo || tableNo;
+      section = tbl.section || section;
+    }
+  }
+
+  return {
+    tableId: tableId ? Number(tableId) : null,
+    tableNo: tableNo ? String(tableNo) : null,
+    section: section ? String(section) : null,
+  };
+};
+
 const resolveWaiterIdForKot = async ({ prisma: db, kot, order }) => {
   if (kot?.waiterId) return Number(kot.waiterId);
   if (kot?.tableSessionId) {
     const session = await db.tableSession.findUnique({
-      where: { id: kot.tableSessionId },
-      select: { waiterId: true },
+      where: { id: Number(kot.tableSessionId) },
+      select: { waiterId: true, tableId: true, table: { select: { assignedWaiterId: true } } },
     });
     if (session?.waiterId) return Number(session.waiterId);
+    if (session?.table?.assignedWaiterId) return Number(session.table.assignedWaiterId);
   }
-  if (kot?.restaurantId && kot?.tableNo) {
-    const table = await db.diningTable.findFirst({
-      where: { restaurantId: kot.restaurantId, tableNo: String(kot.tableNo).trim() },
-      select: { assignedWaiterId: true },
+  if (order?.tableSessionId) {
+    const session = await db.tableSession.findUnique({
+      where: { id: Number(order.tableSessionId) },
+      select: { waiterId: true, tableId: true, table: { select: { assignedWaiterId: true } } },
     });
-    if (table?.assignedWaiterId) return Number(table.assignedWaiterId);
+    if (session?.waiterId) return Number(session.waiterId);
+    if (session?.table?.assignedWaiterId) return Number(session.table.assignedWaiterId);
   }
+  if (order?.waiterId) return Number(order.waiterId);
+  if (order?.serverUserId) return Number(order.serverUserId);
   if (order?.createdByUserId) return Number(order.createdByUserId);
   return null;
 };
@@ -244,6 +301,13 @@ export const updateStatus = async (req, res) => {
       actor,
     });
     const updatedOrder = updatedKot?.order || null;
+    const db = req.prisma || prisma;
+
+    const { tableId: kotTableId, tableNo: kotTableNo, section: kotSection } = await resolveKotTableDetails({
+      prisma: db,
+      kot: updatedKot,
+      order: updatedOrder,
+    });
 
     // Realtime notification & broadcast (staff + io)
     const io = req.server?.io || req.server?.realtime?.io || req.app?.get?.("io");
@@ -258,12 +322,12 @@ export const updateStatus = async (req, res) => {
 
     if (String(status).toUpperCase() === "READY") {
       try {
-        const waiterId = await resolveWaiterIdForKot({ prisma: req.prisma || prisma, kot: updatedKot, order: updatedOrder });
+        const waiterId = await resolveWaiterIdForKot({ prisma: db, kot: updatedKot, order: updatedOrder });
         if (waiterId) {
-          const tableLabel = updatedKot?.tableNo ? `Table ${updatedKot.tableNo}` : "Takeaway";
+          const tableLabel = kotSection ? `${kotSection} — Table ${kotTableNo}` : (kotTableNo ? `Table ${kotTableNo}` : "Takeaway");
           const orderLabel = updatedOrder?.orderNo ? `Order #${updatedOrder.orderNo}` : (updatedKot?.orderId ? `Order #${updatedKot.orderId}` : "");
           await createAndDispatchNotification({
-            prisma: req.prisma || prisma,
+            prisma: db,
             realtime: { io, staff },
             recipientType: RECIPIENT_TYPES.USER,
             recipientId: waiterId,
@@ -278,9 +342,10 @@ export const updateStatus = async (req, res) => {
               orderId: updatedKot?.orderId ? Number(updatedKot.orderId) : null,
               orderNo: updatedOrder?.orderNo || (updatedKot?.orderId ? String(updatedKot.orderId) : null),
               kotId: Number(kotId),
-              tableId: updatedKot?.tableId ? Number(updatedKot.tableId) : null,
+              tableId: kotTableId,
+              section: kotSection,
               tableSessionId: updatedKot?.tableSessionId ? Number(updatedKot.tableSessionId) : null,
-              tableNo: updatedKot?.tableNo || null,
+              tableNo: kotTableNo,
               recipientId: waiterId,
             },
           }).catch((e) => console.warn("[kot.controller] KOT ready notification error:", e?.message));
@@ -289,13 +354,30 @@ export const updateStatus = async (req, res) => {
         console.warn("[kot.controller] Failed to dispatch KOT ready notification:", notifErr?.message);
       }
     } else if (String(status).toUpperCase() === "SERVED" || String(status).toUpperCase() === "DELIVERED") {
+      const foodDeliveredPayload = {
+        kotId: Number(kotId),
+        orderId: updatedKot?.orderId ? Number(updatedKot.orderId) : null,
+        tableId: kotTableId,
+        tableNo: kotTableNo,
+        section: kotSection,
+        status: "SERVED",
+      };
+      if (staff) {
+        staff.to(`restaurant_${restaurantId}`).emit("food:delivered", foodDeliveredPayload);
+        staff.to(`restaurant:${restaurantId}`).emit("food:delivered", foodDeliveredPayload);
+      }
+      if (io) {
+        io.to(`restaurant_${restaurantId}`).emit("food:delivered", foodDeliveredPayload);
+        io.to(`restaurant:${restaurantId}`).emit("food:delivered", foodDeliveredPayload);
+      }
+
       try {
-        const waiterId = await resolveWaiterIdForKot({ prisma: req.prisma || prisma, kot: updatedKot, order: updatedOrder });
-        const tableLabel = updatedKot?.tableNo ? `Table ${updatedKot.tableNo}` : "Takeaway";
+        const waiterId = await resolveWaiterIdForKot({ prisma: db, kot: updatedKot, order: updatedOrder });
+        const tableLabel = kotSection ? `${kotSection} — Table ${kotTableNo}` : (kotTableNo ? `Table ${kotTableNo}` : "Takeaway");
         const orderLabel = updatedOrder?.orderNo ? `Order #${updatedOrder.orderNo}` : (updatedKot?.orderId ? `Order #${updatedKot.orderId}` : "");
         if (waiterId) {
           await createAndDispatchNotification({
-            prisma: req.prisma || prisma,
+            prisma: db,
             realtime: { io, staff },
             recipientType: RECIPIENT_TYPES.USER,
             recipientId: waiterId,
@@ -310,9 +392,10 @@ export const updateStatus = async (req, res) => {
               orderId: updatedKot?.orderId ? Number(updatedKot.orderId) : null,
               orderNo: updatedOrder?.orderNo || (updatedKot?.orderId ? String(updatedKot.orderId) : null),
               kotId: Number(kotId),
-              tableId: updatedKot?.tableId ? Number(updatedKot.tableId) : null,
+              tableId: kotTableId,
+              section: kotSection,
               tableSessionId: updatedKot?.tableSessionId ? Number(updatedKot.tableSessionId) : null,
-              tableNo: updatedKot?.tableNo || null,
+              tableNo: kotTableNo,
               recipientId: waiterId,
             },
           }).catch((e) => console.warn("[kot.controller] KOT served notification error:", e?.message));
@@ -320,7 +403,7 @@ export const updateStatus = async (req, res) => {
 
         // Also dispatch to Restaurant / Owner
         await createAndDispatchNotification({
-          prisma: req.prisma || prisma,
+          prisma: db,
           realtime: { io, staff },
           recipientType: RECIPIENT_TYPES.RESTAURANT,
           recipientId: restaurantId,
@@ -335,9 +418,10 @@ export const updateStatus = async (req, res) => {
             orderId: updatedKot?.orderId ? Number(updatedKot.orderId) : null,
             orderNo: updatedOrder?.orderNo || (updatedKot?.orderId ? String(updatedKot.orderId) : null),
             kotId: Number(kotId),
-            tableId: updatedKot?.tableId ? Number(updatedKot.tableId) : null,
+            tableId: kotTableId,
+            section: kotSection,
             tableSessionId: updatedKot?.tableSessionId ? Number(updatedKot.tableSessionId) : null,
-            tableNo: updatedKot?.tableNo || null,
+            tableNo: kotTableNo,
           },
         }).catch((e) => console.warn("[kot.controller] Restaurant KOT served notification error:", e?.message));
       } catch (notifErr) {
@@ -346,12 +430,13 @@ export const updateStatus = async (req, res) => {
     }
 
     if (updatedOrder) {
-      const orderTableId = updatedKot?.tableId ? Number(updatedKot.tableId) : (updatedOrder.tableId ? Number(updatedOrder.tableId) : (updatedOrder.tableSession?.tableId ? Number(updatedOrder.tableSession.tableId) : null));
+      const orderTableId = kotTableId || (updatedOrder.tableId ? Number(updatedOrder.tableId) : (updatedOrder.tableSession?.tableId ? Number(updatedOrder.tableSession.tableId) : null));
+      const orderTableNo = kotTableNo || updatedOrder.tableNo || null;
       if (staff) {
         staff.to(`restaurant_${restaurantId}`).emit("order:updated", updatedOrder);
         staff.to(`restaurant:${restaurantId}`).emit("order:updated", updatedOrder);
-        if (updatedOrder.tableNo || orderTableId) {
-          const tableUpdatePayload = { restaurantId, id: orderTableId, tableId: orderTableId, tableNo: updatedOrder.tableNo };
+        if (orderTableNo || orderTableId) {
+          const tableUpdatePayload = { restaurantId, id: orderTableId, tableId: orderTableId, tableNo: orderTableNo, section: kotSection };
           staff.to(`restaurant_${restaurantId}`).emit("table:updated", tableUpdatePayload);
           staff.to(`restaurant:${restaurantId}`).emit("table:updated", tableUpdatePayload);
         }
@@ -359,8 +444,8 @@ export const updateStatus = async (req, res) => {
       if (io) {
         io.to(`restaurant_${restaurantId}`).emit("order:updated", updatedOrder);
         io.to(`restaurant:${restaurantId}`).emit("order:updated", updatedOrder);
-        if (updatedOrder.tableNo || orderTableId) {
-          const tableUpdatePayload = { restaurantId, id: orderTableId, tableId: orderTableId, tableNo: updatedOrder.tableNo };
+        if (orderTableNo || orderTableId) {
+          const tableUpdatePayload = { restaurantId, id: orderTableId, tableId: orderTableId, tableNo: orderTableNo, section: kotSection };
           io.to(`restaurant_${restaurantId}`).emit("table:updated", tableUpdatePayload);
           io.to(`restaurant:${restaurantId}`).emit("table:updated", tableUpdatePayload);
         }
@@ -419,6 +504,12 @@ export const updateItemStatus = async (req, res) => {
 
     const updatedItem = (kot?.items || []).find((it) => it.id === itemId);
 
+    const { tableId: kotTableId, tableNo: kotTableNo, section: kotSection } = await resolveKotTableDetails({
+      prisma: db,
+      kot,
+      order,
+    });
+
     // Realtime notification & broadcast (staff + io)
     const io = req.server?.io || req.server?.realtime?.io || req.app?.get?.("io");
     const staff = req.server?.staff || req.server?.realtime?.staff;
@@ -454,7 +545,7 @@ export const updateItemStatus = async (req, res) => {
       try {
         const waiterId = await resolveWaiterIdForKot({ prisma: db, kot, order });
         if (waiterId) {
-          const tableLabel = kot?.tableNo ? `Table ${kot.tableNo}` : "Takeaway";
+          const tableLabel = kotSection ? `${kotSection} — Table ${kotTableNo}` : (kotTableNo ? `Table ${kotTableNo}` : "Takeaway");
           const orderLabel = order?.orderNo ? `Order #${order.orderNo}` : (kot?.orderId ? `Order #${kot.orderId}` : "");
           const title = `Food Ready — ${tableLabel}`;
           const message = `${updatedItem?.itemName || "Food item"} is ready for ${tableLabel}${orderLabel ? ` (${orderLabel})` : ""}.`;
@@ -477,9 +568,10 @@ export const updateItemStatus = async (req, res) => {
               kotId: Number(kotId),
               kotItemId: Number(itemId),
               orderItemId: updatedItem?.orderItemId ? Number(updatedItem.orderItemId) : null,
-              tableId: kot?.tableId ? Number(kot.tableId) : null,
+              tableId: kotTableId,
+              section: kotSection,
               tableSessionId: kot?.tableSessionId ? Number(kot.tableSessionId) : null,
-              tableNo: kot?.tableNo || null,
+              tableNo: kotTableNo,
               recipientId: waiterId,
             },
           }).catch((e) => console.warn("[kot.controller] Item ready notification error:", e?.message));
@@ -496,12 +588,30 @@ export const updateItemStatus = async (req, res) => {
         payload: { kotId, itemId, status: "SERVED", kot, item: updatedItem },
       });
 
+      const foodDeliveredPayload = {
+        itemId: Number(itemId),
+        kotId: Number(kotId),
+        orderId: kot?.orderId ? Number(kot.orderId) : null,
+        tableId: kotTableId,
+        tableNo: kotTableNo,
+        section: kotSection,
+        status: "SERVED",
+      };
+      if (staff) {
+        staff.to(`restaurant_${restaurantId}`).emit("food:delivered", foodDeliveredPayload);
+        staff.to(`restaurant:${restaurantId}`).emit("food:delivered", foodDeliveredPayload);
+      }
+      if (io) {
+        io.to(`restaurant_${restaurantId}`).emit("food:delivered", foodDeliveredPayload);
+        io.to(`restaurant:${restaurantId}`).emit("food:delivered", foodDeliveredPayload);
+      }
+
       // Dispatch persistent notification for server delivery confirmation
       try {
         const waiterId = await resolveWaiterIdForKot({ prisma: db, kot, order });
+        const tableLabel = kotSection ? `${kotSection} — Table ${kotTableNo}` : (kotTableNo ? `Table ${kotTableNo}` : "Takeaway");
+        const orderLabel = order?.orderNo ? `Order #${order.orderNo}` : (kot?.orderId ? `Order #${kot.orderId}` : "");
         if (waiterId) {
-          const tableLabel = kot?.tableNo ? `Table ${kot.tableNo}` : "Takeaway";
-          const orderLabel = order?.orderNo ? `Order #${order.orderNo}` : (kot?.orderId ? `Order #${kot.orderId}` : "");
           await createAndDispatchNotification({
             prisma: db,
             realtime: { io, staff },
@@ -519,8 +629,10 @@ export const updateItemStatus = async (req, res) => {
               orderNo: order?.orderNo || (kot?.orderId ? String(kot.orderId) : null),
               kotId: Number(kotId),
               kotItemId: Number(itemId),
+              tableId: kotTableId,
+              section: kotSection,
               tableSessionId: kot?.tableSessionId ? Number(kot.tableSessionId) : null,
-              tableNo: kot?.tableNo || null,
+              tableNo: kotTableNo,
               recipientId: waiterId,
             },
           }).catch((e) => console.warn("[kot.controller] Item served notification error:", e?.message));
@@ -544,8 +656,10 @@ export const updateItemStatus = async (req, res) => {
             orderNo: order?.orderNo || (kot?.orderId ? String(kot.orderId) : null),
             kotId: Number(kotId),
             kotItemId: Number(itemId),
+            tableId: kotTableId,
+            section: kotSection,
             tableSessionId: kot?.tableSessionId ? Number(kot.tableSessionId) : null,
-            tableNo: kot?.tableNo || null,
+            tableNo: kotTableNo,
           },
         }).catch((e) => console.warn("[kot.controller] Restaurant item served notification error:", e?.message));
       } catch (notifErr) {
@@ -562,12 +676,13 @@ export const updateItemStatus = async (req, res) => {
     });
 
     if (order) {
-      const orderTableId = kot?.tableId ? Number(kot.tableId) : (order.tableId ? Number(order.tableId) : (order.tableSession?.tableId ? Number(order.tableSession.tableId) : null));
+      const orderTableId = kotTableId || (order.tableId ? Number(order.tableId) : (order.tableSession?.tableId ? Number(order.tableSession.tableId) : null));
+      const orderTableNo = kotTableNo || order.tableNo || null;
       if (staff) {
         staff.to(`restaurant_${restaurantId}`).emit("order:updated", order);
         staff.to(`restaurant:${restaurantId}`).emit("order:updated", order);
-        if (order.tableNo || orderTableId) {
-          const tableUpdatePayload = { restaurantId, id: orderTableId, tableId: orderTableId, tableNo: order.tableNo };
+        if (orderTableNo || orderTableId) {
+          const tableUpdatePayload = { restaurantId, id: orderTableId, tableId: orderTableId, tableNo: orderTableNo, section: kotSection };
           staff.to(`restaurant_${restaurantId}`).emit("table:updated", tableUpdatePayload);
           staff.to(`restaurant:${restaurantId}`).emit("table:updated", tableUpdatePayload);
         }
@@ -575,8 +690,8 @@ export const updateItemStatus = async (req, res) => {
       if (io) {
         io.to(`restaurant_${restaurantId}`).emit("order:updated", order);
         io.to(`restaurant:${restaurantId}`).emit("order:updated", order);
-        if (order.tableNo || orderTableId) {
-          const tableUpdatePayload = { restaurantId, id: orderTableId, tableId: orderTableId, tableNo: order.tableNo };
+        if (orderTableNo || orderTableId) {
+          const tableUpdatePayload = { restaurantId, id: orderTableId, tableId: orderTableId, tableNo: orderTableNo, section: kotSection };
           io.to(`restaurant_${restaurantId}`).emit("table:updated", tableUpdatePayload);
           io.to(`restaurant:${restaurantId}`).emit("table:updated", tableUpdatePayload);
         }

@@ -625,6 +625,8 @@ export default function Kitchen() {
         socket.on("kitchen:item_self_picked", handleKitchenAssignmentEvent);
         socket.on("kitchen:item_status_updated", handleKitchenAssignmentEvent);
         socket.on("kitchen:item_status_updated", onKitchenHistoryUpdated);
+        socket.on("kitchen:item_served", onKitchenHistoryUpdated);
+        socket.on("food:delivered", onKitchenHistoryUpdated);
         socket.on("kitchen:item_ready", onKitchenHistoryUpdated);
 
         return () => {
@@ -641,6 +643,8 @@ export default function Kitchen() {
             socket.off("kitchen:item_self_picked", handleKitchenAssignmentEvent);
             socket.off("kitchen:item_status_updated", handleKitchenAssignmentEvent);
             socket.off("kitchen:item_status_updated", onKitchenHistoryUpdated);
+            socket.off("kitchen:item_served", onKitchenHistoryUpdated);
+            socket.off("food:delivered", onKitchenHistoryUpdated);
             socket.off("kitchen:item_ready", onKitchenHistoryUpdated);
         };
     }, [socket, soundMuted, loadWorkload, loadKots, loadHistoryData]);

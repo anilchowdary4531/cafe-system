@@ -1367,6 +1367,7 @@ export default function OwnerLayout() {
         socket.on("new_order", handleNewOrder);
         socket.on("order:updated", loadTableOverview);
         socket.on("order:status_updated", loadTableOverview);
+        socket.on("food:delivered", loadTableOverview);
         socket.on("payment:updated", loadTableOverview);
         socket.on("notification:new", handleNotificationNew);
         socket.on("reservation:updated", loadTableOverview);
@@ -1384,6 +1385,7 @@ export default function OwnerLayout() {
             socket.off("new_order", handleNewOrder);
             socket.off("order:updated", loadTableOverview);
             socket.off("order:status_updated", loadTableOverview);
+            socket.off("food:delivered", loadTableOverview);
             socket.off("payment:updated", loadTableOverview);
             socket.off("notification:new", handleNotificationNew);
             socket.off("reservation:updated", loadTableOverview);

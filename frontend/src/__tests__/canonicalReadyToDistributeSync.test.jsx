@@ -9,6 +9,8 @@ import { RestaurantThemeProvider } from "../context/ThemeContext.jsx";
 import { RestaurantContextProvider } from "../context/RestaurantContext.jsx";
 import { CartProvider } from "../context/CartContext.jsx";
 
+import { api } from "../utils/apiClient.js";
+
 const mockTables = [
     {
         id: 1,
@@ -27,10 +29,27 @@ let mockCanonicalReadyItems = [];
 const mockRefreshCanonicalReady = vi.fn();
 const mockSocketListeners = {};
 
+vi.mock("../utils/apiClient.js", () => {
+    const mockApi = {
+        get: vi.fn().mockResolvedValue({ data: { success: true } }),
+        post: vi.fn().mockResolvedValue({ data: { success: true } }),
+        put: vi.fn().mockResolvedValue({ data: { success: true, ok: true } }),
+        delete: vi.fn().mockResolvedValue({ data: { success: true } }),
+        interceptors: {
+            request: { use: vi.fn() },
+            response: { use: vi.fn() },
+        },
+    };
+    return {
+        api: mockApi,
+        default: mockApi,
+    };
+});
+
 vi.mock("../hooks/useCachedGet", () => ({
     default: (url) => {
         const urlStr = String(url || "");
-        if (urlStr.includes("/kitchen/ready-items") || urlStr.includes("/ready-items")) {
+        if (urlStr.includes("food-runner-items") || urlStr.includes("/kitchen/ready-items") || urlStr.includes("/ready-items")) {
             return {
                 data: {
                     success: true,
@@ -144,13 +163,12 @@ describe("CANONICAL READY-TO-DISTRIBUTE FRONTEND SYNC SUITE", () => {
         );
 
         // Header shows Ready to Distribute with count 1
-        const headerBtn = await screen.findByTitle("Kitchen Pass / Ready to Distribute");
+        const headerBtn = await screen.findByTestId("server-ready-distribute-nav-btn");
         expect(headerBtn).toBeInTheDocument();
-        expect(headerBtn).toHaveTextContent("Ready to Distribute");
         expect(headerBtn).toHaveTextContent("1");
 
-        // Pass / distribution badge shows 1 Item
-        expect(screen.getByText("1 Item")).toBeInTheDocument();
+        // Pass / distribution badge shows 1 Ready Item(s)
+        expect(screen.getByText("1 Ready Item(s)")).toBeInTheDocument();
 
         // Queue card displays the exact canonical item
         expect(screen.getByText("Margherita Pizza")).toBeInTheDocument();
@@ -207,10 +225,9 @@ describe("CANONICAL READY-TO-DISTRIBUTE FRONTEND SYNC SUITE", () => {
         );
 
         // Header shows 2
-        const headerBtn = await screen.findByTitle("Kitchen Pass / Ready to Distribute");
-        expect(headerBtn).toHaveTextContent("Ready to Distribute");
+        const headerBtn = await screen.findByTestId("server-ready-distribute-nav-btn");
         expect(headerBtn).toHaveTextContent("2");
-        expect(screen.getByText("2 Items")).toBeInTheDocument();
+        expect(screen.getByText("2 Ready Item(s)")).toBeInTheDocument();
 
         // Both items rendered in queue
         expect(screen.getByText("Margherita Pizza")).toBeInTheDocument();
@@ -251,7 +268,7 @@ describe("CANONICAL READY-TO-DISTRIBUTE FRONTEND SYNC SUITE", () => {
             </MemoryRouter>
         );
 
-        const headerBtn = await screen.findByTitle("Kitchen Pass / Ready to Distribute");
+        const headerBtn = await screen.findByTestId("server-ready-distribute-nav-btn");
         expect(headerBtn).toHaveTextContent("1");
         expect(screen.getByText("Margherita Pizza")).toBeInTheDocument();
         expect(screen.queryByText("Cold Brew Coffee")).not.toBeInTheDocument();
@@ -295,9 +312,8 @@ describe("CANONICAL READY-TO-DISTRIBUTE FRONTEND SYNC SUITE", () => {
         fireEvent.click(markServedBtn);
 
         await waitFor(() => {
-            expect(axios.put).toHaveBeenCalledWith(
-                expect.stringContaining("/kitchen/items/304/status"),
-                { status: "SERVED" }
+            expect(api.put).toHaveBeenCalledWith(
+                expect.stringContaining("/api/v1/staff/food-runner-items/304/delivered")
             );
         });
     });
