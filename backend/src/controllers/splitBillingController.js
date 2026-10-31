@@ -110,6 +110,7 @@ export async function recordPaymentController(req, reply) {
       const effectiveRid = restaurantId;
       const clearPayload = {
         restaurantId: effectiveRid,
+        id: result.session?.tableId,
         tableId: result.session?.tableId,
         tableNo: result.session?.tableNo,
         assignedWaiterId: null,

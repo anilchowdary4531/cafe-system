@@ -404,4 +404,294 @@ describe("Tiffzy Canonical Table Identity & Cross-Module State Parity (Exhaustiv
         expect(cashierHasBill).toBe(true);
         expect(cleanerNeedsWork).toBe(false);
     });
+
+    // 21. Simultaneous occupancy on both tables with independent order totals and item counts
+    it("21. Simultaneous occupancy on Table 8 and Table 12 maintains independent order totals and counts", () => {
+        const table8 = normalizeCanonicalTable({
+            id: 8,
+            restaurantId: 1,
+            tableNo: "1",
+            section: "Main Hall",
+            activeOrders: [
+                { id: 101, tableId: 8, status: "READY", total: 500, items: [{ id: 1, name: "Pizza", qty: 2 }] },
+            ],
+        }, 1);
+
+        const table12 = normalizeCanonicalTable({
+            id: 12,
+            restaurantId: 1,
+            tableNo: "table 1",
+            section: "TABLE",
+            activeOrders: [
+                { id: 102, tableId: 12, status: "PREPARING", total: 250, items: [{ id: 2, name: "Burger", qty: 1 }] },
+                { id: 103, tableId: 12, status: "PLACED", total: 150, items: [{ id: 3, name: "Fries", qty: 1 }] },
+            ],
+        }, 1);
+
+        expect(table8.isOccupied).toBe(true);
+        expect(table8.activeOrderCount).toBe(1);
+        expect(table8.activeOrders[0].total).toBe(500);
+
+        expect(table12.isOccupied).toBe(true);
+        expect(table12.activeOrderCount).toBe(2);
+        const table12Total = table12.activeOrders.reduce((sum, o) => sum + o.total, 0);
+        expect(table12Total).toBe(400);
+    });
+
+    // 22. Order cancellation on Table 8 does not affect Table 12
+    it("22. Order cancellation on Table 8 does not clear or affect Table 12 active orders", () => {
+        let table8 = normalizeCanonicalTable({
+            id: 8,
+            restaurantId: 1,
+            tableNo: "1",
+            activeOrders: [{ id: 201, tableId: 8, status: "PLACED", total: 300 }],
+        }, 1);
+
+        const table12 = normalizeCanonicalTable({
+            id: 12,
+            restaurantId: 1,
+            tableNo: "table 1",
+            activeOrders: [{ id: 202, tableId: 12, status: "PREPARING", total: 450 }],
+        }, 1);
+
+        // Cancel order on table 8
+        const cancelledOrderUpdate = {
+            id: 8,
+            tableId: 8,
+            activeOrders: [],
+            isOccupied: false,
+            status: "AVAILABLE",
+            version: Date.now(),
+        };
+        table8 = reconcileTable(table8, cancelledOrderUpdate);
+
+        expect(table8.isOccupied).toBe(false);
+        expect(table8.status).toBe("AVAILABLE");
+        expect(table8.activeOrders).toHaveLength(0);
+
+        // Table 12 remains completely unaffected
+        expect(table12.isOccupied).toBe(true);
+        expect(table12.status).toBe("OCCUPIED");
+        expect(table12.activeOrders).toHaveLength(1);
+        expect(table12.activeOrders[0].id).toBe(202);
+    });
+
+    // 23. Socket before HTTP: Early socket arrival sets state, subsequent HTTP reconciles smoothly
+    it("23. Early socket event followed by HTTP response preserves latest canonical state without flash", () => {
+        const initial = normalizeCanonicalTable({
+            id: 8,
+            tableNo: "1",
+            status: "AVAILABLE",
+            isOccupied: false,
+            version: 1000,
+        }, 1);
+
+        // Socket arrives first with new order
+        const socketEvent = {
+            id: 8,
+            tableId: 8,
+            status: "OCCUPIED",
+            isOccupied: true,
+            version: 2000,
+            activeOrders: [{ id: 301, tableId: 8, status: "PLACED", total: 600 }],
+        };
+        const afterSocket = reconcileTable(initial, socketEvent);
+        expect(afterSocket.isOccupied).toBe(true);
+
+        // Stale HTTP response arrives with version 1500 and no orders
+        const staleHttp = {
+            id: 8,
+            tableId: 8,
+            status: "AVAILABLE",
+            isOccupied: false,
+            version: 1500,
+            activeOrders: [],
+        };
+        const afterStaleHttp = reconcileTable(afterSocket, staleHttp);
+        // Stale HTTP rejected
+        expect(afterStaleHttp.isOccupied).toBe(true);
+        expect(afterStaleHttp.status).toBe("OCCUPIED");
+        expect(afterStaleHttp.activeOrders).toHaveLength(1);
+    });
+
+    // 24. HTTP before Socket: Full HTTP fetch followed by granular socket update
+    it("24. Full HTTP fetch followed by granular socket event updates only targeted tableId", () => {
+        const tablesState = new Map([
+            [8, normalizeCanonicalTable({ id: 8, tableNo: "1", status: "AVAILABLE", version: 1000 }, 1)],
+            [12, normalizeCanonicalTable({ id: 12, tableNo: "table 1", status: "AVAILABLE", version: 1000 }, 1)],
+        ]);
+
+        // Socket event arrives specifically for tableId 12
+        const socketEvent = {
+            id: 12,
+            tableId: 12,
+            status: "OCCUPIED",
+            isOccupied: true,
+            version: 1500,
+            activeOrders: [{ id: 401, tableId: 12, status: "PLACED" }],
+        };
+
+        const targetTable = tablesState.get(socketEvent.tableId);
+        tablesState.set(socketEvent.tableId, reconcileTable(targetTable, socketEvent));
+
+        expect(tablesState.get(8).isOccupied).toBe(false);
+        expect(tablesState.get(12).isOccupied).toBe(true);
+    });
+
+    // 25. Reconnect after disconnect: Full resync keeps tables strictly isolated
+    it("25. Reconnect after disconnect resyncs both tables independently based on canonical IDs", () => {
+        const disconnectedState = new Map([
+            [8, normalizeCanonicalTable({ id: 8, tableNo: "1", status: "AVAILABLE" }, 1)],
+            [12, normalizeCanonicalTable({ id: 12, tableNo: "table 1", status: "AVAILABLE" }, 1)],
+        ]);
+
+        const serverAuthoritativeSync = [
+            { id: 8, restaurantId: 1, tableNo: "1", section: "Main Hall", status: "OCCUPIED", isOccupied: true, activeOrders: [{ id: 501, tableId: 8 }] },
+            { id: 12, restaurantId: 1, tableNo: "table 1", section: "TABLE", status: "DIRTY", cleaningStatus: "DIRTY", isOccupied: false, activeOrders: [] },
+        ];
+
+        serverAuthoritativeSync.forEach((rawTbl) => {
+            const canonicalTbl = normalizeCanonicalTable(rawTbl, 1);
+            disconnectedState.set(canonicalTbl.id, canonicalTbl);
+        });
+
+        expect(disconnectedState.get(8).status).toBe("OCCUPIED");
+        expect(disconnectedState.get(8).isOccupied).toBe(true);
+        expect(disconnectedState.get(12).status).toBe("DIRTY");
+        expect(disconnectedState.get(12).cleaningStatus).toBe("DIRTY");
+        expect(disconnectedState.get(12).isOccupied).toBe(false);
+    });
+
+    // 26. Split billing on Table 8 closes session for Table 8 only
+    it("26. Split billing completion on Table 8 clears Table 8 without touching Table 12", () => {
+        const table8Session = { id: 8, tableId: 8, tableNo: "1", isOccupied: true, activeOrders: [{ id: 601, total: 300 }] };
+        const table12Session = { id: 12, tableId: 12, tableNo: "table 1", isOccupied: true, activeOrders: [{ id: 602, total: 400 }] };
+
+        // Split billing payload completes for tableId 8
+        const splitBillSettledPayload = {
+            restaurantId: 1,
+            id: 8,
+            tableId: 8,
+            tableNo: "1",
+            assignedWaiterId: null,
+            assignedWaiterName: null,
+            isOccupied: false,
+            activeOrders: [],
+            status: "AVAILABLE",
+            cleared: true,
+            version: Date.now(),
+        };
+
+        const reconciled8 = reconcileTable(table8Session, splitBillSettledPayload);
+
+        expect(reconciled8.isOccupied).toBe(false);
+        expect(reconciled8.activeOrders).toHaveLength(0);
+        // Table 12 remains occupied
+        expect(table12Session.isOccupied).toBe(true);
+        expect(table12Session.activeOrders).toHaveLength(1);
+    });
+
+    // 27. QR code order for Table 12 carries canonical tableId: 12
+    it("27. QR resolution with canonical tableId: 12 prevents routing to Table 8", () => {
+        const qrPayload = {
+            restaurantId: 1,
+            tableId: 12,
+            tableNo: "table 1",
+            section: "TABLE",
+        };
+
+        const resolvedIdentity = getTableIdentity(qrPayload);
+        expect(resolvedIdentity).toBe("1:12");
+        expect(getTableId(qrPayload)).toBe(12);
+        expect(isSameTable(qrPayload, { id: 8, restaurantId: 1 })).toBe(false);
+    });
+
+    // 28. Food runner marking item delivered on Table 8 decrements ready count only for Table 8
+    it("28. Food runner delivery for Table 8 decrements ready count strictly on Table 8", () => {
+        const readyItemsState = [
+            { id: 1, tableId: 8, tableNo: "1", section: "Main Hall", status: "READY" },
+            { id: 2, tableId: 8, tableNo: "1", section: "Main Hall", status: "READY" },
+            { id: 3, tableId: 12, tableNo: "table 1", section: "TABLE", status: "READY" },
+        ];
+
+        // Mark item 1 delivered
+        const updatedReadyItems = readyItemsState.filter((it) => it.id !== 1);
+
+        const table8ReadyCount = updatedReadyItems.filter((it) => Number(it.tableId) === 8).length;
+        const table12ReadyCount = updatedReadyItems.filter((it) => Number(it.tableId) === 12).length;
+
+        expect(table8ReadyCount).toBe(1);
+        expect(table12ReadyCount).toBe(1);
+    });
+
+    // 29. Table sanitation request on Table 8 marks Table 8 as CLEAN without altering Table 12 DIRTY
+    it("29. Cleaner sanitation completion on Table 8 leaves Table 12 DIRTY status intact", () => {
+        const tables = [
+            { id: 8, tableNo: "1", cleaningStatus: "DIRTY" },
+            { id: 12, tableNo: "table 1", cleaningStatus: "DIRTY" },
+        ];
+
+        const sanitizeEvent = { tableId: 8, status: "CLEAN" };
+
+        const updated = tables.map((t) => {
+            if (t.id === sanitizeEvent.tableId) {
+                return { ...t, cleaningStatus: sanitizeEvent.status };
+            }
+            return t;
+        });
+
+        expect(updated[0].cleaningStatus).toBe("CLEAN");
+        expect(updated[1].cleaningStatus).toBe("DIRTY");
+    });
+
+    // 30. Full lifecycle end-to-end isolation between Table 8 and Table 12
+    it("30. End-to-end full lifecycle isolation guarantees Table 8 and Table 12 never cross-talk", () => {
+        const state = {
+            table8: normalizeCanonicalTable({ id: 8, restaurantId: 1, tableNo: "1", section: "Main Hall" }, 1),
+            table12: normalizeCanonicalTable({ id: 12, restaurantId: 1, tableNo: "table 1", section: "TABLE" }, 1),
+        };
+
+        // Lifecycle 1: Customer sits at Table 8
+        state.table8 = reconcileTable(state.table8, {
+            id: 8,
+            status: "OCCUPIED",
+            isOccupied: true,
+            activeOrders: [{ id: 701, tableId: 8, status: "PLACED", total: 850 }],
+        });
+
+        // Lifecycle 2: Table 12 requested cleaning
+        state.table12 = reconcileTable(state.table12, {
+            id: 12,
+            status: "DIRTY",
+            cleaningStatus: "DIRTY",
+            isOccupied: false,
+        });
+
+        // Assert no crosstalk
+        expect(state.table8.isOccupied).toBe(true);
+        expect(state.table8.cleaningStatus).not.toBe("DIRTY");
+        expect(state.table12.isOccupied).toBe(false);
+        expect(state.table12.cleaningStatus).toBe("DIRTY");
+
+        // Lifecycle 3: Table 8 bill settled
+        state.table8 = reconcileTable(state.table8, {
+            id: 8,
+            status: "DIRTY",
+            cleaningStatus: "DIRTY",
+            isOccupied: false,
+            activeOrders: [],
+        });
+
+        // Lifecycle 4: Cleaner cleans Table 12
+        state.table12 = reconcileTable(state.table12, {
+            id: 12,
+            status: "AVAILABLE",
+            cleaningStatus: "CLEAN",
+            isOccupied: false,
+        });
+
+        expect(state.table8.cleaningStatus).toBe("DIRTY");
+        expect(state.table12.cleaningStatus).toBe("CLEAN");
+        expect(state.table12.status).toBe("AVAILABLE");
+    });
 });

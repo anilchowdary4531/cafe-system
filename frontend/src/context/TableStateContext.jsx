@@ -200,12 +200,16 @@ export function reconcileTable(current, incoming) {
     const isExplicitRelease =
         !hasIncomingAssignment &&
         !incomingHasOrders &&
-        !currentHasOrders &&
         Boolean(
-            (incoming.status === "AVAILABLE" && incoming.isOccupied === false) ||
-            incoming.session?.status === "CLOSED" ||
-            incoming.activeSession?.status === "CLOSED" ||
-            incoming.sessionStatus === "CLOSED"
+            incoming.cleared === true ||
+            incoming.orderCancelled === true ||
+            (!currentHasOrders && (
+                (incoming.status === "AVAILABLE" && incoming.isOccupied === false) ||
+                incoming.session?.status === "CLOSED" ||
+                incoming.activeSession?.status === "CLOSED" ||
+                incoming.sessionStatus === "CLOSED"
+            )) ||
+            (incomingVer >= currentVer && !incoming.session && incoming.isOccupied === false && incoming.status === "AVAILABLE")
         );
 
     // Preserve authoritative metadata from current when incoming lacks it
@@ -261,9 +265,20 @@ export function reconcileTable(current, incoming) {
     const resolvedWaiterName = incoming.assignedWaiterName !== undefined ? incoming.assignedWaiterName : current.assignedWaiterName;
     const resolvedServer = incoming.assignedServer !== undefined ? incoming.assignedServer : (incoming.assignedWaiterName !== undefined ? incoming.assignedWaiterName : current.assignedServer);
 
-    const resolvedActiveOrders = incomingHasOrders
-        ? incoming.activeOrders
-        : (currentHasOrders ? current.activeOrders : (Array.isArray(incoming.activeOrders) ? incoming.activeOrders : current.activeOrders || []));
+    let resolvedActiveOrders;
+    if (incomingHasOrders) {
+        resolvedActiveOrders = incoming.activeOrders;
+    } else if (Array.isArray(incoming.activeOrders)) {
+        if (incoming.cleared || incoming.orderCancelled || (incomingVer >= currentVer && !incoming.session && (incoming.isOccupied === false || incoming.status === "AVAILABLE" || incoming.status === "DIRTY"))) {
+            resolvedActiveOrders = [];
+        } else if (currentHasOrders) {
+            resolvedActiveOrders = current.activeOrders;
+        } else {
+            resolvedActiveOrders = [];
+        }
+    } else {
+        resolvedActiveOrders = current.activeOrders || [];
+    }
     const finalHasOrders = Array.isArray(resolvedActiveOrders) && resolvedActiveOrders.length > 0;
     const resolvedIsOccupied = finalHasOrders
         ? true

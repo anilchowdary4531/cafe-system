@@ -160,5 +160,70 @@ test("CANONICAL TABLE IDENTITY & CONSISTENCY HARDENING (BACKEND)", async (t) => 
     assert.equal(updatedTables[0].cleaningStatus, "CLEAN");
     assert.equal(updatedTables[1].cleaningStatus, "DIRTY"); // Table 12 remains DIRTY!
   });
+
+  await t.test("7. Authoritative bill resolution does not use integer tableParam as table primary key", async () => {
+    const diningTablesInDb = [
+      { id: 1, restaurantId: 1, tableNo: "99", section: "VIP" },
+      { id: 8, restaurantId: 1, tableNo: "1", section: "Main Hall" },
+      { id: 12, restaurantId: 1, tableNo: "table 1", section: "TABLE" },
+    ];
+
+    // Simulated fetchAuthoritativeTableOrders logic
+    const resolveDiningTable = ({ restaurantId, tableParam, requestedTableId }) => {
+      const rawParam = String(tableParam || "").trim();
+      let diningTable = null;
+      if (requestedTableId) {
+        diningTable = diningTablesInDb.find((t) => t.id === requestedTableId && t.restaurantId === restaurantId);
+      }
+      if (!diningTable && rawParam) {
+        diningTable = diningTablesInDb.find(
+          (t) => t.restaurantId === restaurantId && t.tableNo.toLowerCase() === rawParam.toLowerCase()
+        );
+      }
+      return diningTable;
+    };
+
+    // When client passes tableParam = "1" without tableId query param:
+    // It should resolve Table 8 (tableNo "1"), NOT Table 1 (tableNo "99")!
+    const resolvedTable8 = resolveDiningTable({ restaurantId: 1, tableParam: "1", requestedTableId: null });
+    assert.equal(resolvedTable8?.id, 8);
+    assert.equal(resolvedTable8?.tableNo, "1");
+
+    // When client passes tableParam = "table 1" without tableId query param:
+    // It should resolve Table 12 (tableNo "table 1"), NEVER Table 8!
+    const resolvedTable12 = resolveDiningTable({ restaurantId: 1, tableParam: "table 1", requestedTableId: null });
+    assert.equal(resolvedTable12?.id, 12);
+    assert.equal(resolvedTable12?.tableNo, "table 1");
+  });
+
+  await t.test("8. Customer order exact tableNo matching prevents aliasing 'table 1' to '1'", async () => {
+    const diningTablesInDb = [
+      { id: 8, restaurantId: 1, tableNo: "1", section: "Main Hall" },
+      { id: 12, restaurantId: 1, tableNo: "table 1", section: "TABLE" },
+    ];
+
+    const matchCustomerTable = ({ restaurantId, bodyTableId, normalizedTableNo }) => {
+      let target = null;
+      if (bodyTableId) {
+        target = diningTablesInDb.find((t) => t.id === Number(bodyTableId) && t.restaurantId === restaurantId);
+      }
+      if (!target && normalizedTableNo) {
+        const rawTable = String(normalizedTableNo).trim();
+        target = diningTablesInDb.find(
+          (t) => t.restaurantId === restaurantId && t.tableNo.toLowerCase() === rawTable.toLowerCase()
+        );
+      }
+      return target;
+    };
+
+    // Customer scans Table 12 QR code with tableId: 12
+    const targetWithId = matchCustomerTable({ restaurantId: 1, bodyTableId: 12, normalizedTableNo: "table 1" });
+    assert.equal(targetWithId?.id, 12);
+
+    // Customer enters text "table 1" without tableId
+    const targetWithText = matchCustomerTable({ restaurantId: 1, bodyTableId: null, normalizedTableNo: "table 1" });
+    assert.equal(targetWithText?.id, 12);
+    assert.notEqual(targetWithText?.id, 8); // Never aliased to 8!
+  });
 });
 

@@ -576,30 +576,11 @@ export default async function customerRoutes(app, deps = {}) {
       if (!targetDiningTable && normalizedTableNo) {
         const rawTable = String(normalizedTableNo).trim();
         targetDiningTable = await prisma.diningTable.findFirst({
-          where: { restaurantId: restaurant.id, tableNo: rawTable },
+          where: {
+            restaurantId: restaurant.id,
+            tableNo: { equals: rawTable, mode: "insensitive" },
+          },
         });
-
-        if (!targetDiningTable) {
-          const strippedTable = rawTable.replace(/^(table|tbl)[-\s]*/i, "");
-          const possibleTableNos = Array.from(new Set([
-            rawTable,
-            strippedTable,
-            `Table ${strippedTable}`,
-            `Table-${strippedTable}`,
-            `Table ${rawTable}`,
-          ].filter(Boolean)));
-
-          targetDiningTable = await prisma.diningTable.findFirst({
-            where: {
-              restaurantId: restaurant.id,
-              OR: [
-                { tableNo: { in: possibleTableNos, mode: "insensitive" } },
-                ...(Number.isInteger(Number(rawTable)) ? [{ id: Number(rawTable) }] : []),
-                ...(Number.isInteger(Number(strippedTable)) ? [{ id: Number(strippedTable) }] : []),
-              ],
-            },
-          });
-        }
       }
 
       if (targetDiningTable) {

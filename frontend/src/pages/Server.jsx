@@ -930,6 +930,7 @@ export default function Server() {
         socket.on("kot:status_updated", handleRealtimeUpdate);
         socket.on("kot:item_updated", handleRealtimeUpdate);
         socket.on("kitchen:item_ready", handleRealtimeUpdate);
+        socket.on("kitchen:item_served", handleRealtimeUpdate);
         socket.on("food:delivered", handleRealtimeUpdate);
         socket.on("kitchen:item_status_updated", handleRealtimeUpdate);
         socket.on("order:updated", handleRealtimeUpdate);
@@ -950,6 +951,7 @@ export default function Server() {
             socket.off("kot:status_updated", handleRealtimeUpdate);
             socket.off("kot:item_updated", handleRealtimeUpdate);
             socket.off("kitchen:item_ready", handleRealtimeUpdate);
+            socket.off("kitchen:item_served", handleRealtimeUpdate);
             socket.off("food:delivered", handleRealtimeUpdate);
             socket.off("kitchen:item_status_updated", handleRealtimeUpdate);
             socket.off("order:updated", handleRealtimeUpdate);

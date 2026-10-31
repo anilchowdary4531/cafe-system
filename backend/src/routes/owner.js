@@ -3887,14 +3887,6 @@ export default async function ownerRoutes(app, deps = {}) {
   const fetchAuthoritativeTableOrders = async ({ prisma, restaurantId, tableParam, requestedTableId }) => {
     const activeStatuses = ["PLACED", "ACCEPTED", "PREPARING", "READY"];
     const rawParam = String(tableParam || "").trim();
-    const strippedNumber = rawParam.replace(/^(table|tbl)[-\s]*/i, "");
-    const possibleTableNos = Array.from(new Set([
-      rawParam,
-      strippedNumber,
-      `Table ${strippedNumber}`,
-      `Table-${strippedNumber}`,
-      `Table ${rawParam}`,
-    ].filter(Boolean)));
 
     let diningTable = null;
     if (requestedTableId) {
@@ -3910,22 +3902,6 @@ export default async function ownerRoutes(app, deps = {}) {
         },
       });
     }
-    if (!diningTable) {
-      diningTable = await prisma.diningTable.findFirst({
-        where: {
-          restaurantId,
-          tableNo: { in: possibleTableNos, mode: "insensitive" },
-        },
-      });
-    }
-    if (!diningTable && Number.isInteger(Number(rawParam))) {
-      diningTable = await prisma.diningTable.findFirst({
-        where: {
-          restaurantId,
-          id: Number(rawParam),
-        },
-      });
-    }
 
     const effectiveTableNo = diningTable?.tableNo || tableParam;
     const orderWhereOr = [];
@@ -3937,8 +3913,8 @@ export default async function ownerRoutes(app, deps = {}) {
       if (duplicateTables <= 1) {
         orderWhereOr.push({ tableSessionId: null, tableNo: diningTable.tableNo });
       }
-    } else {
-      orderWhereOr.push({ tableNo: { in: possibleTableNos, mode: "insensitive" } });
+    } else if (rawParam) {
+      orderWhereOr.push({ tableNo: rawParam });
     }
 
     const activeOrders = await prisma.order.findMany({
@@ -4024,8 +4000,6 @@ export default async function ownerRoutes(app, deps = {}) {
 
       const requestedTableId = req.query?.tableId
         ? Number(req.query.tableId)
-        : Number.isInteger(Number(tableParam))
-        ? Number(tableParam)
         : null;
 
       const { diningTable, effectiveTableNo, activeOrders, authoritativeTotal } =
@@ -4075,9 +4049,7 @@ export default async function ownerRoutes(app, deps = {}) {
 
       const requestedTableId = req.body?.tableId
         ? Number(req.body.tableId)
-        : Number.isInteger(Number(tableParam))
-        ? Number(tableParam)
-        : null;
+        : (req.query?.tableId ? Number(req.query.tableId) : null);
 
       const { diningTable, effectiveTableNo, activeOrders, authoritativeTotal } =
         await fetchAuthoritativeTableOrders({
