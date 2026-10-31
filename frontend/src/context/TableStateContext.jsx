@@ -61,36 +61,44 @@ export function normalizeCanonicalTable(raw, defaultRestaurantId = null, tableGr
 
     const isDirty = raw.cleaningStatus === "DIRTY" || raw.status === "DIRTY";
     const cleaningStatus = isDirty ? "DIRTY" : (raw.cleaningStatus || "CLEAN");
+    const isBlocked = Boolean(raw.isBlocked);
 
-    const isExplicitlyFree =
-        !isDirty && (
+    // Active in-flight orders are ALWAYS authoritative
+    const hasActiveOrders = Array.isArray(raw.activeOrders) && raw.activeOrders.length > 0;
+    const hasActiveSession = Boolean(
+        (raw.activeSession && !["CLOSED", "CANCELLED"].includes(String(raw.activeSession.status).toUpperCase())) ||
+        (raw.session && !["CLOSED", "CANCELLED"].includes(String(raw.session.status).toUpperCase()))
+    );
+
+    // Canonical Occupancy Rule:
+    // If table has active in-flight orders or an active session, it is strictly OCCUPIED.
+    const isOccupied = !isBlocked && !isDirty && (hasActiveOrders || hasActiveSession || (raw.isOccupied === true && !String(raw.status || "").includes("AVAILABLE")));
+
+    // A table is ONLY explicitly free if it has NO active orders, NO active session, and is not dirty/blocked
+    const isExplicitlyFree = !isBlocked && !isDirty && !hasActiveOrders && !hasActiveSession && (
         raw.status === "AVAILABLE" ||
         raw.isOccupied === false ||
         raw.session?.status === "CLOSED" ||
         raw.activeSession?.status === "CLOSED" ||
-        raw.sessionStatus === "CLOSED");
+        raw.sessionStatus === "CLOSED"
+    );
 
-    const isBlocked = Boolean(raw.isBlocked);
-    const isReserved = !isBlocked && !raw.isOccupied && Boolean(raw.activeReservation || raw.isReserved);
+    const isReserved = !isBlocked && !isOccupied && !isDirty && Boolean(raw.activeReservation || raw.isReserved);
 
-    let canonicalStatus = hasStatus ? String(raw.status).toUpperCase() : undefined;
+    let canonicalStatus = "AVAILABLE";
     if (isBlocked) {
         canonicalStatus = "BLOCKED";
-    } else if (isDirty && !raw.isOccupied) {
+    } else if (isDirty) {
         canonicalStatus = "DIRTY";
-    } else if (canonicalStatus === undefined && isExplicitlyFree) {
-        canonicalStatus = isReserved ? "RESERVED" : "AVAILABLE";
-    } else if (raw.isOccupied) {
+    } else if (isOccupied) {
         canonicalStatus = raw.activeOrderStatus === "PAYMENT_PENDING"
             ? "PAYMENT_PENDING"
-            : raw.activeSession?.status === "BILLING" || raw.session?.status === "BILLING"
+            : (raw.activeSession?.status === "BILLING" || raw.session?.status === "BILLING")
             ? "BILLING"
-            : "OCCUPIED";
+            : (hasStatus && raw.status !== "AVAILABLE" && raw.status !== "DIRTY" ? String(raw.status).toUpperCase() : "OCCUPIED");
+    } else if (isReserved) {
+        canonicalStatus = "RESERVED";
     }
-
-    const isOccupied = hasOccupancy
-        ? Boolean(raw.isOccupied)
-        : (canonicalStatus ? (!isExplicitlyFree && (canonicalStatus === "OCCUPIED" || canonicalStatus === "PAYMENT_PENDING" || canonicalStatus === "BILLING")) : undefined);
 
     // Canonical Server Assignment
     let assignedWaiterId = raw.assignedWaiterId !== undefined
@@ -101,10 +109,10 @@ export function normalizeCanonicalTable(raw, defaultRestaurantId = null, tableGr
         ? raw.assignedWaiterName
         : (raw.assignedServer !== undefined ? raw.assignedServer : (raw.assignedServerName !== undefined ? raw.assignedServerName : (raw.activeSession?.waiterName || undefined)));
 
-    const activeOrders = Array.isArray(raw.activeOrders) ? raw.activeOrders : (isExplicitlyFree ? [] : undefined);
-    const activeOrderCount = raw.activeOrderCount !== undefined ? Number(raw.activeOrderCount) : (activeOrders ? activeOrders.length : (isExplicitlyFree ? 0 : undefined));
+    const activeOrders = hasActiveOrders ? raw.activeOrders : (isExplicitlyFree ? [] : (Array.isArray(raw.activeOrders) ? raw.activeOrders : []));
+    const activeOrderCount = hasActiveOrders ? raw.activeOrders.length : (isExplicitlyFree ? 0 : (raw.activeOrderCount !== undefined ? Number(raw.activeOrderCount) : (activeOrders ? activeOrders.length : 0)));
     const activeItemCount = raw.activeItemCount !== undefined ? Number(raw.activeItemCount) : (isExplicitlyFree ? 0 : undefined);
-    const activeOrderStatus = raw.activeOrderStatus !== undefined ? raw.activeOrderStatus : (isExplicitlyFree ? null : undefined);
+    const activeOrderStatus = hasActiveOrders ? (raw.activeOrderStatus || raw.activeOrders[0]?.status || null) : (isExplicitlyFree ? null : (raw.activeOrderStatus || null));
     const paymentStatus = isExplicitlyFree ? null : (activeOrderStatus === "PAYMENT_PENDING" ? "PENDING" : raw.paymentStatus);
 
     const version = Number(raw.version || (raw.updatedAt ? new Date(raw.updatedAt).getTime() : Date.now()));
@@ -157,12 +165,12 @@ export function normalizeCanonicalTable(raw, defaultRestaurantId = null, tableGr
         normalized.session = { status: "CLOSED" };
         normalized.activeSession = null;
         normalized.occupiedSince = null;
-    } else if (raw.sessionId || raw.session || raw.activeSession) {
+    } else if (raw.sessionId || raw.session || raw.activeSession || hasActiveOrders) {
         normalized.sessionId = raw.sessionId || raw.session?.id || raw.activeSession?.id || null;
-        normalized.sessionStatus = raw.session?.status || raw.activeSession?.status || raw.sessionStatus || "OPEN";
-        normalized.session = raw.session || raw.activeSession || null;
-        normalized.activeSession = raw.activeSession || raw.session || null;
-        normalized.occupiedSince = raw.occupiedSince || raw.activeSession?.openedAt || null;
+        normalized.sessionStatus = raw.session?.status || raw.activeSession?.status || raw.sessionStatus || (isOccupied ? "OPEN" : "CLOSED");
+        normalized.session = raw.session || raw.activeSession || (isOccupied ? { status: "OPEN" } : null);
+        normalized.activeSession = raw.activeSession || raw.session || (isOccupied ? { status: "OPEN" } : null);
+        normalized.occupiedSince = raw.occupiedSince || raw.activeSession?.openedAt || (hasActiveOrders ? raw.activeOrders[0]?.createdAt : null);
     }
 
     return normalized;
@@ -178,15 +186,19 @@ export function reconcileTable(current, incoming) {
     const currentVer = Number(current.version || (current.updatedAt ? new Date(current.updatedAt).getTime() : 0));
     const incomingVer = Number(incoming.version || (incoming.updatedAt ? new Date(incoming.updatedAt).getTime() : 0));
 
+    const incomingHasOrders = Array.isArray(incoming.activeOrders) && incoming.activeOrders.length > 0;
+
     // Stale HTTP/Socket Response Rejection:
-    // If incoming is strictly older than current, reject the stale update!
-    if (incomingVer > 0 && currentVer > 0 && incomingVer < currentVer) {
+    // Only reject if incoming is strictly older, incoming does NOT carry active in-flight orders,
+    // and neither occupancy nor cleaning status has changed authoritatively.
+    if (incomingVer > 0 && currentVer > 0 && incomingVer < currentVer && !incomingHasOrders && incoming.isOccupied === current.isOccupied) {
         return current;
     }
 
     const hasIncomingAssignment = incoming.assignedWaiterId !== undefined || incoming.assignedWaiterName !== undefined || incoming.assignedServer !== undefined;
     const isExplicitRelease =
         !hasIncomingAssignment &&
+        !incomingHasOrders &&
         Boolean(
             (incoming.status === "AVAILABLE" && incoming.isOccupied === false) ||
             incoming.session?.status === "CLOSED" ||
@@ -386,8 +398,9 @@ export function TableStateProvider({ children }) {
         setTablesMap((prev) => {
             const next = new Map(prev);
             incomingList.forEach((raw) => {
+                const effectiveVer = Math.max(Number(raw.version || 0), responseTimestamp);
                 const normalized = normalizeCanonicalTable(
-                    { ...raw, version: raw.version || responseTimestamp },
+                    { ...raw, version: effectiveVer },
                     restaurantId,
                     tableGroups,
                     groupCatalog
@@ -487,38 +500,43 @@ export function TableStateProvider({ children }) {
             if (rid && rid !== restaurantId) return;
 
             const isClosed = payload.status === "CLOSED" || payload.status === "CANCELLED";
-            const tid = Number(payload.tableId || 0);
+            const tid = Number(payload.tableId || payload.id || 0);
 
             if (tid) {
                 if (isClosed) {
-                    upsertTable({
-                        tableId: tid,
-                        id: tid,
-                        status: "AVAILABLE",
-                        isOccupied: false,
-                        session: { status: "CLOSED" },
-                        activeSession: null,
-                        sessionStatus: "CLOSED",
-                        activeOrders: [],
-                        activeOrderCount: 0,
-                        activeOrderStatus: null,
-                        paymentStatus: null,
-                        assignedServer: null,
-                        assignedServerId: null,
-                        assignedServerName: null,
-                        assignedWaiterId: null,
-                        assignedWaiterName: null,
-                        version: Date.now(),
-                    });
+                    const existing = tablesMapRef.current.get(tid);
+                    const hasActiveOrders = Array.isArray(existing?.activeOrders) && existing.activeOrders.length > 0;
+                    if (!hasActiveOrders) {
+                        upsertTable({
+                            tableId: tid,
+                            id: tid,
+                            status: "AVAILABLE",
+                            isOccupied: false,
+                            session: { status: "CLOSED" },
+                            activeSession: null,
+                            sessionStatus: "CLOSED",
+                            activeOrders: [],
+                            activeOrderCount: 0,
+                            activeOrderStatus: null,
+                            paymentStatus: null,
+                            assignedServer: null,
+                            assignedServerId: null,
+                            assignedServerName: null,
+                            assignedWaiterId: null,
+                            assignedWaiterName: null,
+                            version: Date.now(),
+                        });
+                    }
                 } else {
                     upsertTable({
                         tableId: tid,
                         id: tid,
                         isOccupied: true,
+                        status: "OCCUPIED",
                         session: payload,
                         activeSession: payload,
-                        sessionId: payload.id,
-                        sessionStatus: payload.status,
+                        sessionId: payload.sessionId || payload.id || null,
+                        sessionStatus: payload.status || "OPEN",
                         version: Date.now(),
                     });
                 }

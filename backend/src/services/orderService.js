@@ -358,6 +358,10 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
       });
       if (existingSession?.tableId) {
         dTable = { id: existingSession.tableId, tableNo: existingSession.tableNo };
+        await tx.diningTable.update({
+          where: { id: existingSession.tableId },
+          data: { updatedAt: new Date() },
+        }).catch(() => {});
       }
     } else if (body.tableId || tableNo) {
       dTable = body.tableId
@@ -403,6 +407,12 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
           });
         }
         inputTableSessionId = activeSession.id;
+
+        // Authoritative version bump on order creation
+        await tx.diningTable.update({
+          where: { id: dTable.id },
+          data: { updatedAt: new Date() },
+        }).catch(() => {});
       }
     }
 
@@ -710,9 +720,22 @@ export const updateOrderStatus = async ({ prisma, actor, orderId, nextStatus, no
           where: { id: updated.tableSessionId },
           data: sessionUpdateData,
         });
+
+        // Authoritative version bump on order status change
+        if (updated.tableSession?.tableId) {
+          await tx.diningTable.update({
+            where: { id: updated.tableSession.tableId },
+            data: { updatedAt: new Date() },
+          }).catch(() => {});
+        }
       } catch (sessErr) {
         console.warn("[updateOrderStatus] TableSession sync warning:", sessErr?.message);
       }
+    } else if (updated.tableId) {
+      await tx.diningTable.update({
+        where: { id: Number(updated.tableId) },
+        data: { updatedAt: new Date() },
+      }).catch(() => {});
     }
 
     // Trigger Notification for Customer on Order Status Change

@@ -94,6 +94,12 @@ export const getOrCreateActiveSession = async ({
           },
         },
       });
+
+      // Authoritative DiningTable version bump on session creation
+      await tx.diningTable.update({
+        where: { id: tid },
+        data: { updatedAt: new Date() },
+      }).catch(() => {});
     }
 
     return session;
@@ -269,6 +275,13 @@ export const addOrderToTableSession = async ({
   // 3. Recalculate table session running totals
   const updatedSession = await recalculateSessionTotals({ prisma, sessionId: session.id });
 
+  if (session.tableId) {
+    await prisma.diningTable.update({
+      where: { id: session.tableId },
+      data: { updatedAt: new Date() },
+    }).catch(() => {});
+  }
+
   return {
     order,
     session: updatedSession,
@@ -296,6 +309,13 @@ export const generateSessionBill = async ({ prisma, sessionId, discountAmount = 
       discountAmount: Number(discountAmount || 0),
     },
   });
+
+  if (session.tableId) {
+    await prisma.diningTable.update({
+      where: { id: session.tableId },
+      data: { updatedAt: new Date() },
+    }).catch(() => {});
+  }
 
   return recalculateSessionTotals({ prisma, sessionId: sid });
 };
@@ -436,6 +456,7 @@ export const closeTableSession = async ({
       data: {
         assignedWaiterId: null,
         assignedWaiterName: null,
+        updatedAt: new Date(),
       },
     }).catch((err) => console.warn("[TableSession] Error clearing waiter on close:", err?.message));
   }
@@ -710,6 +731,7 @@ export const completeSessionAndReleaseTable = async ({
           assignedWaiterId: null,
           assignedWaiterName: null,
           cleaningStatus: cleanerExists ? "DIRTY" : "CLEAN",
+          updatedAt: new Date(),
         },
       }).catch(() => {});
     } else if (session.tableNo) {

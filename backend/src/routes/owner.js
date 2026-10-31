@@ -440,15 +440,36 @@ export default async function ownerRoutes(app, deps = {}) {
         const io = req.server?.io || realtime?.io;
         const staff = req.server?.staff || realtime?.staff;
         const orderTableId = order.tableId ? Number(order.tableId) : (req.body?.tableId ? Number(req.body.tableId) : null);
+        const tableUpdatePayload = {
+          restaurantId,
+          tableId: orderTableId,
+          id: orderTableId,
+          tableNo: order.tableNo,
+          isOccupied: true,
+          status: "OCCUPIED",
+          activeOrderCount: 1,
+          version: Date.now(),
+        };
+        const sessionUpdatePayload = {
+          restaurantId,
+          tableId: orderTableId,
+          id: orderTableId,
+          tableNo: order.tableNo,
+          sessionId: order.tableSessionId ? Number(order.tableSessionId) : null,
+          status: "OPEN",
+          isOccupied: true,
+          version: Date.now(),
+        };
         if (io) {
           io.to(`restaurant_${restaurantId}`).emit("new_order", order);
           io.to(`restaurant:${restaurantId}`).emit("new_order", order);
           io.to(`restaurant_${restaurantId}`).emit("order_created", { order, source: order.orderSource || "POS" });
           io.to(`restaurant:${restaurantId}`).emit("order_created", { order, source: order.orderSource || "POS" });
-          if (order.tableNo) {
-            io.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo, tableId: orderTableId });
-            io.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo, tableId: orderTableId });
-            io.to(`restaurant_${restaurantId}`).emit("table:session_updated", { restaurantId, tableNo: order.tableNo, tableId: orderTableId });
+          if (orderTableId || order.tableNo) {
+            io.to(`restaurant_${restaurantId}`).emit("table:updated", tableUpdatePayload);
+            io.to(`restaurant:${restaurantId}`).emit("table:updated", tableUpdatePayload);
+            io.to(`restaurant_${restaurantId}`).emit("table:session_updated", sessionUpdatePayload);
+            io.to(`restaurant:${restaurantId}`).emit("table:session_updated", sessionUpdatePayload);
           }
         }
         if (staff) {
@@ -458,10 +479,11 @@ export default async function ownerRoutes(app, deps = {}) {
           staff.to(`restaurant:${restaurantId}`).emit("order_created", { order, source: order.orderSource || "POS" });
           staff.to(`restaurant_${restaurantId}`).emit("order:created", { order, source: order.orderSource || "POS" });
           staff.to(`restaurant:${restaurantId}`).emit("order:created", { order, source: order.orderSource || "POS" });
-          if (order.tableNo) {
-            staff.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo, tableId: orderTableId });
-            staff.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo, tableId: orderTableId });
-            staff.to(`restaurant_${restaurantId}`).emit("table:session_updated", { restaurantId, tableNo: order.tableNo, tableId: orderTableId });
+          if (orderTableId || order.tableNo) {
+            staff.to(`restaurant_${restaurantId}`).emit("table:updated", tableUpdatePayload);
+            staff.to(`restaurant:${restaurantId}`).emit("table:updated", tableUpdatePayload);
+            staff.to(`restaurant_${restaurantId}`).emit("table:session_updated", sessionUpdatePayload);
+            staff.to(`restaurant:${restaurantId}`).emit("table:session_updated", sessionUpdatePayload);
           }
         }
 
@@ -1260,7 +1282,13 @@ export default async function ownerRoutes(app, deps = {}) {
             assignedServer: resolvedWaiterName,
             assignedServerId: resolvedWaiterId,
             assignedServerName: resolvedWaiterName,
-            version: Number(table.updatedAt ? new Date(table.updatedAt).getTime() : Date.now()),
+            version: Math.max(
+              Number(table.updatedAt ? new Date(table.updatedAt).getTime() : 0),
+              Number(activeSession?.openedAt ? new Date(activeSession.openedAt).getTime() : 0),
+              Number(tableActiveOrders[0]?.createdAt ? new Date(tableActiveOrders[0].createdAt).getTime() : 0),
+              Number(tableActiveOrders[0]?.updatedAt ? new Date(tableActiveOrders[0].updatedAt).getTime() : 0),
+              Date.now() - 5000
+            ),
             updatedAt: table.updatedAt ? new Date(table.updatedAt).toISOString() : new Date().toISOString(),
             occupiedSince: activeSession?.openedAt || tableActiveOrders[0]?.createdAt || null,
             activeOrderCount: tableActiveOrders.length,
@@ -3895,7 +3923,12 @@ export default async function ownerRoutes(app, deps = {}) {
     const orderWhereOr = [];
     if (diningTable) {
       orderWhereOr.push({ tableSession: { tableId: diningTable.id } });
-      orderWhereOr.push({ tableSessionId: null, tableNo: diningTable.tableNo });
+      const duplicateTables = await prisma.diningTable.count({
+        where: { restaurantId, tableNo: diningTable.tableNo },
+      });
+      if (duplicateTables <= 1) {
+        orderWhereOr.push({ tableSessionId: null, tableNo: diningTable.tableNo });
+      }
     } else {
       orderWhereOr.push({ tableNo: { in: possibleTableNos, mode: "insensitive" } });
     }

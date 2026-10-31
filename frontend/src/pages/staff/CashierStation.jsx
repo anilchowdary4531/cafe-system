@@ -630,9 +630,14 @@ export default function CashierStation() {
     const tableStripData = useMemo(() => {
         const canonicalList = Array.isArray(tables) ? tables : [];
         return canonicalList.map((t) => {
+            const tid = Number(t.id);
             const tNo = String(t.tableNo || t.label || "").trim();
-            // Match with an active unpaid order
-            const activeOrder = orders.find((o) => String(o.tableNo || "").trim() === tNo);
+            // Match with an active unpaid order using canonical tableId first
+            const activeOrder = orders.find((o) => {
+                const oTid = Number(o.tableId || o.tableSession?.tableId || 0);
+                if (tid && oTid) return oTid === tid;
+                return !oTid && String(o.tableNo || "").trim() === tNo;
+            });
             const status = t.canonicalStatus || (t.isOccupied ? "OCCUPIED" : "AVAILABLE");
             const billTotal = activeOrder ? getAuthoritativeTotal(activeOrder) : Number(t.sessionTotal || 0);
             return {

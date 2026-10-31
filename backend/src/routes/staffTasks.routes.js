@@ -765,6 +765,18 @@ export default async function staffTaskRoutes(app, deps = {}) {
         return reply.code(404).send({ message: "Item not found in this restaurant" });
       }
 
+      // Idempotency: If item is already SERVED or DELIVERED, treat as successful idempotent operation
+      if (existing.status === "SERVED" || existing.status === "DELIVERED") {
+        return reply.send({
+          success: true,
+          ok: true,
+          message: `Item already marked ${existing.status}`,
+          item: existing,
+          kot: existing.kot,
+          alreadyServed: true,
+        });
+      }
+
       if (existing.status !== "READY") {
         return reply.code(400).send({
           success: false,
@@ -874,6 +886,13 @@ export default async function staffTaskRoutes(app, deps = {}) {
               select: { waiterId: true },
             });
             if (sess?.waiterId) waiterId = Number(sess.waiterId);
+          }
+          if (!waiterId && kotTableId && rid) {
+            const dt = await prisma.diningTable.findUnique({
+              where: { id: Number(kotTableId) },
+              select: { assignedWaiterId: true },
+            });
+            if (dt?.assignedWaiterId) waiterId = Number(dt.assignedWaiterId);
           }
           if (!waiterId && updatedItem.kot?.tableNo && rid) {
             const dt = await prisma.diningTable.findFirst({

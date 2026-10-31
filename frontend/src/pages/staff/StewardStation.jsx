@@ -36,6 +36,7 @@ export default function StewardStation() {
     const [refreshing, setRefreshing] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [unreadCount, setUnreadCount] = useState(0);
+    const [deliveringItemIds, setDeliveringItemIds] = useState({});
 
     const restaurantId = Number(
         user?.restaurantId ||
@@ -172,6 +173,8 @@ export default function StewardStation() {
     };
 
     const handleDeliverFood = async (itemId, tableNo) => {
+        if (!itemId || deliveringItemIds[itemId]) return;
+        setDeliveringItemIds((prev) => ({ ...prev, [itemId]: true }));
         try {
             await axios.put(
                 `${API}/api/v1/staff/food-runner-items/${itemId}/delivered`,
@@ -185,7 +188,18 @@ export default function StewardStation() {
             });
             fetchFoodRunnerItems();
         } catch (err) {
-            showToast({ title: "Error", message: "Failed to mark item delivered", variant: "error" });
+            if (err.response?.data?.alreadyServed || err.response?.data?.code === "item_already_served") {
+                showToast({
+                    title: "Already Delivered",
+                    message: `Order already served to Table ${tableNo || ""}.`,
+                    variant: "success",
+                });
+                fetchFoodRunnerItems();
+            } else {
+                showToast({ title: "Error", message: err.response?.data?.message || "Failed to mark item delivered", variant: "error" });
+            }
+        } finally {
+            setDeliveringItemIds((prev) => ({ ...prev, [itemId]: false }));
         }
     };
 
@@ -374,11 +388,14 @@ export default function StewardStation() {
 
                                         <button
                                             type="button"
+                                            disabled={Boolean(deliveringItemIds[item.id])}
                                             onClick={() => handleDeliverFood(item.id, item.kot?.tableNo)}
-                                            className="w-full py-2.5 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white font-semibold text-xs sm:text-sm transition flex items-center justify-center gap-2 min-h-[42px] shadow-xs cursor-pointer active:scale-[0.99]"
+                                            className={`w-full py-2.5 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white font-semibold text-xs sm:text-sm transition flex items-center justify-center gap-2 min-h-[42px] shadow-xs cursor-pointer active:scale-[0.99] ${
+                                                deliveringItemIds[item.id] ? "opacity-60 cursor-not-allowed" : ""
+                                            }`}
                                         >
                                             <Check className="w-4 h-4 shrink-0" />
-                                            <span>Deliver to Table {item.kot?.tableNo}</span>
+                                            <span>{deliveringItemIds[item.id] ? "Delivering..." : `Deliver to Table ${item.kot?.tableNo}`}</span>
                                         </button>
                                     </div>
                                 ))}

@@ -517,9 +517,20 @@ export default function Server() {
                 };
             }
 
-            // If canonical backend status is AVAILABLE, not occupied, or closed session:
-            // Ensure no stale occupied/order/payment/server fields leak through
-            const isExplicitlyFree = t.status === "AVAILABLE" || t.isOccupied === false || t.session?.status === "CLOSED" || t.activeSession?.status === "CLOSED";
+            // Active in-flight orders or active session ALWAYS mean OCCUPIED
+            const hasActiveOrders = Array.isArray(t.activeOrders) && t.activeOrders.length > 0;
+            const hasActiveSession = Boolean(
+                (t.activeSession && !["CLOSED", "CANCELLED"].includes(String(t.activeSession.status).toUpperCase())) ||
+                (t.session && !["CLOSED", "CANCELLED"].includes(String(t.session.status).toUpperCase()))
+            );
+
+            // A table is ONLY explicitly free if it has NO active orders and NO active session
+            const isExplicitlyFree = !hasActiveOrders && !hasActiveSession && (
+                t.status === "AVAILABLE" ||
+                t.isOccupied === false ||
+                t.session?.status === "CLOSED" ||
+                t.activeSession?.status === "CLOSED"
+            );
             if (isExplicitlyFree) {
                 return {
                     ...t,
@@ -1065,6 +1076,8 @@ export default function Server() {
     const handleMarkItemServed = async (item) => {
         if (!item) return;
         const itemId = Number(item.kotItemId || item.id);
+        if (itemId && distributingItemIds[itemId]) return; // Prevent double-trigger
+
         if (itemId) {
             setDistributingItemIds((prev) => ({ ...prev, [itemId]: true }));
             setRealtimeRemovedItemIds((prev) => {
@@ -1089,7 +1102,10 @@ export default function Server() {
                 try {
                     await api.put(`/api/v1/staff/food-runner-items/${itemId}/delivered`);
                 } catch (runnerErr) {
-                    if (item.kotId) {
+                    // If backend responded that it was already served, treat as idempotent success
+                    if (runnerErr?.response?.data?.alreadyServed || runnerErr?.response?.data?.code === "item_already_served") {
+                        // success idempotent
+                    } else if (item.kotId) {
                         await api.put(`/owner/${restaurantId}/kitchen/items/${itemId}/status`, {
                             status: "SERVED",
                         });
@@ -1268,7 +1284,7 @@ export default function Server() {
                 setViewMode("FLOOR_PLAN");
                 setSelectedTable(null);
                 setSearchParams({}, { replace: true });
-                refreshTables();
+                combinedRefreshTables?.({ force: true });
             }
         } catch (err) {
             showToast({ title: "Order Error", message: err.message || "Failed to send KOT.", variant: "error" });
@@ -1781,9 +1797,12 @@ export default function Server() {
                                             <button
                                                 type="button"
                                                 onClick={() => handleMarkItemServed(item)}
-                                                className="flex-1 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs shadow-xs active:scale-95 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                                                disabled={Boolean(distributingItemIds[item.kotItemId || item.id])}
+                                                className={`flex-1 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs shadow-xs active:scale-95 transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                                                    distributingItemIds[item.kotItemId || item.id] ? "opacity-60 cursor-not-allowed" : ""
+                                                }`}
                                             >
-                                                <Check className="h-3.5 w-3.5 stroke-[3]" /> Served / Distributed
+                                                <Check className="h-3.5 w-3.5 stroke-[3]" /> {distributingItemIds[item.kotItemId || item.id] ? "Serving..." : "Served / Distributed"}
                                             </button>
                                         </div>
                                     </div>
@@ -1864,9 +1883,19 @@ export default function Server() {
                             {filteredTables.map((table) => {
                                 const isBlocked = Boolean(table.isBlocked);
                                 const isDirty = table.cleaningStatus === "DIRTY" || table.status === "DIRTY";
-                                const isExplicitlyFree = !isDirty && (table.status === "AVAILABLE" || table.isOccupied === false || table.session?.status === "CLOSED" || table.activeSession?.status === "CLOSED");
-                                const hasPendingPayment = !isBlocked && !isExplicitlyFree && !isDirty && isTablePaymentPending(table);
-                                const isOccupied = !isBlocked && !isExplicitlyFree && !isDirty && Boolean(table.isOccupied || hasPendingPayment || table.status === "OCCUPIED" || (Array.isArray(table.activeOrders) && table.activeOrders.length > 0));
+                                const hasActiveOrders = Array.isArray(table.activeOrders) && table.activeOrders.length > 0;
+                                const hasActiveSession = Boolean(
+                                    (table.activeSession && !["CLOSED", "CANCELLED"].includes(String(table.activeSession.status).toUpperCase())) ||
+                                    (table.session && !["CLOSED", "CANCELLED"].includes(String(table.session.status).toUpperCase()))
+                                );
+                                const isExplicitlyFree = !hasActiveOrders && !hasActiveSession && !isDirty && (
+                                    table.status === "AVAILABLE" ||
+                                    table.isOccupied === false ||
+                                    table.session?.status === "CLOSED" ||
+                                    table.activeSession?.status === "CLOSED"
+                                );
+                                const hasPendingPayment = !isBlocked && !isDirty && isTablePaymentPending(table);
+                                const isOccupied = !isBlocked && !isDirty && (hasActiveOrders || hasActiveSession || (!isExplicitlyFree && Boolean(table.isOccupied || hasPendingPayment || table.status === "OCCUPIED")));
                                 const isReserved = !isBlocked && !isOccupied && !isDirty && Boolean(table.isReserved || table.activeReservation);
 
                                 return (
@@ -2187,12 +2216,24 @@ export default function Server() {
                         {/* Ready Food Alert Banner for Selected Table */}
                         {(() => {
                             if (!selectedTable) return null;
+                            const tId = Number(selectedTable.id);
                             const tRaw = String(selectedTable.tableNo || "").trim();
                             const tNorm = normalizeTableKey(tRaw);
                             const tableReadyItems = readyItemsToDistribute.filter((it) => {
+                                // 1. Canonical tableId match first
+                                const itTid = Number(it.tableId || it.order?.tableId || it.kot?.tableId || 0);
+                                if (tId && itTid) {
+                                    return itTid === tId;
+                                }
+                                // 2. Fallback only if no tableId exists on item: match tableNo scoped to same section
                                 const itRaw = String(it.tableNo || "").trim();
                                 const itNorm = normalizeTableKey(itRaw);
-                                return itRaw === tRaw || (tNorm && itNorm === tNorm);
+                                const sameNo = itRaw === tRaw || (tNorm && itNorm === tNorm);
+                                if (!sameNo) return false;
+                                if (it.section && selectedTable.section) {
+                                    return String(it.section).trim().toLowerCase() === String(selectedTable.section).trim().toLowerCase();
+                                }
+                                return true;
                             });
                             if (tableReadyItems.length === 0) return null;
                             return (
@@ -2219,12 +2260,19 @@ export default function Server() {
                                     </div>
                                     <button
                                         type="button"
+                                        disabled={tableReadyItems.some((it) => distributingItemIds[it.kotItemId || it.id])}
                                         onClick={async () => {
                                             for (const it of tableReadyItems) {
-                                                await handleMarkItemServed(it);
+                                                const itId = Number(it.kotItemId || it.id);
+                                                if (itId && distributingItemIds[itId]) continue;
+                                                try {
+                                                    await handleMarkItemServed(it);
+                                                } catch (err) {
+                                                    console.warn("[Server] Batch distribute error:", err);
+                                                }
                                             }
                                         }}
-                                        className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95 transition"
+                                        className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95 transition disabled:opacity-60 disabled:cursor-not-allowed"
                                     >
                                         <Check className="h-3.5 w-3.5 stroke-[3]" /> Served / Distributed
                                     </button>
