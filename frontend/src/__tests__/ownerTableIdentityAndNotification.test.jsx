@@ -337,5 +337,119 @@ describe("Owner Panel — Strict Table Identity and Server Isolation", () => {
         expect(tableB.assignedWaiterName).toBeNull();
         expect(tableB.occupiedSince).toBeNull();
     });
+
+    it("8. Table Cleaning Isolation: Table 1 (Main Hall, id:1 = DIRTY) vs Table 1 (Section TABLE, id:2 = CLEAN)", () => {
+        const rawTables = [
+            {
+                id: 1,
+                tableNo: "1",
+                section: "Main Hall",
+                status: "DIRTY",
+                cleaningStatus: "DIRTY",
+                isOccupied: false,
+                activeOrders: [],
+                activeSession: null,
+            },
+            {
+                id: 2,
+                tableNo: "table 1",
+                section: "TABLE",
+                status: "AVAILABLE",
+                cleaningStatus: "CLEAN",
+                isOccupied: false,
+                activeOrders: [],
+                activeSession: null,
+            },
+        ];
+
+        const normalized = normalizeTableRows(rawTables);
+        const table1 = normalized.find((t) => t.id === 1);
+        const table2 = normalized.find((t) => t.id === 2);
+
+        expect(table1.cleaningStatus).toBe("DIRTY");
+        expect(table1.status).toBe("DIRTY");
+
+        expect(table2.cleaningStatus).toBe("CLEAN");
+        expect(table2.status).toBe("AVAILABLE");
+    });
+
+    it("9. Reverse Table Cleaning Isolation: Table 1 (Main Hall, id:1 = CLEAN) vs Table 1 (Section TABLE, id:2 = DIRTY)", () => {
+        const rawTables = [
+            {
+                id: 1,
+                tableNo: "1",
+                section: "Main Hall",
+                status: "AVAILABLE",
+                cleaningStatus: "CLEAN",
+                isOccupied: false,
+                activeOrders: [],
+                activeSession: null,
+            },
+            {
+                id: 2,
+                tableNo: "table 1",
+                section: "TABLE",
+                status: "DIRTY",
+                cleaningStatus: "DIRTY",
+                isOccupied: false,
+                activeOrders: [],
+                activeSession: null,
+            },
+        ];
+
+        const normalized = normalizeTableRows(rawTables);
+        const table1 = normalized.find((t) => t.id === 1);
+        const table2 = normalized.find((t) => t.id === 2);
+
+        expect(table1.cleaningStatus).toBe("CLEAN");
+        expect(table1.status).toBe("AVAILABLE");
+
+        expect(table2.cleaningStatus).toBe("DIRTY");
+        expect(table2.status).toBe("DIRTY");
+    });
+
+    it("10. Realtime table:updated with cleaningStatus: DIRTY targets strictly by tableId", () => {
+        const tables = [
+            { id: 1, tableNo: "1", status: "AVAILABLE", cleaningStatus: "CLEAN", isOccupied: false },
+            { id: 2, tableNo: "table 1", status: "AVAILABLE", cleaningStatus: "CLEAN", isOccupied: false },
+        ];
+
+        const payload = {
+            tableId: 1,
+            tableNo: "1",
+            status: "DIRTY",
+            cleaningStatus: "DIRTY",
+            isOccupied: false,
+        };
+
+        const targetId = payload.tableId;
+        const targetNo = payload.tableNo;
+        const isDirty = payload.cleaningStatus === "DIRTY" || payload.status === "DIRTY";
+
+        const updated = tables.map((t) => {
+            const match = targetId
+                ? String(t.id) === String(targetId)
+                : Boolean(targetNo && String(t.tableNo).trim() === String(targetNo).trim());
+            if (match) {
+                return {
+                    ...t,
+                    status: isDirty ? "DIRTY" : "AVAILABLE",
+                    cleaningStatus: isDirty ? "DIRTY" : "CLEAN",
+                    isOccupied: false,
+                };
+            }
+            return t;
+        });
+
+        // Table 1 becomes DIRTY
+        expect(updated[0].id).toBe(1);
+        expect(updated[0].status).toBe("DIRTY");
+        expect(updated[0].cleaningStatus).toBe("DIRTY");
+
+        // Table 2 MUST remain AVAILABLE and CLEAN
+        expect(updated[1].id).toBe(2);
+        expect(updated[1].status).toBe("AVAILABLE");
+        expect(updated[1].cleaningStatus).toBe("CLEAN");
+    });
 });
 

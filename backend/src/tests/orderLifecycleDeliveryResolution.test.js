@@ -78,7 +78,7 @@ function createSimulatedSocketServer() {
 }
 
 test("TIFFZY ORDER LIFECYCLE DELIVERY & NOTIFICATION RESOLUTION SUITE", async (t) => {
-  const ts = Date.now();
+  const ts = `${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
   const simulated = createSimulatedSocketServer();
 
   // 1. Setup Test Restaurant

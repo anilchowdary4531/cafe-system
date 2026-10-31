@@ -1538,20 +1538,14 @@ export default async function ownerRoutes(app, deps = {}) {
         });
       }
 
-      // Execute session closure, order updates, waiter unassignment, and audit log atomically in a transaction
+      // Execute session closure, order updates, waiter unassignment, cleaning task completion, and audit log atomically in a transaction
+      // STRICT CANONICAL ISOLATION: Never use fuzzy tableNo aliasing. All mutations are keyed strictly to table.id.
       const updatedTable = await prisma.$transaction(async (tx) => {
-        const rawNo = String(table.tableNo || "").trim();
-        const strippedNo = rawNo.replace(/^(table|tbl)[-\s]*/i, "");
-        const candidates = Array.from(new Set([rawNo, strippedNo, `Table ${strippedNo}`].filter(Boolean)));
-
-        // Find all active sessions for this table to get their session IDs
+        // Find all active sessions for this table strictly by table.id
         const sessionsToClose = await tx.tableSession.findMany({
           where: {
             restaurantId: effectiveRid,
-            OR: [
-              { tableId: table.id },
-              { tableNo: { in: candidates, mode: "insensitive" } },
-            ],
+            tableId: table.id,
             status: { in: ["OPEN", "BILLING", "PAID"] },
           },
           select: { id: true },
@@ -1559,14 +1553,11 @@ export default async function ownerRoutes(app, deps = {}) {
 
         const activeSessionIds = sessionsToClose.map((s) => s.id);
 
-        // Always close all active table sessions matching tableId OR tableNo candidates
+        // Always close active table sessions strictly matching tableId
         await tx.tableSession.updateMany({
           where: {
             restaurantId: effectiveRid,
-            OR: [
-              { tableId: table.id },
-              { tableNo: { in: candidates, mode: "insensitive" } },
-            ],
+            tableId: table.id,
             status: { in: ["OPEN", "BILLING", "PAID"] },
           },
           data: {
@@ -1575,36 +1566,48 @@ export default async function ownerRoutes(app, deps = {}) {
           },
         });
 
-        // Mark open prep/active orders for this table as DELIVERED
-        // Note: Order model uses tableNo and tableSessionId (not tableId)
-        const orderWhereOr = [{ tableNo: { in: candidates, mode: "insensitive" } }];
+        // Mark open prep/active orders for this table as DELIVERED strictly by active session IDs
         if (activeSessionIds.length > 0) {
-          orderWhereOr.push({ tableSessionId: { in: activeSessionIds } });
+          await tx.order.updateMany({
+            where: {
+              restaurantId: effectiveRid,
+              tableSessionId: { in: activeSessionIds },
+              status: { in: ["PLACED", "ACCEPTED", "PREPARING", "READY", "OPEN", "BILLING"] },
+            },
+            data: {
+              status: "DELIVERED",
+            },
+          });
         }
 
-        await tx.order.updateMany({
-          where: {
-            restaurantId: effectiveRid,
-            OR: orderWhereOr,
-            status: { in: ["PLACED", "ACCEPTED", "PREPARING", "READY", "OPEN", "BILLING"] },
-          },
+        // Freeing a table resets it to CLEAN and AVAILABLE, and clears the assigned server
+        // unless explicitly requested to preserve it via clearWaiter: false
+        const shouldClearWaiter = req.body?.clearWaiter !== false;
+        const updated = await tx.diningTable.update({
+          where: { id: table.id },
           data: {
-            status: "DELIVERED",
+            assignedWaiterId: shouldClearWaiter ? null : table.assignedWaiterId,
+            assignedWaiterName: shouldClearWaiter ? null : table.assignedWaiterName,
+            cleaningStatus: "CLEAN",
           },
         });
 
-        // Freeing a table automatically clears the assigned server (setting assignedWaiterId and assignedWaiterName to null)
-        // unless explicitly requested to preserve it via clearWaiter: false
-        const shouldClearWaiter = req.body?.clearWaiter !== false;
-        const updated = shouldClearWaiter
-          ? await tx.diningTable.update({
-              where: { id: table.id },
-              data: {
-                assignedWaiterId: null,
-                assignedWaiterName: null,
-              },
-            })
-          : table;
+        // Complete any pending cleaning tasks for this table
+        if (tx.staffTask) {
+          await tx.staffTask.updateMany({
+            where: {
+              restaurantId: effectiveRid,
+              tableId: table.id,
+              category: "CLEANING",
+              isCompleted: false,
+            },
+            data: {
+              status: "COMPLETED",
+              isCompleted: true,
+              completedAt: new Date(),
+            },
+          }).catch(() => {});
+        }
 
         // Record Audit Log in TableOperationLog
         try {
@@ -1645,6 +1648,7 @@ export default async function ownerRoutes(app, deps = {}) {
           tableNo: table.tableNo,
           isOccupied: false,
           status: "AVAILABLE",
+          cleaningStatus: "CLEAN",
           assignedWaiterId: updatedTable?.assignedWaiterId || null,
           assignedWaiterName: updatedTable?.assignedWaiterName || null,
           assignedServer: updatedTable?.assignedWaiterName || null,
@@ -3857,18 +3861,12 @@ export default async function ownerRoutes(app, deps = {}) {
     }
 
     const effectiveTableNo = diningTable?.tableNo || tableParam;
-    const targetTableNos = diningTable
-      ? Array.from(new Set([
-          diningTable.tableNo,
-          String(diningTable.tableNo).replace(/^(table|tbl)[-\s]*/i, ""),
-          `Table ${String(diningTable.tableNo).replace(/^(table|tbl)[-\s]*/i, "")}`,
-          `Table-${String(diningTable.tableNo).replace(/^(table|tbl)[-\s]*/i, "")}`,
-        ].filter(Boolean)))
-      : possibleTableNos;
-
-    const orderWhereOr = [{ tableNo: { in: targetTableNos, mode: "insensitive" } }];
+    const orderWhereOr = [];
     if (diningTable) {
       orderWhereOr.push({ tableSession: { tableId: diningTable.id } });
+      orderWhereOr.push({ tableSessionId: null, tableNo: diningTable.tableNo });
+    } else {
+      orderWhereOr.push({ tableNo: { in: possibleTableNos, mode: "insensitive" } });
     }
 
     const activeOrders = await prisma.order.findMany({

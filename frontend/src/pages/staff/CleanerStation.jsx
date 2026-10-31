@@ -543,7 +543,7 @@ export default function CleanerStation() {
                                                 </span>
                                                 {task.table?.tableNo && (
                                                     <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#F97316] text-white shrink-0">
-                                                        Table {task.table.tableNo}
+                                                        Table {task.table.tableNo}{task.table?.section ? ` (${task.table.section})` : ""}
                                                     </span>
                                                 )}
                                                 {task.priority === "HIGH" || task.priority === "URGENT" ? (
@@ -612,7 +612,7 @@ export default function CleanerStation() {
                                                 </span>
                                                 {task.table?.tableNo && (
                                                     <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#F97316] text-white shrink-0">
-                                                        Table {task.table.tableNo}
+                                                        Table {task.table.tableNo}{task.table?.section ? ` (${task.table.section})` : ""}
                                                     </span>
                                                 )}
                                             </div>
@@ -681,7 +681,7 @@ export default function CleanerStation() {
                                             <CheckCircle2 className="w-5 h-5 text-[#059669] shrink-0 mt-0.5 sm:mt-0" />
                                             <div className="min-w-0">
                                                 <div className="font-bold text-sm text-[#171717] break-words">
-                                                    {task.table?.tableNo ? `Table ${task.table.tableNo}` : task.title}
+                                                    {task.table?.tableNo ? `Table ${task.table.tableNo}${task.table?.section ? ` (${task.table.section})` : ""}` : task.title}
                                                 </div>
                                                 <div className="text-xs text-[#78716C] flex items-center gap-1.5 flex-wrap">
                                                     <span>Cleaned by {task.assignedUser?.name || "Staff"}</span>

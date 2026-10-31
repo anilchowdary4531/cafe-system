@@ -497,12 +497,10 @@ export const completeSessionAndReleaseTable = async ({
         } else if (orderRecord?.tableNo && (restaurantId || orderRecord?.restaurantId)) {
           const effectiveRid = restaurantId ? Number(restaurantId) : orderRecord.restaurantId;
           const rawNo = String(orderRecord.tableNo || "").trim();
-          const stripped = rawNo.replace(/^(table|tbl)[-\s]*/i, "");
-          const candidates = [rawNo, stripped, `Table ${stripped}`].filter(Boolean);
           const foundSession = await prisma.tableSession.findFirst({
             where: {
               restaurantId: effectiveRid,
-              tableNo: { in: candidates, mode: "insensitive" },
+              tableNo: rawNo,
               status: { in: ACTIVE_STATUSES },
             },
             select: { id: true },
@@ -518,12 +516,10 @@ export const completeSessionAndReleaseTable = async ({
     // C. Check by tableNo if provided
     if (!sid && tableNo && restaurantId) {
       const rawNo = String(tableNo || "").trim();
-      const stripped = rawNo.replace(/^(table|tbl)[-\s]*/i, "");
-      const candidates = [rawNo, stripped, `Table ${stripped}`].filter(Boolean);
       const foundSession = await prisma.tableSession.findFirst({
         where: {
           restaurantId: Number(restaurantId),
-          tableNo: { in: candidates, mode: "insensitive" },
+          tableNo: rawNo,
           status: { in: ACTIVE_STATUSES },
         },
         select: { id: true },
@@ -538,17 +534,9 @@ export const completeSessionAndReleaseTable = async ({
   if (!sid) {
     if (tableId) {
       const tid = Number(tableId);
-      const rawNo = String(tableNo || "").trim();
-      const strippedNo = rawNo.replace(/^(table|tbl)[-\s]*/i, "");
-      const candidates = Array.from(new Set([rawNo, strippedNo, `Table ${strippedNo}`].filter(Boolean)));
-
-      await prisma.diningTable.updateMany({
-        where: {
-          OR: [
-            { id: tid },
-            ...(restaurantId && candidates.length ? [{ restaurantId: Number(restaurantId), tableNo: { in: candidates, mode: "insensitive" } }] : []),
-          ],
-        },
+      // STRICT CANONICAL ISOLATION: Update ONLY the specific table by id.
+      await prisma.diningTable.update({
+        where: { id: tid },
         data: {
           assignedWaiterId: null,
           assignedWaiterName: null,
@@ -712,23 +700,36 @@ export const completeSessionAndReleaseTable = async ({
     }
 
     // Clear waiter assignment from table and set cleaning status based on cleaner availability
-    const rawNo = String(session.tableNo || "").trim();
-    const strippedNo = rawNo.replace(/^(table|tbl)[-\s]*/i, "");
-    const candidates = Array.from(new Set([rawNo, strippedNo, `Table ${strippedNo}`].filter(Boolean)));
-    await tx.diningTable.updateMany({
-      where: {
-        restaurantId: session.restaurantId,
-        OR: [
-          ...(session.tableId ? [{ id: session.tableId }] : []),
-          { tableNo: { in: candidates, mode: "insensitive" } },
-        ],
-      },
-      data: {
-        assignedWaiterId: null,
-        assignedWaiterName: null,
-        cleaningStatus: cleanerExists ? "DIRTY" : "CLEAN",
-      },
-    }).catch(() => {});
+    // STRICT CANONICAL ISOLATION: Update ONLY the specific table by tableId. Never use fuzzy tableNo OR clauses.
+    if (session.tableId) {
+      await tx.diningTable.update({
+        where: { id: session.tableId },
+        data: {
+          assignedWaiterId: null,
+          assignedWaiterName: null,
+          cleaningStatus: cleanerExists ? "DIRTY" : "CLEAN",
+        },
+      }).catch(() => {});
+    } else if (session.tableNo) {
+      // Fallback only if session.tableId was genuinely null: resolve single unique exact table
+      const matchingTables = await tx.diningTable.findMany({
+        where: {
+          restaurantId: session.restaurantId,
+          tableNo: String(session.tableNo).trim(),
+        },
+        select: { id: true },
+      });
+      if (matchingTables.length === 1) {
+        await tx.diningTable.update({
+          where: { id: matchingTables[0].id },
+          data: {
+            assignedWaiterId: null,
+            assignedWaiterName: null,
+            cleaningStatus: cleanerExists ? "DIRTY" : "CLEAN",
+          },
+        }).catch(() => {});
+      }
+    }
 
     // Create cleaning task for Cleaner station ONLY if active cleaner exists
     if (cleanerExists) {

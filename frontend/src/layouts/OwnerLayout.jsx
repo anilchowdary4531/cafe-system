@@ -1246,6 +1246,7 @@ export default function OwnerLayout() {
             const targetNo = payload.tableNo;
 
             if (payload.status === "AVAILABLE" || payload.isOccupied === false) {
+                const isDirty = payload.cleaningStatus === "DIRTY" || payload.status === "DIRTY";
                 setTableOverview((prev) => {
                     const updatedTables = (prev.tables || []).map((t) => {
                         const match = targetId
@@ -1254,7 +1255,8 @@ export default function OwnerLayout() {
                         if (match) {
                             return {
                                 ...t,
-                                status: "AVAILABLE",
+                                status: isDirty ? "DIRTY" : "AVAILABLE",
+                                cleaningStatus: isDirty ? "DIRTY" : "CLEAN",
                                 isOccupied: false,
                                 activeOrderCount: 0,
                                 activeItemCount: 0,

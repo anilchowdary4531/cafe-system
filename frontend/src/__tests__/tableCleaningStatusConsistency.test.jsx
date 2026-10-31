@@ -279,7 +279,7 @@ describe("TABLE CLEANING STATUS CONSISTENCY SUITE", () => {
 
     it("TEST 8: Complete payment for Table A makes Table A cleaning-required while Table B is unaffected", async () => {
         currentTables = [
-            { id: 201, restaurantId: 4, tableNo: "Table A", seats: 4, status: "OCCUPIED", cleaningStatus: "CLEAN", isOccupied: true },
+            { id: 201, restaurantId: 4, tableNo: "Table A", seats: 4, status: "OCCUPIED", cleaningStatus: "CLEAN", isOccupied: true, activeSession: { id: 501, tableId: 201, status: "OPEN" } },
             { id: 202, restaurantId: 4, tableNo: "Table B", seats: 4, status: "AVAILABLE", cleaningStatus: "CLEAN", isOccupied: false },
         ];
 
