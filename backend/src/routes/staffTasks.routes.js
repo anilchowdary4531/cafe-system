@@ -4,6 +4,7 @@ import { completeSessionAndReleaseTable } from "../services/tableSessionService.
 import { syncParentOrderStatusFromKots, getCanonicalReadyItems } from "../services/kotService.js";
 import { createAndDispatchNotification, dispatchDesignationNotification } from "../services/notificationService.js";
 import { NOTIFICATION_TYPES, RECIPIENT_TYPES } from "../constants/notificationTypes.js";
+import { formatTableDisplayLabel } from "../utils/tableIdentity.js";
 import {
   getActiveStaffByCapability,
   hasActiveCleaner,
@@ -508,17 +509,23 @@ export default async function staffTaskRoutes(app, deps = {}) {
             });
 
             try {
+              const displayLabel = formatTableDisplayLabel({
+                section: existing.table?.section,
+                tableNo: existing.table?.tableNo,
+              });
               await dispatchDesignationNotification({
                 prisma,
                 realtime,
                 restaurantId: effectiveRid,
                 targetDesignation: "OWNER",
                 notificationType: NOTIFICATION_TYPES.TABLE_CLEANED,
-                title: `✨ Table ${existing.table?.tableNo} Sanitized`,
-                message: `Table ${existing.table?.tableNo} has been sanitized and is ready for guests.`,
+                title: `✨ ${displayLabel} Sanitized`,
+                message: `${displayLabel} has been sanitized and is ready for guests.`,
                 data: {
+                  restaurantId: effectiveRid,
                   tableId: existing.tableId,
                   tableNo: existing.table?.tableNo,
+                  section: existing.table?.section || null,
                   cleanedBy: req.staffActor?.name || "Cleaner",
                   timestamp: nowIso,
                 },
@@ -656,17 +663,23 @@ export default async function staffTaskRoutes(app, deps = {}) {
 
       // Persist and dispatch TABLE_CLEANED notification to OWNER & assigned waiter
       try {
+        const displayLabel = formatTableDisplayLabel({
+          section: table.section,
+          tableNo: table.tableNo,
+        });
         await dispatchDesignationNotification({
           prisma,
           realtime,
           restaurantId: effectiveRid,
           targetDesignation: "OWNER",
           notificationType: NOTIFICATION_TYPES.TABLE_CLEANED,
-          title: `✨ Table ${table.tableNo} Sanitized`,
-          message: `Table ${table.tableNo} has been sanitized and is ready for guests.`,
+          title: `✨ ${displayLabel} Sanitized`,
+          message: `${displayLabel} has been sanitized and is ready for guests.`,
           data: {
+            restaurantId: effectiveRid,
             tableId: table.id,
             tableNo: table.tableNo,
+            section: table.section || null,
             cleanedBy: req.staffActor?.name || "Cleaner",
             timestamp: nowIso,
           },
@@ -680,11 +693,13 @@ export default async function staffTaskRoutes(app, deps = {}) {
             recipientId: table.assignedWaiterId,
             restaurantId: effectiveRid,
             notificationType: NOTIFICATION_TYPES.TABLE_CLEANED,
-            title: `✨ Table ${table.tableNo} Sanitized`,
-            message: `Table ${table.tableNo} has been cleaned and is ready for new guests.`,
+            title: `✨ ${displayLabel} Sanitized`,
+            message: `${displayLabel} has been cleaned and is ready for new guests.`,
             data: {
+              restaurantId: effectiveRid,
               tableId: table.id,
               tableNo: table.tableNo,
+              section: table.section || null,
             },
           }).catch(() => {});
         }
@@ -758,7 +773,15 @@ export default async function staffTaskRoutes(app, deps = {}) {
           id: itemId,
           ...(restaurantId ? { kot: { restaurantId } } : {}),
         },
-        include: { kot: true },
+        include: {
+          kot: {
+            include: {
+              tableSession: { select: { id: true, tableId: true, tableNo: true } },
+              table: { select: { id: true, tableNo: true, section: true } },
+              order: { select: { id: true, tableId: true, tableNo: true } },
+            },
+          },
+        },
       });
 
       if (!existing) {
@@ -788,7 +811,15 @@ export default async function staffTaskRoutes(app, deps = {}) {
       const updatedItem = await prisma.kitchenOrderTicketItem.update({
         where: { id: itemId },
         data: { status: "SERVED" },
-        include: { kot: true },
+        include: {
+          kot: {
+            include: {
+              tableSession: { select: { id: true, tableId: true, tableNo: true } },
+              table: { select: { id: true, tableNo: true, section: true } },
+              order: { select: { id: true, tableId: true, tableNo: true } },
+            },
+          },
+        },
       });
 
       // Synchronize KOT status if all items are now SERVED
@@ -827,13 +858,23 @@ export default async function staffTaskRoutes(app, deps = {}) {
       const staff = realtime?.staff || null;
       const io = realtime?.io || null;
       const rid = updatedItem.kot?.restaurantId || restaurantId;
-      const kotTableId = updatedItem.kot?.tableId ? Number(updatedItem.kot.tableId) : (updatedOrder?.tableId ? Number(updatedOrder.tableId) : null);
+      const kotTableId = updatedItem.kot?.tableId ? Number(updatedItem.kot.tableId) : (
+        updatedItem.kot?.table?.id ? Number(updatedItem.kot.table.id) : (
+          updatedItem.kot?.tableSession?.tableId ? Number(updatedItem.kot.tableSession.tableId) : (
+            updatedOrder?.tableId ? Number(updatedOrder.tableId) : null
+          )
+        )
+      );
+      const kotSection = updatedItem.kot?.table?.section || null;
+      const kotTableNo = updatedItem.kot?.tableNo || updatedItem.kot?.table?.tableNo || updatedItem.kot?.order?.tableNo || null;
+      const tableLabel = formatTableDisplayLabel({ section: kotSection, tableNo: kotTableNo });
 
       if (rid) {
         const payload = {
           itemId,
           tableId: kotTableId,
-          tableNo: updatedItem.kot?.tableNo,
+          section: kotSection,
+          tableNo: kotTableNo,
           deliveredBy: req.staffActor?.name || req.staffActor?.userName || "Steward",
           item: updatedItem,
           kot: finalKot,
@@ -852,9 +893,9 @@ export default async function staffTaskRoutes(app, deps = {}) {
             staff.to(`restaurant_${rid}`).emit("order:updated", updatedOrder);
             staff.to(`restaurant:${rid}`).emit("order:updated", updatedOrder);
           }
-          if (updatedItem.kot?.tableNo || kotTableId) {
-            staff.to(`restaurant_${rid}`).emit("table:updated", { restaurantId: rid, tableId: kotTableId, tableNo: updatedItem.kot?.tableNo });
-            staff.to(`restaurant:${rid}`).emit("table:updated", { restaurantId: rid, tableId: kotTableId, tableNo: updatedItem.kot?.tableNo });
+          if (kotTableNo || kotTableId) {
+            staff.to(`restaurant_${rid}`).emit("table:updated", { restaurantId: rid, tableId: kotTableId, id: kotTableId, section: kotSection, tableNo: kotTableNo });
+            staff.to(`restaurant:${rid}`).emit("table:updated", { restaurantId: rid, tableId: kotTableId, id: kotTableId, section: kotSection, tableNo: kotTableNo });
           }
         }
 
@@ -871,9 +912,9 @@ export default async function staffTaskRoutes(app, deps = {}) {
             io.to(`restaurant_${rid}`).emit("order:updated", updatedOrder);
             io.to(`restaurant:${rid}`).emit("order:updated", updatedOrder);
           }
-          if (updatedItem.kot?.tableNo || kotTableId) {
-            io.to(`restaurant_${rid}`).emit("table:updated", { restaurantId: rid, tableId: kotTableId, tableNo: updatedItem.kot?.tableNo });
-            io.to(`restaurant:${rid}`).emit("table:updated", { restaurantId: rid, tableId: kotTableId, tableNo: updatedItem.kot?.tableNo });
+          if (kotTableNo || kotTableId) {
+            io.to(`restaurant_${rid}`).emit("table:updated", { restaurantId: rid, tableId: kotTableId, id: kotTableId, section: kotSection, tableNo: kotTableNo });
+            io.to(`restaurant:${rid}`).emit("table:updated", { restaurantId: rid, tableId: kotTableId, id: kotTableId, section: kotSection, tableNo: kotTableNo });
           }
         }
 
@@ -894,9 +935,9 @@ export default async function staffTaskRoutes(app, deps = {}) {
             });
             if (dt?.assignedWaiterId) waiterId = Number(dt.assignedWaiterId);
           }
-          if (!waiterId && updatedItem.kot?.tableNo && rid) {
+          if (!waiterId && kotTableNo && rid) {
             const dt = await prisma.diningTable.findFirst({
-              where: { restaurantId: rid, tableNo: String(updatedItem.kot.tableNo).trim() },
+              where: { restaurantId: rid, tableNo: String(kotTableNo).trim() },
               select: { assignedWaiterId: true },
             });
             if (dt?.assignedWaiterId) waiterId = Number(dt.assignedWaiterId);
@@ -904,8 +945,6 @@ export default async function staffTaskRoutes(app, deps = {}) {
           if (!waiterId) {
             waiterId = Number(req.staffActor?.userId || 0);
           }
-
-          const tableLabel = updatedItem.kot?.tableNo ? `Table ${updatedItem.kot.tableNo}` : "Takeaway";
 
           if (waiterId && rid) {
             await createAndDispatchNotification({
@@ -924,8 +963,10 @@ export default async function staffTaskRoutes(app, deps = {}) {
                 orderId: updatedItem.kot?.orderId ? Number(updatedItem.kot.orderId) : null,
                 kotId: Number(kId),
                 kotItemId: Number(itemId),
+                tableId: kotTableId,
+                section: kotSection,
                 tableSessionId: updatedItem.kot?.tableSessionId ? Number(updatedItem.kot.tableSessionId) : null,
-                tableNo: updatedItem.kot?.tableNo || null,
+                tableNo: kotTableNo,
                 recipientId: waiterId,
               },
             }).catch((e) => console.warn("[staffTasks] Food delivered notification error:", e?.message));
@@ -949,8 +990,10 @@ export default async function staffTaskRoutes(app, deps = {}) {
                 orderId: updatedItem.kot?.orderId ? Number(updatedItem.kot.orderId) : null,
                 kotId: Number(kId),
                 kotItemId: Number(itemId),
+                tableId: kotTableId,
+                section: kotSection,
                 tableSessionId: updatedItem.kot?.tableSessionId ? Number(updatedItem.kot.tableSessionId) : null,
-                tableNo: updatedItem.kot?.tableNo || null,
+                tableNo: kotTableNo,
               },
             }).catch((e) => console.warn("[staffTasks] Restaurant food delivered notification error:", e?.message));
           }

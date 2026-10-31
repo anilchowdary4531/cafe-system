@@ -13,7 +13,7 @@ const allowed = [
 export async function getLiveOrders(req) {
     const restaurantId = Number(req.params.restaurantId);
 
-    return prisma.order.findMany({
+    const orders = await prisma.order.findMany({
         where: {
             restaurantId,
             status: {
@@ -22,12 +22,20 @@ export async function getLiveOrders(req) {
         },
         include: {
             items: true,
+            tableSession: {
+                select: { id: true, tableId: true, tableNo: true, status: true },
+            },
             kots: {
                 include: { station: true, items: true }
             }
         },
         orderBy: { createdAt: 'desc' },
     });
+
+    return orders.map((o) => ({
+        ...o,
+        tableId: o.tableSession?.tableId ? Number(o.tableSession.tableId) : null,
+    }));
 }
 
 // ✅ KITCHEN QUEUE

@@ -3902,6 +3902,14 @@ export default async function ownerRoutes(app, deps = {}) {
         where: { id: requestedTableId, restaurantId },
       });
     }
+    if (!diningTable && rawParam) {
+      diningTable = await prisma.diningTable.findFirst({
+        where: {
+          restaurantId,
+          tableNo: { equals: rawParam, mode: "insensitive" },
+        },
+      });
+    }
     if (!diningTable) {
       diningTable = await prisma.diningTable.findFirst({
         where: {
@@ -3982,13 +3990,18 @@ export default async function ownerRoutes(app, deps = {}) {
       });
     }
 
-    const orderSum = activeOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+    const enrichedActiveOrders = activeOrders.map((o) => ({
+      ...o,
+      tableId: diningTable?.id ? Number(diningTable.id) : (o.tableId ? Number(o.tableId) : null),
+    }));
+
+    const orderSum = enrichedActiveOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
     const authoritativeTotal = orderSum > 0 ? orderSum : (activeSession ? Number(activeSession.total || 0) : 0);
 
     return {
       diningTable,
       effectiveTableNo,
-      activeOrders,
+      activeOrders: enrichedActiveOrders,
       activeSession,
       authoritativeTotal,
     };

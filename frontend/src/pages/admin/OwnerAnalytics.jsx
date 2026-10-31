@@ -1010,8 +1010,8 @@ export default function OwnerAnalytics() {
                     <div>
                         <div className="font-bold text-[color:var(--app-text)] text-sm mb-2">Table Performance Breakdown</div>
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 text-xs">
-                            {(data?.charts?.tableHeatmap || []).map((t) => (
-                                <div key={t.tableNo} className="p-2 border border-[color:var(--app-border)]/50 rounded bg-[color:var(--app-bg)]">
+                            {(data?.charts?.tableHeatmap || []).map((t, idx) => (
+                                <div key={t.id ? `${t.restaurantId || ''}:${t.id}` : (t.tableNo ? `${t.tableNo}-${idx}` : idx)} className="p-2 border border-[color:var(--app-border)]/50 rounded bg-[color:var(--app-bg)]">
                                     <div className="font-bold text-[color:var(--app-text)]">Table #{t.tableNo}</div>
                                     <div className="theme-muted mt-0.5">{t.orders} orders</div>
                                     <div className="font-semibold text-[var(--app-primary)] mt-1">{formatMoney(t.revenue)}</div>

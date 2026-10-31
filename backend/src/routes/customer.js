@@ -565,48 +565,62 @@ export default async function customerRoutes(app, deps = {}) {
       const invoiceNo = `${String(restaurant.invoicePrefix || "INV").toUpperCase()}-${invoiceSequence}`;
 
       let activeTableSessionId = null;
-      if (normalizedTableNo) {
-        const rawTable = String(normalizedTableNo).trim();
-        const strippedTable = rawTable.replace(/^(table|tbl)[-\s]*/i, "");
-        const possibleTableNos = Array.from(new Set([
-          rawTable,
-          strippedTable,
-          `Table ${strippedTable}`,
-          `Table-${strippedTable}`,
-          `Table ${rawTable}`,
-        ].filter(Boolean)));
+      let targetDiningTable = null;
 
-        const diningTable = await prisma.diningTable.findFirst({
-          where: {
-            restaurantId: restaurant.id,
-            OR: [
-              { tableNo: { in: possibleTableNos, mode: "insensitive" } },
-              ...(Number.isInteger(Number(rawTable)) ? [{ id: Number(rawTable) }] : []),
-              ...(Number.isInteger(Number(strippedTable)) ? [{ id: Number(strippedTable) }] : []),
-            ],
-          },
+      if (body.tableId) {
+        targetDiningTable = await prisma.diningTable.findFirst({
+          where: { id: Number(body.tableId), restaurantId: restaurant.id },
+        });
+      }
+
+      if (!targetDiningTable && normalizedTableNo) {
+        const rawTable = String(normalizedTableNo).trim();
+        targetDiningTable = await prisma.diningTable.findFirst({
+          where: { restaurantId: restaurant.id, tableNo: rawTable },
         });
 
-        if (diningTable) {
-          try {
-            const session = await getOrCreateActiveSession({
-              prisma,
+        if (!targetDiningTable) {
+          const strippedTable = rawTable.replace(/^(table|tbl)[-\s]*/i, "");
+          const possibleTableNos = Array.from(new Set([
+            rawTable,
+            strippedTable,
+            `Table ${strippedTable}`,
+            `Table-${strippedTable}`,
+            `Table ${rawTable}`,
+          ].filter(Boolean)));
+
+          targetDiningTable = await prisma.diningTable.findFirst({
+            where: {
               restaurantId: restaurant.id,
-              tableId: diningTable.id,
-              guestCount: 1,
-            });
-            if (session) {
-              activeTableSessionId = session.id;
-            }
-          } catch (sessionErr) {
-            if (sessionErr?.code === "table_dirty") {
-              return reply.code(400).send({
-                message: sessionErr.message,
-                code: "table_dirty",
-              });
-            }
-            throw sessionErr;
+              OR: [
+                { tableNo: { in: possibleTableNos, mode: "insensitive" } },
+                ...(Number.isInteger(Number(rawTable)) ? [{ id: Number(rawTable) }] : []),
+                ...(Number.isInteger(Number(strippedTable)) ? [{ id: Number(strippedTable) }] : []),
+              ],
+            },
+          });
+        }
+      }
+
+      if (targetDiningTable) {
+        try {
+          const session = await getOrCreateActiveSession({
+            prisma,
+            restaurantId: restaurant.id,
+            tableId: targetDiningTable.id,
+            guestCount: 1,
+          });
+          if (session) {
+            activeTableSessionId = session.id;
           }
+        } catch (sessionErr) {
+          if (sessionErr?.code === "table_dirty") {
+            return reply.code(400).send({
+              message: sessionErr.message,
+              code: "table_dirty",
+            });
+          }
+          throw sessionErr;
         }
       }
 

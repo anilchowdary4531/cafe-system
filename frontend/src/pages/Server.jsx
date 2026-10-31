@@ -607,6 +607,7 @@ export default function Server() {
                 orderItemId: it.orderItemId || null,
                 orderId: it.orderId || it.kot?.orderId || null,
                 kotId: it.kotId || it.kot?.id || null,
+                tableId: it.tableId ? Number(it.tableId) : (it.kot?.tableId ? Number(it.kot.tableId) : (it.kot?.order?.tableId ? Number(it.kot.order.tableId) : null)),
                 restaurantId: it.restaurantId || restaurantId,
                 type: "KOT_ITEM",
                 kotNo: it.kotNo || it.kot?.kotNo || "",
@@ -652,6 +653,7 @@ export default function Server() {
                         id: kot.id,
                         kotId: kot.id,
                         orderId: kot.orderId,
+                        tableId: kot.tableId ? Number(kot.tableId) : (kot.order?.tableId ? Number(kot.order.tableId) : (kot.tableSession?.tableId ? Number(kot.tableSession.tableId) : null)),
                         type: "KOT",
                         kotNo: kot.kotNo || "",
                         orderNo: kot.order?.orderNo || "",
@@ -675,15 +677,22 @@ export default function Server() {
         return list;
     }, [readyRunnerData, readyKotsData, restaurantId, realtimeAddedReadyItems, realtimeRemovedItemIds]);
 
-    // Map table number (and normalized key) to count of ready items waiting for pickup
+    // Map table identity (canonical tableId, exact tableNo, and lowercased tableNo) to count of ready items waiting for pickup
     const readyItemsByTable = useMemo(() => {
         const map = new Map();
         readyItemsToDistribute.forEach((item) => {
+            if (item.tableId) {
+                const tid = Number(item.tableId);
+                map.set(tid, (map.get(tid) || 0) + 1);
+            }
             const raw = String(item.tableNo || "").trim();
             if (!raw || raw === "N/A") return;
-            const norm = normalizeTableKey(raw);
-            const keysToIncrement = new Set([raw]);
-            if (norm) keysToIncrement.add(norm);
+            const keysToIncrement = new Set([raw, raw.toLowerCase()]);
+            // Only add normalized key if no canonical tableId is available, to avoid fuzzy cross-table collision
+            if (!item.tableId) {
+                const norm = normalizeTableKey(raw);
+                if (norm) keysToIncrement.add(norm);
+            }
             keysToIncrement.forEach((k) => {
                 map.set(k, (map.get(k) || 0) + 1);
             });
@@ -1007,10 +1016,11 @@ export default function Server() {
         }
 
         setViewMode("ORDERING");
-        setSearchParams({ table: activeTable.tableNo }, { replace: true });
+        setSearchParams({ table: activeTable.tableNo, ...(activeTable.id ? { tableId: activeTable.id } : {}) }, { replace: true });
     }, [user, restaurantId, refreshTables, setSearchParams]);
 
-    // Auto-select table if query param ?table=X is provided
+    // Auto-select table if query param ?tableId=X or ?table=X is provided
+    const urlTableIdParam = searchParams.get("tableId");
     const urlTableParam = searchParams.get("table");
     const autoSelectedRef = useRef(null);
 
@@ -1019,42 +1029,41 @@ export default function Server() {
         setViewMode("FLOOR_PLAN");
         autoSelectedRef.current = null;
 
-        const normNo = normalizeTableKey(tableNo);
         const matched = tables.find((t) => {
-            if (tableId && (t.id === Number(tableId) || String(t.id) === String(tableId))) return true;
-            if (tableNo && (String(t.tableNo).trim() === String(tableNo).trim() || normalizeTableKey(t.tableNo) === normNo)) return true;
+            if (tableId) return Number(t.id) === Number(tableId);
+            if (tableNo) return String(t.tableNo).trim().toLowerCase() === String(tableNo).trim().toLowerCase();
             return false;
         });
 
         if (matched) {
             handleSelectTableForOrder(matched);
+        } else if (tableId) {
+            navigate(`/server?tableId=${encodeURIComponent(tableId)}`);
         } else if (tableNo) {
             navigate(`/server?table=${encodeURIComponent(tableNo)}`);
         }
     }, [tables, handleSelectTableForOrder, navigate]);
     useEffect(() => {
-        if (!urlTableParam) {
+        if (!urlTableIdParam && !urlTableParam) {
             autoSelectedRef.current = null;
             return;
         }
         if (tables.length === 0) return;
-        if (autoSelectedRef.current === urlTableParam) return;
+        const currentParamKey = urlTableIdParam ? `id:${urlTableIdParam}` : `no:${urlTableParam}`;
+        if (autoSelectedRef.current === currentParamKey) return;
 
-        const normParam = normalizeTableKey(urlTableParam);
         const matched = tables.find((t) => {
-            const tNo = String(t.tableNo || "").trim();
-            const normTNo = normalizeTableKey(tNo);
-            return (
-                tNo === String(urlTableParam).trim() ||
-                String(t.id).trim() === String(urlTableParam).trim() ||
-                (normParam && normTNo === normParam)
-            );
+            if (urlTableIdParam) {
+                return Number(t.id) === Number(urlTableIdParam);
+            }
+            const tNo = String(t.tableNo || "").trim().toLowerCase();
+            return tNo === String(urlTableParam).trim().toLowerCase();
         });
         if (matched) {
-            autoSelectedRef.current = urlTableParam;
+            autoSelectedRef.current = currentParamKey;
             handleSelectTableForOrder(matched);
         }
-    }, [urlTableParam, tables, handleSelectTableForOrder]);
+    }, [urlTableIdParam, urlTableParam, tables, handleSelectTableForOrder]);
 
     // Keep selectedTable in sync with refreshed tables data
     useEffect(() => {
@@ -1953,7 +1962,7 @@ export default function Server() {
                                             {/* Ready Items Alert for this Table */}
                                             {(() => {
                                                 const rawNo = String(table.tableNo || "").trim();
-                                                const count = readyItemsByTable.get(rawNo) || readyItemsByTable.get(rawNo.toLowerCase()) || readyItemsByTable.get(normalizeTableKey(rawNo)) || 0;
+                                                const count = (table.id && readyItemsByTable.get(Number(table.id))) || readyItemsByTable.get(rawNo) || readyItemsByTable.get(rawNo.toLowerCase()) || 0;
                                                 if (count <= 0) return null;
                                                 return (
                                                     <div className="flex items-center justify-between rounded-lg bg-emerald-500/15 border border-emerald-500/30 px-2 py-1 text-[10px] text-emerald-700 dark:text-emerald-300 font-extrabold animate-pulse">

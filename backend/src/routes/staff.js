@@ -111,12 +111,25 @@ export default async function staffRoutes(app, deps = {}) {
           customer: true,
           statusEvents: { orderBy: { createdAt: "asc" } },
           kots: { include: { items: true } },
+          tableSession: {
+            select: {
+              id: true,
+              tableId: true,
+              tableNo: true,
+              status: true,
+            },
+          },
         },
         orderBy: { createdAt: "desc" },
         take: 250,
       });
 
-      return { orders };
+      const enrichedOrders = orders.map((o) => ({
+        ...o,
+        tableId: o.tableSession?.tableId ? Number(o.tableSession.tableId) : null,
+      }));
+
+      return { orders: enrichedOrders };
     } catch (err) {
       // eslint-disable-next-line no-console
       console.log(err);

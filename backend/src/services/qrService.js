@@ -237,6 +237,8 @@ export const resolveQrToken = async (token, prisma) => {
     return {
       restaurant: table.restaurant,
       table: {
+        id: table.id,
+        tableId: table.id,
         tableNo: table.tableNo,
         section: table.section || "Main Floor",
         seats: table.seats,
@@ -271,6 +273,8 @@ export const resolveQrToken = async (token, prisma) => {
       return {
         restaurant: table.restaurant,
         table: {
+          id: table.id,
+          tableId: table.id,
           tableNo: table.tableNo,
           section: table.section || "Main Floor",
           seats: table.seats,
@@ -297,6 +301,8 @@ export const resolveQrToken = async (token, prisma) => {
   return {
     restaurant: table.restaurant,
     table: {
+      id: table.id,
+      tableId: table.id,
       tableNo: table.tableNo,
       section: table.section || "Main Floor",
       seats: table.seats,
@@ -440,6 +446,7 @@ export const placeQrOrder = async ({
     input: {
       orderSource: "QR",
       fulfillment: "DINE_IN",
+      tableId: table.id,
       tableNo: table.tableNo,
       tableSessionId: session.id,
       items,

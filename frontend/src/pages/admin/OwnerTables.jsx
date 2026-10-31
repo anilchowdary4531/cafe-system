@@ -1748,13 +1748,14 @@ export default function OwnerTables() {
                             onMouseLeave={() => setDragState(null)}
                         >
                             {filteredTables.map((table, index) => {
-                                const session = activeSessions[String(table.id)];
-                                const sessionStatus = session ? session.status : "AVAILABLE";
+                                const session = activeSessions[String(table.id)] || table.activeSession;
+                                const hasOrders = Array.isArray(table.activeOrders) && table.activeOrders.length > 0;
                                 const isDirty = table.cleaningStatus === "DIRTY" || table.status === "DIRTY";
-                                const isOccupied = !isDirty && sessionStatus === "OPEN";
-                                const isBilling = !isDirty && sessionStatus === "BILLING";
-                                const isPaid = !isDirty && sessionStatus === "PAID";
-                                const isAvailable = !session && !isDirty;
+                                const sessionStatus = session?.status || table.status || "AVAILABLE";
+                                const isOccupied = !isDirty && (table.isOccupied || sessionStatus === "OPEN" || hasOrders);
+                                const isBilling = !isDirty && !isOccupied && (sessionStatus === "BILLING" || table.status === "BILLING" || table.status === "PAYMENT_PENDING");
+                                const isPaid = !isDirty && !isOccupied && !isBilling && (sessionStatus === "PAID" || table.status === "PAID");
+                                const isAvailable = !isOccupied && !isBilling && !isPaid && !isDirty;
 
                                 const layoutData = isEditingLayout && editedLayoutTables[table.id]
                                     ? editedLayoutTables[table.id]
@@ -1932,17 +1933,16 @@ export default function OwnerTables() {
                                         const debugTarget = buildDebugTargetUrl(table.tableNo);
                                         const image = qrImageUrl(target);
                                         const tableGroup = getTableGroup(table);
-                                        const session = activeSessions[String(table.id)];
-                                        const sessionStatus = session ? session.status : "AVAILABLE";
-                                        const isOccupied = sessionStatus === "OPEN";
-                                        const isBilling = sessionStatus === "BILLING";
-                                        const isPaid = sessionStatus === "PAID";
+                                        const session = activeSessions[String(table.id)] || table.activeSession;
+                                        const hasOrders = Array.isArray(table.activeOrders) && table.activeOrders.length > 0;
                                         const isDirty = table.cleaningStatus === "DIRTY" || table.status === "DIRTY";
-                                        const isAvailable = !session && !isDirty;
+                                        const sessionStatus = session?.status || table.status || "AVAILABLE";
+                                        const isOccupied = !isDirty && (table.isOccupied || sessionStatus === "OPEN" || hasOrders);
+                                        const isBilling = !isDirty && !isOccupied && (sessionStatus === "BILLING" || table.status === "BILLING" || table.status === "PAYMENT_PENDING");
+                                        const isPaid = !isDirty && !isOccupied && !isBilling && (sessionStatus === "PAID" || table.status === "PAID");
+                                        const isAvailable = !isOccupied && !isBilling && !isPaid && !isDirty;
                                         const resForTable = reservations.find((r) =>
-                                            Number(r.tableId) === Number(table.id) ||
-                                            (r.tableNo && String(r.tableNo).trim().toLowerCase() === String(table.tableNo).trim().toLowerCase()) ||
-                                            (r.table?.tableNo && String(r.table.tableNo).trim().toLowerCase() === String(table.tableNo).trim().toLowerCase())
+                                            Number(r.tableId || r.table?.id) === Number(table.id)
                                         );
 
                                         return (

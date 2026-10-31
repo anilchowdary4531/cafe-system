@@ -1,6 +1,7 @@
 import prisma from "../prisma.js";
 import { createAndDispatchNotification } from "../services/notificationService.js";
 import { NOTIFICATION_TYPES, RECIPIENT_TYPES } from "../constants/notificationTypes.js";
+import { updateOrderStatus } from "../services/orderService.js";
 
 export default async function (fastify) {
 
@@ -60,45 +61,78 @@ export default async function (fastify) {
                 });
             }
 
-            const order = await prisma.order.update({
-                where: {
-                    id: Number(id),
-                },
-                data: {
-                    status,
-                },
-                include: {
-                    items: true,
-                },
+            const updated = await updateOrderStatus({
+                prisma,
+                actor: req.staffActor || { role: "KITCHEN", userId: null },
+                orderId: Number(id),
+                nextStatus: status,
+                notes: req.body?.notes,
+                changedByName: req.body?.changedByName || "Kitchen",
             });
 
-            if (status === "READY" && order?.restaurantId) {
+            const io = fastify.io || fastify.server?.io;
+            const staff = fastify.staff || fastify.server?.staff;
+            const rid = Number(updated.restaurantId || 0);
+
+            if (rid) {
+                if (io) {
+                    io.to(`restaurant_${rid}`).emit("order:updated", updated);
+                    io.to(`restaurant:${rid}`).emit("order:updated", updated);
+                }
+                if (staff) {
+                    staff.to(`restaurant_${rid}`).emit("order:updated", updated);
+                    staff.to(`restaurant:${rid}`).emit("order:updated", updated);
+                }
+                const tableId = updated.tableId || updated.tableSession?.tableId;
+                if (tableId) {
+                    const tableUpdatePayload = {
+                        restaurantId: rid,
+                        tableId,
+                        id: tableId,
+                        tableNo: updated.tableNo,
+                        activeOrderStatus: status,
+                        version: Date.now(),
+                    };
+                    if (io) {
+                        io.to(`restaurant_${rid}`).emit("table:updated", tableUpdatePayload);
+                        io.to(`restaurant:${rid}`).emit("table:updated", tableUpdatePayload);
+                    }
+                    if (staff) {
+                        staff.to(`restaurant_${rid}`).emit("table:updated", tableUpdatePayload);
+                        staff.to(`restaurant:${rid}`).emit("table:updated", tableUpdatePayload);
+                    }
+                }
+            }
+
+            if (status === "READY" && updated?.restaurantId) {
                 try {
+                    const tableId = updated.tableId || updated.tableSession?.tableId || null;
                     await createAndDispatchNotification({
                         prisma,
-                        realtime: fastify.realtime || { io: fastify.io },
+                        realtime: fastify.realtime || { io: fastify.io, staff: fastify.staff },
                         recipientType: RECIPIENT_TYPES.RESTAURANT,
-                        recipientId: order.restaurantId,
-                        restaurantId: order.restaurantId,
-                        orderId: order.id,
+                        recipientId: updated.restaurantId,
+                        restaurantId: updated.restaurantId,
+                        orderId: updated.id,
                         notificationType: NOTIFICATION_TYPES.FOOD_READY || "FOOD_READY",
-                        title: `🔔 Order Ready — Table ${order.tableNo || "Takeaway"}`,
-                        message: `Order #${order.orderNo || order.id} for Table ${order.tableNo || "Takeaway"} is ready to serve!`,
+                        title: `🔔 Order Ready — Table ${updated.tableNo || "Takeaway"}`,
+                        message: `Order #${updated.orderNo || updated.id} for Table ${updated.tableNo || "Takeaway"} is ready to serve!`,
                         data: {
-                            orderId: order.id,
-                            tableNo: order.tableNo,
-                            orderNo: order.orderNo,
-                            restaurantId: order.restaurantId,
+                            orderId: updated.id,
+                            tableId,
+                            tableNo: updated.tableNo,
+                            orderNo: updated.orderNo,
+                            restaurantId: updated.restaurantId,
                             status: "READY",
                         },
-                        idempotencyKey: `order_ready_${order.id}_${order.updatedAt?.getTime() || Date.now()}`,
+                        idempotencyKey: `order_ready_${updated.id}_${updated.updatedAt?.getTime() || Date.now()}`,
                     }).catch((err) => console.warn("[KitchenRoute] READY notification warning:", err?.message));
                 } catch (notifErr) {
                     console.warn("[KitchenRoute] Failed to send READY notification:", notifErr?.message);
                 }
             }
 
-            return order;
+            return updated;
         } catch (error) {
             console.error("Failed to update order status:", error);
 
@@ -132,6 +166,9 @@ export default async function (fastify) {
 
                 include: {
                     items: true,
+                    tableSession: {
+                        select: { id: true, tableId: true, tableNo: true },
+                    },
                 },
 
                 orderBy: {
@@ -139,7 +176,10 @@ export default async function (fastify) {
                 },
             });
 
-            return orders;
+            return orders.map((o) => ({
+                ...o,
+                tableId: o.tableSession?.tableId ? Number(o.tableSession.tableId) : null,
+            }));
         } catch (error) {
             console.error("Failed to fetch table orders:", error);
 
@@ -174,19 +214,50 @@ export default async function (fastify) {
                 });
             }
 
-            const order = await prisma.order.update({
-                where: {
-                    id: Number(id),
-                },
-                data: {
-                    status,
-                },
-                include: {
-                    items: true,
-                },
+            const updated = await updateOrderStatus({
+                prisma,
+                actor: req.staffActor || { role: "KITCHEN", userId: null },
+                orderId: Number(id),
+                nextStatus: status,
+                notes: req.body?.notes,
+                changedByName: req.body?.changedByName || "Kitchen",
             });
 
-            return order;
+            const io = fastify.io || fastify.server?.io;
+            const staff = fastify.staff || fastify.server?.staff;
+            const rid = Number(updated.restaurantId || 0);
+
+            if (rid) {
+                if (io) {
+                    io.to(`restaurant_${rid}`).emit("order:updated", updated);
+                    io.to(`restaurant:${rid}`).emit("order:updated", updated);
+                }
+                if (staff) {
+                    staff.to(`restaurant_${rid}`).emit("order:updated", updated);
+                    staff.to(`restaurant:${rid}`).emit("order:updated", updated);
+                }
+                const tableId = updated.tableId || updated.tableSession?.tableId;
+                if (tableId) {
+                    const tableUpdatePayload = {
+                        restaurantId: rid,
+                        tableId,
+                        id: tableId,
+                        tableNo: updated.tableNo,
+                        activeOrderStatus: status,
+                        version: Date.now(),
+                    };
+                    if (io) {
+                        io.to(`restaurant_${rid}`).emit("table:updated", tableUpdatePayload);
+                        io.to(`restaurant:${rid}`).emit("table:updated", tableUpdatePayload);
+                    }
+                    if (staff) {
+                        staff.to(`restaurant_${rid}`).emit("table:updated", tableUpdatePayload);
+                        staff.to(`restaurant:${rid}`).emit("table:updated", tableUpdatePayload);
+                    }
+                }
+            }
+
+            return updated;
         } catch (error) {
             console.error("Failed to update table order:", error);
 

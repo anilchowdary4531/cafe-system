@@ -906,12 +906,16 @@ export default function CashierStation() {
                                     ) : (
                                         filteredTables.map((t) => {
                                             const hasActiveOrder = Boolean(t.activeOrder);
-                                            const isSelected = selectedOrder && String(selectedOrder.tableNo || "").trim() === String(t.tableNo).trim();
+                                            const isSelected = selectedOrder && (
+                                                (selectedOrder.tableId && t.id)
+                                                    ? Number(selectedOrder.tableId) === Number(t.id)
+                                                    : String(selectedOrder.tableNo || "").trim() === String(t.tableNo).trim()
+                                            );
                                             const isBilling = t.status === "BILLING" || t.activeOrder?.status === "BILL_REQUESTED";
 
                                             return (
                                                 <button
-                                                    key={t.id || t.tableNo}
+                                                    key={t.id ? `${t.restaurantId || ''}:${t.id}` : t.tableNo}
                                                     type="button"
                                                     onClick={() => {
                                                         if (t.activeOrder) {

@@ -68,6 +68,7 @@ import { API } from "../config";
 import { api } from "../utils/apiClient";
 import { useStaffSocket } from "../context/StaffSocketContext";
 import { playNotificationSound } from "../utils/soundPlayer";
+import { useCanonicalTables } from "../context/TableStateContext";
 import {
     getStoredTableGroups,
     getStoredGroupCatalog,
@@ -1242,6 +1243,8 @@ export default function OwnerLayout() {
                     const updatedTables = (prev.tables || []).map((t) => {
                         const match = String(t.id) === String(targetId);
                         if (match) {
+                            const hasActiveOrders = Array.isArray(t.activeOrders) && t.activeOrders.length > 0;
+                            if (hasActiveOrders) return t; // NEVER wipe active in-flight orders
                             return {
                                 ...t,
                                 status: isDirty ? "DIRTY" : "AVAILABLE",
@@ -1308,12 +1311,14 @@ export default function OwnerLayout() {
 
         const handleSessionUpdated = (session) => {
             if (session && (!session.status || session.status === "CLOSED" || session.status === "CANCELLED")) {
-                const targetId = session.tableId || session.id;
-                if (!targetId) return; // Strict canonical table identity: never guess or fall back to tableNo
+                const targetId = session.tableId ? Number(session.tableId) : null;
+                if (!targetId) return; // Strict canonical table identity: never guess or use session.id as table id!
                 setTableOverview((prev) => {
                     const updatedTables = (prev.tables || []).map((t) => {
-                        const match = String(t.id) === String(targetId);
+                        const match = Number(t.id) === targetId;
                         if (match) {
+                            const hasActiveOrders = Array.isArray(t.activeOrders) && t.activeOrders.length > 0;
+                            if (hasActiveOrders) return t; // NEVER wipe active in-flight orders
                             return {
                                 ...t,
                                 status: "AVAILABLE",

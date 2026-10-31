@@ -812,13 +812,14 @@ export const completeSessionAndReleaseTable = async ({
   // 5. Emit Realtime Events after successful transaction commit
   const effectiveRid = session.restaurantId;
   const cleanerExists = Boolean(updatedSession?._cleanerExists);
+  const resolvedTableId = session.tableId ? Number(session.tableId) : (session.table?.id ? Number(session.table.id) : null);
   const nowTimestamp = Date.now();
   const nowIso = new Date(nowTimestamp).toISOString();
   const clearPayload = {
     type: "TABLE_UPDATED",
     restaurantId: effectiveRid,
-    tableId: session.tableId || null,
-    id: session.tableId || null,
+    tableId: resolvedTableId,
+    id: resolvedTableId,
     tableNo: session.tableNo,
     status: cleanerExists ? "DIRTY" : "AVAILABLE",
     cleaningStatus: cleanerExists ? "DIRTY" : "CLEAN",
@@ -841,8 +842,8 @@ export const completeSessionAndReleaseTable = async ({
 
   const sessionPayload = {
     restaurantId: effectiveRid,
-    tableId: session.tableId || null,
-    id: session.tableId || null,
+    tableId: resolvedTableId,
+    id: resolvedTableId,
     tableNo: session.tableNo,
     sessionId: session.id,
     status: "CLOSED",
@@ -868,14 +869,14 @@ export const completeSessionAndReleaseTable = async ({
     io.to(`restaurant:${effectiveRid}`).emit("table:layout_updated", { restaurantId: effectiveRid });
     io.to(`restaurant_${effectiveRid}`).emit("payment:updated", {
       restaurantId: effectiveRid,
-      tableId: session.tableId || null,
+      tableId: resolvedTableId,
       tableNo: session.tableNo,
       status: "PAID",
       paymentMode,
     });
     io.to(`restaurant:${effectiveRid}`).emit("payment:updated", {
       restaurantId: effectiveRid,
-      tableId: session.tableId || null,
+      tableId: resolvedTableId,
       tableNo: session.tableNo,
       status: "PAID",
       paymentMode,
@@ -889,14 +890,14 @@ export const completeSessionAndReleaseTable = async ({
     staff.to(`restaurant:${effectiveRid}`).emit("table:session_updated", sessionPayload);
     staff.to(`restaurant_${effectiveRid}`).emit("payment:updated", {
       restaurantId: effectiveRid,
-      tableId: session.tableId || null,
+      tableId: resolvedTableId,
       tableNo: session.tableNo,
       status: "PAID",
       paymentMode,
     });
     staff.to(`restaurant:${effectiveRid}`).emit("payment:updated", {
       restaurantId: effectiveRid,
-      tableId: session.tableId || null,
+      tableId: resolvedTableId,
       tableNo: session.tableNo,
       status: "PAID",
       paymentMode,
@@ -904,26 +905,26 @@ export const completeSessionAndReleaseTable = async ({
     if (cleanerExists) {
       staff.to(`restaurant_${effectiveRid}`).emit("cleaner:table_dirty", {
         restaurantId: effectiveRid,
-        tableId: session.tableId || null,
+        tableId: resolvedTableId,
         tableNo: session.tableNo,
         timestamp: nowIso,
       });
       staff.to(`restaurant:${effectiveRid}`).emit("cleaner:table_dirty", {
         restaurantId: effectiveRid,
-        tableId: session.tableId || null,
+        tableId: resolvedTableId,
         tableNo: session.tableNo,
         timestamp: nowIso,
       });
       staff.to(`restaurant_${effectiveRid}`).emit("cleaner:task_created", {
         restaurantId: effectiveRid,
-        tableId: session.tableId || null,
+        tableId: resolvedTableId,
         tableNo: session.tableNo,
         taskType: "TABLE_BUS_AND_SANITIZE",
         status: "PENDING",
       });
       staff.to(`restaurant:${effectiveRid}`).emit("cleaner:task_created", {
         restaurantId: effectiveRid,
-        tableId: session.tableId || null,
+        tableId: resolvedTableId,
         tableNo: session.tableNo,
         taskType: "TABLE_BUS_AND_SANITIZE",
         status: "PENDING",
@@ -947,13 +948,13 @@ export const completeSessionAndReleaseTable = async ({
         priority: "HIGH",
         data: {
           restaurantId: effectiveRid,
-          tableId: session.tableId ? Number(session.tableId) : null,
+          tableId: resolvedTableId,
           tableNo: session.tableNo,
           section: session.table?.section || null,
           sessionId: session.id,
           taskType: "TABLE_BUS_AND_SANITIZE",
         },
-        idempotencyKey: `table_dirty_${effectiveRid}_${session.tableId}_${session.id}`,
+        idempotencyKey: `table_dirty_${effectiveRid}_${resolvedTableId}_${session.id}`,
       }).catch((e) => console.warn("[tableSessionService] Cleaner notification error:", e?.message));
 
       await createAndDispatchNotification({
@@ -965,8 +966,13 @@ export const completeSessionAndReleaseTable = async ({
         notificationType: NOTIFICATION_TYPES.TABLE_DIRTY || "TABLE_DIRTY",
         title: `🧹 ${displayLabel} Requires Cleaning`,
         message: `${displayLabel} marked dirty and dispatched to Cleaner Station.`,
-        data: { tableId: session.tableId, tableNo: session.tableNo, section: session.table?.section || null },
-        idempotencyKey: `owner_table_dirty_${effectiveRid}_${session.tableId}_${session.id}`,
+        data: {
+          restaurantId: effectiveRid,
+          tableId: resolvedTableId,
+          tableNo: session.tableNo,
+          section: session.table?.section || null,
+        },
+        idempotencyKey: `owner_table_dirty_${effectiveRid}_${resolvedTableId}_${session.id}`,
       }).catch(() => {});
     }
 

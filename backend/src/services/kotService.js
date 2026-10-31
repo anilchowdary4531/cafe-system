@@ -497,6 +497,21 @@ export const getCanonicalReadyItems = async ({ prisma, restaurantId }) => {
                     id: true,
                     kotNo: true,
                     tableNo: true,
+                    tableSessionId: true,
+                    tableSession: {
+                        select: {
+                            id: true,
+                            tableId: true,
+                            tableNo: true,
+                            table: {
+                                select: {
+                                    id: true,
+                                    tableNo: true,
+                                    section: true,
+                                },
+                            },
+                        },
+                    },
                     orderId: true,
                     waiterId: true,
                     waiterName: true,
@@ -510,6 +525,21 @@ export const getCanonicalReadyItems = async ({ prisma, restaurantId }) => {
                             id: true,
                             orderNo: true,
                             tableNo: true,
+                            tableSessionId: true,
+                            tableSession: {
+                                select: {
+                                    id: true,
+                                    tableId: true,
+                                    tableNo: true,
+                                    table: {
+                                        select: {
+                                            id: true,
+                                            tableNo: true,
+                                            section: true,
+                                        },
+                                    },
+                                },
+                            },
                             customerName: true,
                             status: true,
                         },
@@ -523,47 +553,62 @@ export const getCanonicalReadyItems = async ({ prisma, restaurantId }) => {
         ],
     });
 
-    return items.map((it) => ({
-        ...it,
-        id: it.id,
-        kotItemId: it.id,
-        orderItemId: it.orderItemId,
-        kotId: it.kotId,
-        kotNo: it.kot?.kotNo || `KOT-${it.kotId}`,
-        orderId: it.kot?.orderId,
-        orderNo: it.kot?.order?.orderNo,
-        tableNo: String(it.kot?.tableNo || it.kot?.order?.tableNo || "N/A").trim(),
-        waiterId: it.kot?.waiterId || null,
-        waiterName: it.kot?.waiterName || it.kot?.order?.waiterName || it.kot?.order?.customerName || null,
-        stationName: it.kot?.stationName || "Kitchen",
-        itemName: it.itemName,
-        name: it.itemName,
-        qty: it.qty,
-        quantity: it.qty,
-        variantId: it.variantId,
-        variantName: it.variantName,
-        selectedModifiers: it.selectedModifiers,
-        notes: it.notes,
-        status: it.status,
-        preparedByName: it.preparedByName,
-        assignedChefId: it.assignedChefId,
-        assignedChefName: it.assignedChefName,
-        readyAt: it.readyAt,
-        createdAt: it.createdAt,
-        restaurantId: rid,
-        kot: {
-            id: it.kot?.id,
-            kotNo: it.kot?.kotNo,
+    return items.map((it) => {
+        const resolvedTableId =
+            it.kot?.tableSession?.tableId ||
+            it.kot?.order?.tableSession?.tableId ||
+            null;
+        const resolvedSection =
+            it.kot?.tableSession?.table?.section ||
+            it.kot?.order?.tableSession?.table?.section ||
+            null;
+
+        return {
+            ...it,
+            id: it.id,
+            kotItemId: it.id,
+            orderItemId: it.orderItemId,
+            kotId: it.kotId,
+            kotNo: it.kot?.kotNo || `KOT-${it.kotId}`,
             orderId: it.kot?.orderId,
-            tableNo: it.kot?.tableNo || it.kot?.order?.tableNo,
-            waiterId: it.kot?.waiterId,
-            waiterName: it.kot?.waiterName,
-            stationId: it.kot?.stationId,
-            stationName: it.kot?.stationName,
-            status: it.kot?.status,
-            priority: it.kot?.priority,
-            createdAt: it.kot?.createdAt,
-            order: it.kot?.order,
-        },
-    }));
+            orderNo: it.kot?.order?.orderNo,
+            tableId: resolvedTableId,
+            section: resolvedSection,
+            tableNo: String(it.kot?.tableNo || it.kot?.order?.tableNo || "N/A").trim(),
+            waiterId: it.kot?.waiterId || null,
+            waiterName: it.kot?.waiterName || it.kot?.order?.waiterName || it.kot?.order?.customerName || null,
+            stationName: it.kot?.stationName || "Kitchen",
+            itemName: it.itemName,
+            name: it.itemName,
+            qty: it.qty,
+            quantity: it.qty,
+            variantId: it.variantId,
+            variantName: it.variantName,
+            selectedModifiers: it.selectedModifiers,
+            notes: it.notes,
+            status: it.status,
+            preparedByName: it.preparedByName,
+            assignedChefId: it.assignedChefId,
+            assignedChefName: it.assignedChefName,
+            readyAt: it.readyAt,
+            createdAt: it.createdAt,
+            restaurantId: rid,
+            kot: {
+                id: it.kot?.id,
+                kotNo: it.kot?.kotNo,
+                orderId: it.kot?.orderId,
+                tableId: resolvedTableId,
+                section: resolvedSection,
+                tableNo: it.kot?.tableNo || it.kot?.order?.tableNo,
+                waiterId: it.kot?.waiterId,
+                waiterName: it.kot?.waiterName,
+                stationId: it.kot?.stationId,
+                stationName: it.kot?.stationName,
+                status: it.kot?.status,
+                priority: it.kot?.priority,
+                createdAt: it.kot?.createdAt,
+                order: it.kot?.order,
+            },
+        };
+    });
 };

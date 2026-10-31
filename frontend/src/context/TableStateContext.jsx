@@ -187,11 +187,12 @@ export function reconcileTable(current, incoming) {
     const incomingVer = Number(incoming.version || (incoming.updatedAt ? new Date(incoming.updatedAt).getTime() : 0));
 
     const incomingHasOrders = Array.isArray(incoming.activeOrders) && incoming.activeOrders.length > 0;
+    const currentHasOrders = Array.isArray(current.activeOrders) && current.activeOrders.length > 0;
 
     // Stale HTTP/Socket Response Rejection:
-    // Only reject if incoming is strictly older, incoming does NOT carry active in-flight orders,
-    // and neither occupancy nor cleaning status has changed authoritatively.
-    if (incomingVer > 0 && currentVer > 0 && incomingVer < currentVer && !incomingHasOrders && incoming.isOccupied === current.isOccupied) {
+    // If incoming is strictly older than current, and incoming does NOT carry active orders:
+    // A stale response cannot overwrite a newer state that has active in-flight orders or newer timestamps.
+    if (incomingVer > 0 && currentVer > 0 && incomingVer < currentVer && !incomingHasOrders) {
         return current;
     }
 
@@ -199,6 +200,7 @@ export function reconcileTable(current, incoming) {
     const isExplicitRelease =
         !hasIncomingAssignment &&
         !incomingHasOrders &&
+        !currentHasOrders &&
         Boolean(
             (incoming.status === "AVAILABLE" && incoming.isOccupied === false) ||
             incoming.session?.status === "CLOSED" ||
@@ -259,6 +261,20 @@ export function reconcileTable(current, incoming) {
     const resolvedWaiterName = incoming.assignedWaiterName !== undefined ? incoming.assignedWaiterName : current.assignedWaiterName;
     const resolvedServer = incoming.assignedServer !== undefined ? incoming.assignedServer : (incoming.assignedWaiterName !== undefined ? incoming.assignedWaiterName : current.assignedServer);
 
+    const resolvedActiveOrders = incomingHasOrders
+        ? incoming.activeOrders
+        : (currentHasOrders ? current.activeOrders : (Array.isArray(incoming.activeOrders) ? incoming.activeOrders : current.activeOrders || []));
+    const finalHasOrders = Array.isArray(resolvedActiveOrders) && resolvedActiveOrders.length > 0;
+    const resolvedIsOccupied = finalHasOrders
+        ? true
+        : (incoming.isOccupied !== undefined ? incoming.isOccupied : current.isOccupied);
+    const resolvedStatus = finalHasOrders
+        ? (incoming.status && incoming.status !== "AVAILABLE" && incoming.status !== "DIRTY" ? incoming.status : (current.status && current.status !== "AVAILABLE" && current.status !== "DIRTY" ? current.status : "OCCUPIED"))
+        : (incoming.status !== undefined ? incoming.status : current.status);
+    const resolvedActiveOrderCount = finalHasOrders
+        ? resolvedActiveOrders.length
+        : (incoming.activeOrderCount !== undefined ? incoming.activeOrderCount : current.activeOrderCount);
+
     return {
         ...current,
         ...incoming,
@@ -269,8 +285,10 @@ export function reconcileTable(current, incoming) {
         capacity: resolvedCapacity,
         floor: resolvedFloor,
         area: resolvedArea,
-        status: incoming.status !== undefined ? incoming.status : current.status,
-        isOccupied: incoming.isOccupied !== undefined ? incoming.isOccupied : current.isOccupied,
+        activeOrders: resolvedActiveOrders,
+        activeOrderCount: resolvedActiveOrderCount,
+        status: resolvedStatus,
+        isOccupied: resolvedIsOccupied,
         assignedWaiterId: resolvedWaiterId,
         assignedWaiterName: resolvedWaiterName,
         assignedServer: resolvedServer,

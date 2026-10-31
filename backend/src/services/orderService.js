@@ -133,7 +133,9 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
         statusEvents: { orderBy: { createdAt: "asc" } },
       },
     });
+
     if (existingOrder) {
+      existingOrder.tableId = existingOrder.tableSession?.tableId ? Number(existingOrder.tableSession.tableId) : null;
       return existingOrder;
     }
   }
@@ -481,6 +483,8 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
       },
     });
 
+    order.tableId = order.tableSession?.tableId ? Number(order.tableSession.tableId) : (dTable ? dTable.id : null);
+
     // Execute loyalty redemption ledger transaction
     if (loyaltyPointsToRedeem > 0 && customerId) {
       await redeemPointsForOrder({
@@ -687,6 +691,8 @@ export const updateOrderStatus = async ({ prisma, actor, orderId, nextStatus, no
         statusEvents: { orderBy: { createdAt: "asc" } },
       },
     });
+
+    updated.tableId = updated.tableSession?.tableId ? Number(updated.tableSession.tableId) : null;
 
     // Recalculate TableSession totals & check for table release on cancellation
     if (updated.tableSessionId) {

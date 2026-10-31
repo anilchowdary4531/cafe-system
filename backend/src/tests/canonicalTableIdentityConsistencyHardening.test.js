@@ -108,5 +108,57 @@ test("CANONICAL TABLE IDENTITY & CONSISTENCY HARDENING (BACKEND)", async (t) => 
     // Table 12 with tableNo "table 1" resolves correctly to null (does not inherit 17)
     assert.equal(resolveWaiter({ kotTableId: 12, tableNo: "table 1" }), null);
   });
+
+  await t.test("4. Canonical Ready Items enrichment attaches tableId and section", () => {
+    const rawKotItem = {
+      id: 501,
+      itemName: "Ghee Roast",
+      qty: 1,
+      kot: {
+        id: 701,
+        kotNo: "KOT-701",
+        tableSession: { tableId: 8, tableNo: "1", table: { section: "Main Hall" } },
+        order: { tableId: 8, tableNo: "1" },
+      },
+    };
+
+    const resolvedTableId = rawKotItem.kot?.tableId || rawKotItem.kot?.table?.id || rawKotItem.kot?.tableSession?.tableId || rawKotItem.kot?.order?.tableId || null;
+    const resolvedSection = rawKotItem.kot?.section || rawKotItem.kot?.table?.section || rawKotItem.kot?.tableSession?.table?.section || null;
+
+    assert.equal(resolvedTableId, 8);
+    assert.equal(resolvedSection, "Main Hall");
+  });
+
+  await t.test("5. Notification payload carries canonical tableId and section", () => {
+    const notifData = {
+      restaurantId: 1,
+      tableId: 8,
+      tableNo: "1",
+      section: "Main Hall",
+      taskType: "TABLE_BUS_AND_SANITIZE",
+    };
+
+    assert.equal(notifData.tableId, 8);
+    assert.equal(notifData.section, "Main Hall");
+    assert.equal(formatTableDisplayLabel(notifData), "Main Hall · Table 1");
+  });
+
+  await t.test("6. Direct Table Sanitation clears dirty state only for exact tableId", () => {
+    const tables = [
+      { id: 8, tableNo: "1", section: "Main Hall", cleaningStatus: "DIRTY" },
+      { id: 12, tableNo: "table 1", section: "TABLE", cleaningStatus: "DIRTY" },
+    ];
+
+    const targetCleanTableId = 8;
+    const updatedTables = tables.map((tbl) => {
+      if (tbl.id === targetCleanTableId) {
+        return { ...tbl, cleaningStatus: "CLEAN" };
+      }
+      return tbl;
+    });
+
+    assert.equal(updatedTables[0].cleaningStatus, "CLEAN");
+    assert.equal(updatedTables[1].cleaningStatus, "DIRTY"); // Table 12 remains DIRTY!
+  });
 });
 

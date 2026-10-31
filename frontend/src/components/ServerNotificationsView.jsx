@@ -371,6 +371,7 @@ export default function ServerNotificationsView({
                         const isOrder = typeUpper.includes("ORDER") && !isSuccess;
 
                         const tableNo = item.data?.tableNo || item.data?.table_number || item.metadata?.tableNo || item.data?.table;
+                        const tableId = item.data?.tableId ? Number(item.data.tableId) : (item.tableId ? Number(item.tableId) : null);
 
                         return (
                             <div
@@ -416,12 +417,12 @@ export default function ServerNotificationsView({
 
                                 {/* Right Column: Table Action, Time & Mark Read Action */}
                                 <div className="flex items-center gap-2 flex-shrink-0 text-[10px] theme-muted pt-0.5">
-                                    {tableNo && handleSelectTable && (
+                                    {(tableNo || tableId) && handleSelectTable && (
                                         <button
                                             type="button"
-                                            onClick={() => handleSelectTable(tableNo)}
+                                            onClick={() => handleSelectTable(tableNo, tableId)}
                                             className="rounded-lg bg-orange-500/10 hover:bg-orange-500 text-orange-600 dark:text-orange-400 hover:text-white px-2 py-0.5 font-bold transition flex items-center gap-0.5 cursor-pointer"
-                                            title={`View Table ${tableNo}`}
+                                            title={tableNo ? `View Table ${tableNo}` : "View Table"}
                                         >
                                             View Table
                                         </button>

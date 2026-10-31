@@ -370,7 +370,7 @@ export default function StewardStation() {
                                         <div className="min-w-0">
                                             <div className="flex items-center justify-between gap-2 flex-wrap">
                                                 <span className="px-2.5 py-1 rounded-xl bg-[#F97316] text-white font-extrabold text-xs shrink-0">
-                                                    Table {item.kot?.tableNo || "N/A"}
+                                                    {item.section || item.kot?.section ? `${item.section || item.kot?.section} · Table ${item.tableNo || item.kot?.tableNo || "N/A"}` : `Table ${item.tableNo || item.kot?.tableNo || "N/A"}`}
                                                 </span>
                                                 <span className="text-xs text-[#57534E] shrink-0">
                                                     KOT #{item.kot?.kotNo || item.kot?.tokenNo || item.kotId}
@@ -395,7 +395,7 @@ export default function StewardStation() {
                                             }`}
                                         >
                                             <Check className="w-4 h-4 shrink-0" />
-                                            <span>{deliveringItemIds[item.id] ? "Delivering..." : `Deliver to Table ${item.kot?.tableNo}`}</span>
+                                            <span>{deliveringItemIds[item.id] ? "Delivering..." : `Deliver to ${item.section || item.kot?.section ? `${item.section || item.kot?.section} · Table ${item.tableNo || item.kot?.tableNo || "N/A"}` : `Table ${item.tableNo || item.kot?.tableNo}`}`}</span>
                                         </button>
                                     </div>
                                 ))}
