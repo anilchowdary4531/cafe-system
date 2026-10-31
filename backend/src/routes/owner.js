@@ -786,7 +786,14 @@ export default async function ownerRoutes(app, deps = {}) {
       const endOfDay = new Date(tomorrow);
       endOfDay.setDate(endOfDay.getDate() + 1);
 
-      const [tables, activeOrders, latestTableOrders, activeSessions, reservationsToday] = await Promise.all([
+      const [
+        tables,
+        activeOrders,
+        latestTableOrders,
+        activeSessions,
+        reservationsToday,
+        pendingCleaningTasks,
+      ] = await Promise.all([
         prisma.diningTable.findMany({
           where: { restaurantId },
           orderBy: { id: "desc" },
@@ -876,7 +883,20 @@ export default async function ownerRoutes(app, deps = {}) {
           include: { table: true },
           orderBy: { startTime: "asc" },
         }),
+        prisma.staffTask ? prisma.staffTask.findMany({
+          where: {
+            restaurantId,
+            category: "CLEANING",
+            isCompleted: false,
+            tableId: { not: null },
+          },
+          select: { tableId: true },
+        }) : Promise.resolve([]),
       ]);
+
+      const pendingCleaningTableIds = new Set(
+        (pendingCleaningTasks || []).map((t) => Number(t.tableId)).filter(Boolean)
+      );
 
       // Authoritative mapping of tables by primary key and exact tableNo
       const tablesById = new Map();
@@ -1130,7 +1150,18 @@ export default async function ownerRoutes(app, deps = {}) {
 
           const activeOrderStatus = resolveCanonicalActiveOrderStatus(tableActiveOrders, activeSession ? latestOrder : null);
 
-          const isDirty = table.cleaningStatus === "DIRTY" || table.status === "DIRTY";
+          const hasPendingCleaning = pendingCleaningTableIds.has(tid);
+          let isDirty = table.cleaningStatus === "DIRTY" || table.status === "DIRTY";
+
+          // If a table is flagged DIRTY in DB but has NO pending cleaning tasks and NO active session,
+          // it is an orphaned dirty state (from historical bugs or orphaned updates). Reconcile it to CLEAN.
+          if (isDirty && !hasPendingCleaning && !activeSession) {
+            isDirty = false;
+            prisma.diningTable.update({
+              where: { id: table.id },
+              data: { cleaningStatus: "CLEAN" },
+            }).catch(() => {});
+          }
 
           let canonicalStatus = "AVAILABLE";
           if (isBlocked) {

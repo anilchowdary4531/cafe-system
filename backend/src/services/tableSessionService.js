@@ -3,6 +3,7 @@ import { computeBill, toPriceSubunitItems } from "./billingService.js";
 import { hasActiveCleaner } from "./staffManagementService.js";
 import { createAndDispatchNotification, dispatchDesignationNotification } from "./notificationService.js";
 import { NOTIFICATION_TYPES, RECIPIENT_TYPES } from "../constants/notificationTypes.js";
+import { formatTableDisplayLabel, getCanonicalTableIdentity } from "../utils/tableIdentity.js";
 
 const ACTIVE_STATUSES = ["OPEN", "BILLING", "PAID"];
 
@@ -451,6 +452,7 @@ export const closeTableSession = async ({
 export const completeSessionAndReleaseTable = async ({
   prisma,
   tableSessionId,
+  sessionId,
   tableId,
   tableNo,
   restaurantId,
@@ -461,7 +463,7 @@ export const completeSessionAndReleaseTable = async ({
 } = {}) => {
   if (!prisma) return null;
 
-  let sid = tableSessionId ? Number(tableSessionId) : null;
+  let sid = tableSessionId ? Number(tableSessionId) : (sessionId ? Number(sessionId) : null);
 
   // 1. Resolve tableSessionId if not provided directly
   if (!sid && (tableId || orderId || tableNo)) {
@@ -735,12 +737,16 @@ export const completeSessionAndReleaseTable = async ({
     if (cleanerExists) {
       try {
         if (tx.staffTask) {
+          const displayLabel = formatTableDisplayLabel({
+            section: session.table?.section,
+            tableNo: session.tableNo,
+          });
           await tx.staffTask.create({
             data: {
               restaurantId: session.restaurantId,
               tableId: session.tableId || null,
-              title: `Clean Table ${session.tableNo}`,
-              description: `Dining session completed for Table ${session.tableNo}. Thorough sanitation and busing required before new seating.`,
+              title: `Clean ${displayLabel}`,
+              description: `Dining session completed for ${displayLabel}. Thorough sanitation and busing required before new seating.`,
               category: "CLEANING",
               taskType: "TABLE_BUS_AND_SANITIZE",
               roleTarget: "CLEANER",
@@ -902,49 +908,66 @@ export const completeSessionAndReleaseTable = async ({
       });
 
       // Dispatch persistent & realtime notification to all active Cleaners and Owner
-      dispatchDesignationNotification({
+      const displayLabel = formatTableDisplayLabel({
+        section: session.table?.section,
+        tableNo: session.tableNo,
+      });
+
+      // Dispatch persistent & realtime notification to all active Cleaners and Owner
+      await dispatchDesignationNotification({
         prisma,
         realtime: { io, staff },
         restaurantId: effectiveRid,
         designation: "CLEANER",
-        title: `🧹 Table ${session.tableNo} Needs Sanitation`,
-        message: `Dining session ended. Table ${session.tableNo} is dirty and awaiting busing & sanitation.`,
+        title: `🧹 ${displayLabel} Needs Sanitation`,
+        message: `Dining session ended. ${displayLabel} is dirty and awaiting busing & sanitation.`,
         notificationType: NOTIFICATION_TYPES.TABLE_DIRTY || "TABLE_DIRTY",
         priority: "HIGH",
         data: {
           restaurantId: effectiveRid,
           tableId: session.tableId ? Number(session.tableId) : null,
           tableNo: session.tableNo,
+          section: session.table?.section || null,
           sessionId: session.id,
           taskType: "TABLE_BUS_AND_SANITIZE",
         },
         idempotencyKey: `table_dirty_${effectiveRid}_${session.tableId}_${session.id}`,
       }).catch((e) => console.warn("[tableSessionService] Cleaner notification error:", e?.message));
 
-      createAndDispatchNotification({
+      await createAndDispatchNotification({
         prisma,
         realtime: { io, staff },
         recipientType: RECIPIENT_TYPES.OWNER || "OWNER",
         recipientId: effectiveRid,
         restaurantId: effectiveRid,
         notificationType: NOTIFICATION_TYPES.TABLE_DIRTY || "TABLE_DIRTY",
-        title: `🧹 Table ${session.tableNo} Requires Cleaning`,
-        message: `Table ${session.tableNo} marked dirty and dispatched to Cleaner Station.`,
-        data: { tableId: session.tableId, tableNo: session.tableNo },
+        title: `🧹 ${displayLabel} Requires Cleaning`,
+        message: `${displayLabel} marked dirty and dispatched to Cleaner Station.`,
+        data: { tableId: session.tableId, tableNo: session.tableNo, section: session.table?.section || null },
         idempotencyKey: `owner_table_dirty_${effectiveRid}_${session.tableId}_${session.id}`,
       }).catch(() => {});
     }
 
     // Dispatch payment settlement notification to Cashier and Owner
+    const paymentTableLabel = formatTableDisplayLabel({
+      section: session.table?.section,
+      tableNo: session.tableNo,
+    });
     dispatchDesignationNotification({
       prisma,
       realtime: { io, staff },
       restaurantId: effectiveRid,
       designation: "CASHIER",
-      title: `💰 Payment Received — Table ${session.tableNo}`,
-      message: `Table ${session.tableNo} bill settled (₹${Math.round(session.total || 0)}) via ${paymentMode || "Cash/Online"}.`,
+      title: `💰 Payment Received — ${paymentTableLabel}`,
+      message: `${paymentTableLabel} bill settled (₹${Math.round(session.total || 0)}) via ${paymentMode || "Cash/Online"}.`,
       notificationType: NOTIFICATION_TYPES.PAYMENT_SUCCESS || "PAYMENT_SUCCESS",
-      data: { tableId: session.tableId, tableNo: session.tableNo, total: session.total, paymentMode },
+      data: {
+        tableId: session.tableId ? Number(session.tableId) : null,
+        tableNo: session.tableNo,
+        section: session.table?.section || null,
+        total: session.total,
+        paymentMode,
+      },
       idempotencyKey: `cashier_payment_settled_${effectiveRid}_${session.id}`,
     }).catch(() => {});
 
@@ -955,9 +978,15 @@ export const completeSessionAndReleaseTable = async ({
       recipientId: effectiveRid,
       restaurantId: effectiveRid,
       notificationType: NOTIFICATION_TYPES.PAYMENT_SUCCESS || "PAYMENT_SUCCESS",
-      title: `💰 Payment Settled — Table ${session.tableNo}`,
-      message: `Table ${session.tableNo} bill settled (₹${Math.round(session.total || 0)}) via ${paymentMode || "Cash/Online"}.`,
-      data: { tableId: session.tableId, tableNo: session.tableNo, total: session.total, paymentMode },
+      title: `💰 Payment Settled — ${paymentTableLabel}`,
+      message: `${paymentTableLabel} bill settled (₹${Math.round(session.total || 0)}) via ${paymentMode || "Cash/Online"}.`,
+      data: {
+        tableId: session.tableId ? Number(session.tableId) : null,
+        tableNo: session.tableNo,
+        section: session.table?.section || null,
+        total: session.total,
+        paymentMode,
+      },
       idempotencyKey: `owner_payment_settled_${effectiveRid}_${session.id}`,
     }).catch(() => {});
   }
@@ -968,3 +997,64 @@ export const completeSessionAndReleaseTable = async ({
 
   return { completed: true, session: updatedSession };
 };
+
+/**
+ * Idempotently reconcile orphaned DIRTY tables back to CLEAN.
+ * An orphaned dirty table is a table with cleaningStatus = "DIRTY", but with:
+ * 1. NO pending cleaning StaffTasks (category: "CLEANING", isCompleted: false)
+ * 2. NO active TableSessions (status in ["OPEN", "BILLING", "PAID"])
+ */
+export async function reconcileOrphanedDirtyTables({ prisma, restaurantId = null, log = console } = {}) {
+  if (!prisma) return { healedCount: 0 };
+  try {
+    const dirtyTables = await prisma.diningTable.findMany({
+      where: {
+        cleaningStatus: "DIRTY",
+        ...(restaurantId ? { restaurantId: Number(restaurantId) } : {}),
+      },
+      select: { id: true, tableNo: true, section: true, restaurantId: true },
+    });
+
+    if (dirtyTables.length === 0) return { healedCount: 0 };
+
+    const dirtyTableIds = dirtyTables.map((t) => t.id);
+
+    const pendingTasks = await prisma.staffTask.findMany({
+      where: {
+        tableId: { in: dirtyTableIds },
+        category: "CLEANING",
+        isCompleted: false,
+      },
+      select: { tableId: true },
+    });
+    const pendingTaskTableIds = new Set(pendingTasks.map((t) => t.tableId).filter(Boolean));
+
+    const activeSessions = await prisma.tableSession.findMany({
+      where: {
+        tableId: { in: dirtyTableIds },
+        status: { in: ["OPEN", "BILLING", "PAID"] },
+      },
+      select: { tableId: true },
+    });
+    const activeSessionTableIds = new Set(activeSessions.map((s) => s.tableId).filter(Boolean));
+
+    const orphanedTableIds = dirtyTableIds.filter(
+      (id) => !pendingTaskTableIds.has(id) && !activeSessionTableIds.has(id)
+    );
+
+    if (orphanedTableIds.length > 0) {
+      await prisma.diningTable.updateMany({
+        where: { id: { in: orphanedTableIds } },
+        data: { cleaningStatus: "CLEAN" },
+      });
+      log?.info?.(
+        `[reconcileOrphanedDirtyTables] Reconciled ${orphanedTableIds.length} orphaned dirty tables to CLEAN: [${orphanedTableIds.join(", ")}]`
+      );
+    }
+
+    return { healedCount: orphanedTableIds.length, healedTableIds: orphanedTableIds };
+  } catch (err) {
+    log?.warn?.("[reconcileOrphanedDirtyTables] Error reconciling orphaned dirty tables:", err?.message || err);
+    return { healedCount: 0, error: err?.message };
+  }
+}

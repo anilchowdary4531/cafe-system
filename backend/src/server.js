@@ -13,6 +13,7 @@ import routes from "./routes/index.js";
 import { initRealtime } from "./realtime/socketServer.js";
 import { requireStaffJwt } from "./services/staffAuthService.js";
 import { getStorageInfo } from "./services/storageService.js";
+import { reconcileOrphanedDirtyTables } from "./services/tableSessionService.js";
 
 const nodeEnv = String(process.env.NODE_ENV || "development").trim() || "development";
 const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -423,6 +424,11 @@ if (process.env.VALIDATE_BOOT === "1") {
 
 const start = async () => {
   try {
+    try {
+      await reconcileOrphanedDirtyTables({ prisma, log: app.log });
+    } catch (reconcileErr) {
+      app.log?.warn?.(`[server] Orphaned dirty tables reconciliation warning: ${reconcileErr?.message || reconcileErr}`);
+    }
     await app.listen({ port: PORT, host: HOST });
     console.log(`Running on ${HOST}:${PORT}`);
   } catch (err) {

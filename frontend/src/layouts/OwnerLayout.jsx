@@ -1151,16 +1151,7 @@ export default function OwnerLayout() {
                 const next = { ...(prev || {}) };
                 tables.forEach((t) => {
                     const wid = t.assignedWaiterId ? String(t.assignedWaiterId) : "";
-                    const keys = t.id
-                        ? [`table-id-${t.id}`]
-                        : [
-                            t.assignmentKey && t.assignmentKey.startsWith("table-") ? t.assignmentKey : null,
-                            t.tableNo && restaurantId
-                                ? `table-no-${restaurantId}-${String(t.tableNo).trim().toLowerCase()}`
-                                : t.tableNo
-                                ? `table-no-${String(t.tableNo).trim().toLowerCase()}`
-                                : null,
-                          ].filter(Boolean);
+                    const keys = t.id ? [`table-id-${t.id}`] : [];
 
                     if (wid) {
                         keys.forEach((k) => {
@@ -1243,15 +1234,13 @@ export default function OwnerLayout() {
         const handleTableUpdated = (payload) => {
             if (!payload || typeof payload !== "object") return;
             const targetId = payload.tableId || payload.id;
-            const targetNo = payload.tableNo;
+            if (!targetId) return; // Strict canonical table identity: never guess or fall back to tableNo
 
             if (payload.status === "AVAILABLE" || payload.isOccupied === false) {
                 const isDirty = payload.cleaningStatus === "DIRTY" || payload.status === "DIRTY";
                 setTableOverview((prev) => {
                     const updatedTables = (prev.tables || []).map((t) => {
-                        const match = targetId
-                            ? String(t.id) === String(targetId)
-                            : Boolean(targetNo && String(t.tableNo).trim() === String(targetNo).trim());
+                        const match = String(t.id) === String(targetId);
                         if (match) {
                             return {
                                 ...t,
@@ -1285,13 +1274,7 @@ export default function OwnerLayout() {
                 // Immediately clear tableAssignments keys for this table
                 setTableAssignments((prev) => {
                     const next = { ...(prev || {}) };
-                    if (targetId) {
-                        delete next[`table-id-${targetId}`];
-                    } else if (targetNo) {
-                        const normNo = String(targetNo).trim().toLowerCase();
-                        if (restaurantId) delete next[`table-no-${restaurantId}-${normNo}`];
-                        delete next[`table-no-${normNo}`];
-                    }
+                    delete next[`table-id-${targetId}`];
                     return next;
                 });
             } else if (payload.assignedWaiterId !== undefined || payload.assignedWaiterName !== undefined) {
@@ -1299,9 +1282,7 @@ export default function OwnerLayout() {
                 const wname = payload.assignedWaiterName || null;
                 setTableOverview((prev) => {
                     const updatedTables = (prev.tables || []).map((t) => {
-                        const match = targetId
-                            ? String(t.id) === String(targetId)
-                            : Boolean(targetNo && String(t.tableNo).trim() === String(targetNo).trim());
+                        const match = String(t.id) === String(targetId);
                         if (match) {
                             return {
                                 ...t,
@@ -1317,18 +1298,8 @@ export default function OwnerLayout() {
 
                 setTableAssignments((prev) => {
                     const next = { ...(prev || {}) };
-                    if (targetId) {
-                        if (wid) next[`table-id-${targetId}`] = wid;
-                        else delete next[`table-id-${targetId}`];
-                    } else if (targetNo) {
-                        const normNo = String(targetNo).trim().toLowerCase();
-                        if (restaurantId) {
-                            if (wid) next[`table-no-${restaurantId}-${normNo}`] = wid;
-                            else delete next[`table-no-${restaurantId}-${normNo}`];
-                        }
-                        if (wid) next[`table-no-${normNo}`] = wid;
-                        else delete next[`table-no-${normNo}`];
-                    }
+                    if (wid) next[`table-id-${targetId}`] = wid;
+                    else delete next[`table-id-${targetId}`];
                     return next;
                 });
             }
@@ -1337,13 +1308,11 @@ export default function OwnerLayout() {
 
         const handleSessionUpdated = (session) => {
             if (session && (!session.status || session.status === "CLOSED" || session.status === "CANCELLED")) {
-                const targetId = session.tableId;
-                const targetNo = session.tableNo;
+                const targetId = session.tableId || session.id;
+                if (!targetId) return; // Strict canonical table identity: never guess or fall back to tableNo
                 setTableOverview((prev) => {
                     const updatedTables = (prev.tables || []).map((t) => {
-                        const match = targetId
-                            ? String(t.id) === String(targetId)
-                            : Boolean(targetNo && String(t.tableNo).trim() === String(targetNo).trim());
+                        const match = String(t.id) === String(targetId);
                         if (match) {
                             return {
                                 ...t,
@@ -1376,13 +1345,7 @@ export default function OwnerLayout() {
                 // Immediately clear tableAssignments keys
                 setTableAssignments((prev) => {
                     const next = { ...(prev || {}) };
-                    if (targetId) {
-                        delete next[`table-id-${targetId}`];
-                    } else if (targetNo) {
-                        const normNo = String(targetNo).trim().toLowerCase();
-                        if (restaurantId) delete next[`table-no-${restaurantId}-${normNo}`];
-                        delete next[`table-no-${normNo}`];
-                    }
+                    delete next[`table-id-${targetId}`];
                     return next;
                 });
             }
@@ -1538,16 +1501,7 @@ export default function OwnerLayout() {
         const counts = {};
         tableOverview.tables.forEach((table) => {
             const idKey = table.id ? `table-id-${table.id}` : null;
-            const noKey = table.tableNo && restaurantId
-                ? `table-no-${restaurantId}-${String(table.tableNo).trim().toLowerCase()}`
-                : table.tableNo
-                ? `table-no-${String(table.tableNo).trim().toLowerCase()}`
-                : null;
-            const localStaffId = idKey
-                ? tableAssignments[idKey] || ""
-                : ((noKey && tableAssignments[noKey]) ||
-                   (table.assignmentKey && tableAssignments[table.assignmentKey]) ||
-                   "");
+            const localStaffId = idKey ? tableAssignments[idKey] || "" : "";
             const staffId = String(
                 table.assignedWaiterId ||
                 table.activeSession?.waiterId ||
@@ -1603,23 +1557,13 @@ export default function OwnerLayout() {
         const prevAssignments = { ...(tableAssignments || {}) };
         const prevOverview = { ...tableOverview };
 
+        const targetTableId = tableObj?.id || (tableKey?.startsWith("table-id-") ? tableKey.replace("table-id-", "") : null);
+        if (!targetTableId) return;
+
         setTableAssignments((prev) => {
             const next = { ...(prev || {}) };
-            if (tableObj?.id) {
-                delete next[`table-id-${tableObj.id}`];
-            } else if (tableObj?.tableNo) {
-                const normNo = String(tableObj.tableNo).trim().toLowerCase();
-                if (restaurantId) {
-                    delete next[`table-no-${restaurantId}-${normNo}`];
-                }
-                delete next[`table-no-${normNo}`];
-            }
-            if (tableObj?.assignmentKey) {
-                delete next[tableObj.assignmentKey];
-            }
-            if (tableKey) {
-                delete next[tableKey];
-            }
+            delete next[`table-id-${targetTableId}`];
+            if (tableKey) delete next[tableKey];
             return next;
         });
 
@@ -1627,10 +1571,7 @@ export default function OwnerLayout() {
         setTableOverview((prev) => ({
             ...prev,
             tables: (prev.tables || []).map((t) => {
-                const matches = tableObj?.id
-                    ? String(t.id) === String(tableObj.id)
-                    : (tableKey && t.assignmentKey === tableKey) ||
-                      (tableObj?.tableNo && String(t.tableNo).toLowerCase() === String(tableObj.tableNo).toLowerCase());
+                const matches = String(t.id) === String(targetTableId);
                 if (!matches) return t;
                 return {
                     ...t,
@@ -1644,15 +1585,6 @@ export default function OwnerLayout() {
                 };
             }),
         }));
-
-        const targetTableId = tableObj?.id || (function () {
-            const found = tableOverview.tables.find(
-                (t) =>
-                    (t.id && `table-id-${t.id}` === tableKey) ||
-                    t.assignmentKey === tableKey
-            );
-            return found?.id;
-        })();
 
         if (restaurantId && targetTableId) {
             try {
@@ -1674,14 +1606,7 @@ export default function OwnerLayout() {
     };
 
     const assignStaffToTable = async (tableKey, staffId, tableObj) => {
-        const targetTableId = tableObj?.id || (function () {
-            const found = (tableOverview.tables || []).find(
-                (t) =>
-                    (t.id && `table-id-${t.id}` === tableKey) ||
-                    t.assignmentKey === tableKey
-            );
-            return found?.id;
-        })();
+        const targetTableId = tableObj?.id || (tableKey?.startsWith("table-id-") ? tableKey.replace("table-id-", "") : null);
 
         if (!targetTableId) {
             return;
@@ -1718,21 +1643,7 @@ export default function OwnerLayout() {
 
             setTableAssignments((prev) => {
                 const next = { ...(prev || {}) };
-                if (tableObj?.id) {
-                    next[`table-id-${tableObj.id}`] = normalizedStaffId;
-                } else if (tableObj?.tableNo) {
-                    const normNo = String(tableObj.tableNo).trim().toLowerCase();
-                    if (restaurantId) {
-                        next[`table-no-${restaurantId}-${normNo}`] = normalizedStaffId;
-                    }
-                    next[`table-no-${normNo}`] = normalizedStaffId;
-                }
-                if (tableObj?.assignmentKey && !tableObj?.id) {
-                    next[tableObj.assignmentKey] = normalizedStaffId;
-                }
-                if (tableKey && tableKey.startsWith("table-") && !tableObj?.id) {
-                    next[tableKey] = normalizedStaffId;
-                }
+                next[`table-id-${targetTableId}`] = normalizedStaffId;
                 return next;
             });
 
@@ -1740,10 +1651,7 @@ export default function OwnerLayout() {
             setTableOverview((prev) => ({
                 ...prev,
                 tables: (prev.tables || []).map((t) => {
-                    const matches = tableObj?.id
-                        ? String(t.id) === String(tableObj.id)
-                        : (tableObj?.tableNo && String(t.tableNo).toLowerCase() === String(tableObj.tableNo).toLowerCase()) ||
-                          t.assignmentKey === tableKey;
+                    const matches = String(t.id) === String(targetTableId);
                     if (!matches) return t;
                     return {
                         ...t,
@@ -1866,7 +1774,7 @@ export default function OwnerLayout() {
     };
 
     const handleFreeTable = async (table, assignmentKey, options = {}) => {
-        const targetTableId = table?.id || table?.tableNo || table?.label || null;
+        const targetTableId = table?.id ? Number(table.id) : null;
 
         if (!restaurantId || !targetTableId) {
             setOpenOrdersTableKey("");
@@ -1916,11 +1824,7 @@ export default function OwnerLayout() {
         // Optimistically update table state to Available and clear server assignment in local state
         setTableOverview((prev) => {
             const updatedTables = (prev.tables || []).map((t) => {
-                const matches = targetTableId
-                    ? String(t.id) === String(targetTableId)
-                    : (assignmentKey && t.assignmentKey === assignmentKey) ||
-                      Boolean(table?.tableNo && String(t.tableNo).trim() === String(table.tableNo).trim()) ||
-                      Boolean(t.tableNo && String(t.tableNo).trim() === String(tableNoLabel).trim());
+                const matches = Number(t.id) === targetTableId;
                 if (matches) {
                     return {
                         ...t,
@@ -1947,24 +1851,8 @@ export default function OwnerLayout() {
         // Clear local table staff assignments map
         setTableAssignments((prev) => {
             const next = { ...(prev || {}) };
-            const keysToRemove = targetTableId
-                ? [`table-id-${targetTableId}`]
-                : [
-                    assignmentKey,
-                    table?.assignmentKey,
-                    table?.tableNo && restaurantId
-                        ? `table-no-${restaurantId}-${String(table.tableNo).trim().toLowerCase()}`
-                        : null,
-                    table?.tableNo
-                        ? `table-no-${String(table.tableNo).trim().toLowerCase()}`
-                        : null,
-                    tableNoLabel
-                        ? `table-no-${String(tableNoLabel).trim().toLowerCase()}`
-                        : null,
-                  ].filter(Boolean);
-            keysToRemove.forEach((k) => {
-                delete next[k];
-            });
+            delete next[`table-id-${targetTableId}`];
+            if (assignmentKey) delete next[assignmentKey];
             if (restaurantId) {
                 try {
                     localStorage.setItem(getTableStaffStorageKey(restaurantId), JSON.stringify(next));
@@ -2765,16 +2653,7 @@ export default function OwnerLayout() {
                                                      table.assignmentKey || (table.id ? `table-id-${table.id}` : table.key)
                                                  );
                                                  const idKey = table.id ? `table-id-${table.id}` : null;
-                                                 const noKey = table.tableNo && restaurantId
-                                                     ? `table-no-${restaurantId}-${String(table.tableNo).trim().toLowerCase()}`
-                                                     : table.tableNo
-                                                     ? `table-no-${String(table.tableNo).trim().toLowerCase()}`
-                                                     : null;
-                                                 const localAssigned = idKey
-                                                     ? tableAssignments[idKey] || ""
-                                                     : ((noKey && tableAssignments[noKey]) ||
-                                                        (assignmentKey && tableAssignments[assignmentKey]) ||
-                                                        "");
+                                                 const localAssigned = idKey ? tableAssignments[idKey] || "" : "";
                                                  const isExplicitlyFree = table.status === "AVAILABLE" || table.isOccupied === false;
                                                  const assignedStaffId = isExplicitlyFree
                                                      ? (table.assignedWaiterId ? String(table.assignedWaiterId) : "")

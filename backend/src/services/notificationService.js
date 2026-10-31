@@ -183,12 +183,38 @@ export const createAndDispatchNotification = async ({
   // 5. Channel 2: FCM Push Notification Dispatch to Active Devices
   try {
     const isCustomer = recipientType === RECIPIENT_TYPES.CUSTOMER;
-    const tokens = await prisma.deviceToken.findMany({
-      where: isCustomer
-        ? { customerId: Number(recipientId), isActive: true }
-        : { userId: Number(recipientId), isActive: true },
-      select: { deviceToken: true },
-    });
+    const isRole = ["OWNER", "MANAGER", "CLEANER", "STEWARD", "WAITER", "CHEF", "CASHIER", "SWIPER"].includes(String(recipientType).toUpperCase());
+    let tokens = [];
+
+    if (isCustomer) {
+      tokens = await prisma.deviceToken.findMany({
+        where: { customerId: Number(recipientId), isActive: true },
+        select: { deviceToken: true },
+      });
+    } else if (isRole) {
+      const targetRid = Number(restaurantId || recipientId);
+      if (targetRid) {
+        const allStaff = await prisma.user.findMany({
+          where: { restaurantId: targetRid, isActive: true },
+          select: { id: true, role: true, designation: true },
+        });
+        const normRole = String(recipientType).toUpperCase();
+        const targetUserIds = allStaff
+          .filter((u) => (inferRoleFromDesignation(u.designation) || String(u.role || "").toUpperCase()) === normRole)
+          .map((u) => u.id);
+        if (targetUserIds.length > 0) {
+          tokens = await prisma.deviceToken.findMany({
+            where: { userId: { in: targetUserIds }, isActive: true },
+            select: { deviceToken: true },
+          });
+        }
+      }
+    } else {
+      tokens = await prisma.deviceToken.findMany({
+        where: { userId: Number(recipientId), isActive: true },
+        select: { deviceToken: true },
+      });
+    }
 
     for (const t of tokens) {
       sendFcmPushNotification({
@@ -415,23 +441,9 @@ export const dispatchDesignationNotification = async ({
     });
   }
 
-  // Find all active staff users with this designation in the restaurant
-  let targetUsers = [];
-  try {
-    const allStaff = await prisma.user.findMany({
-      where: { restaurantId: rid, isActive: true },
-      select: { id: true, role: true, designation: true },
-    });
-    targetUsers = allStaff.filter((u) => {
-      const uRole = inferRoleFromDesignation(u.designation) || String(u.role || "").toUpperCase();
-      return uRole === normRole;
-    });
-  } catch (err) {
-    console.error("[dispatchDesignationNotification] user lookup error:", err?.message);
-  }
-
-  // Dispatch role-level notification
-  const roleNotif = await createAndDispatchNotification({
+  // Dispatch single authoritative role-level notification.
+  // Never create duplicate personal user notification rows for the same event.
+  return await createAndDispatchNotification({
     prisma,
     realtime,
     recipientType: normRole,
@@ -445,26 +457,6 @@ export const dispatchDesignationNotification = async ({
     priority,
     idempotencyKey: idempotencyKey ? `${idempotencyKey}_role_${normRole}` : null,
   });
-
-  // Dispatch personal user notification to each active staff member with that role
-  for (const u of targetUsers) {
-    await createAndDispatchNotification({
-      prisma,
-      realtime,
-      recipientType: RECIPIENT_TYPES.USER,
-      recipientId: u.id,
-      restaurantId: rid,
-      orderId,
-      notificationType,
-      title,
-      message,
-      data,
-      priority,
-      idempotencyKey: idempotencyKey ? `${idempotencyKey}_user_${u.id}` : null,
-    }).catch(() => {});
-  }
-
-  return roleNotif;
 };
 
 /**
