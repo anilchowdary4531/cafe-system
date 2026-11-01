@@ -576,12 +576,19 @@ export default async function customerRoutes(app, deps = {}) {
 
       if (!targetDiningTable && normalizedTableNo) {
         const rawTable = String(normalizedTableNo).trim();
-        targetDiningTable = await prisma.diningTable.findFirst({
+        const matches = await prisma.diningTable.findMany({
           where: {
             restaurantId: restaurant.id,
             tableNo: { equals: rawTable, mode: "insensitive" },
           },
         });
+        if (matches.length === 1) {
+          targetDiningTable = matches[0];
+        } else if (matches.length > 1 && body.section) {
+          targetDiningTable = matches.find(
+            (m) => String(m.section || "").trim().toLowerCase() === String(body.section).trim().toLowerCase()
+          ) || null;
+        }
       }
 
       if (targetDiningTable) {

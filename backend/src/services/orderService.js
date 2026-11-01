@@ -366,15 +366,30 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
         }).catch(() => {});
       }
     } else if (body.tableId || tableNo) {
-      dTable = body.tableId
-        ? await tx.diningTable.findFirst({
-            where: { id: Number(body.tableId), restaurantId },
-            select: { id: true, tableNo: true, assignedWaiterId: true, assignedWaiterName: true },
-          })
-        : await tx.diningTable.findFirst({
-            where: { restaurantId, tableNo: String(tableNo).trim() },
-            select: { id: true, tableNo: true, assignedWaiterId: true, assignedWaiterName: true },
-          });
+      if (body.tableId) {
+        dTable = await tx.diningTable.findFirst({
+          where: { id: Number(body.tableId), restaurantId },
+          select: { id: true, tableNo: true, section: true, assignedWaiterId: true, assignedWaiterName: true },
+        });
+      } else {
+        const matchingTables = await tx.diningTable.findMany({
+          where: { restaurantId, tableNo: String(tableNo).trim() },
+          select: { id: true, tableNo: true, section: true, assignedWaiterId: true, assignedWaiterName: true },
+        });
+        if (matchingTables.length === 1) {
+          dTable = matchingTables[0];
+        } else if (matchingTables.length > 1 && (body.section || req?.body?.section)) {
+          const sec = String(body.section || req?.body?.section).trim().toLowerCase();
+          dTable = matchingTables.find(
+            (t) => String(t.section || "").trim().toLowerCase() === sec
+          ) || null;
+        }
+        if (matchingTables.length > 1 && !dTable) {
+          const err = new Error(`Ambiguous table number '${tableNo}': multiple physical tables match. Specific tableId is required.`);
+          err.code = "ambiguous_table_identity";
+          throw err;
+        }
+      }
       if (dTable) {
         let activeSession = await tx.tableSession.findFirst({
           where: {
@@ -800,11 +815,26 @@ export const updateOrderStatus = async ({ prisma, actor, orderId, nextStatus, no
           updated.createdByUserId ||
           null;
 
-        if (!responsibleServerId && updated.tableNo && updated.restaurantId) {
-          const dTable = await tx.diningTable.findFirst({
-            where: { restaurantId: updated.restaurantId, tableNo: String(updated.tableNo).trim() },
-            select: { assignedWaiterId: true },
-          });
+        if (!responsibleServerId && (updated.tableSession?.tableId || updated.tableNo) && updated.restaurantId) {
+          let dTable = null;
+          if (updated.tableSession?.tableId) {
+            dTable = await tx.diningTable.findUnique({
+              where: { id: Number(updated.tableSession.tableId) },
+              select: { assignedWaiterId: true },
+            });
+          } else if (updated.tableNo) {
+            const matching = await tx.diningTable.findMany({
+              where: { restaurantId: updated.restaurantId, tableNo: String(updated.tableNo).trim() },
+              select: { assignedWaiterId: true, section: true },
+            });
+            if (matching.length === 1) {
+              dTable = matching[0];
+            } else if (matching.length > 1 && updated.section) {
+              dTable = matching.find(
+                (m) => String(m.section || "").trim().toLowerCase() === String(updated.section).trim().toLowerCase()
+              );
+            }
+          }
           if (dTable?.assignedWaiterId) responsibleServerId = dTable.assignedWaiterId;
         }
 

@@ -143,11 +143,18 @@ export default async function staffTaskRoutes(app, deps = {}) {
 
       let resolvedTableId = tableId ? Number(tableId) : null;
       if (!resolvedTableId && tableNo) {
-        const found = await prisma.diningTable.findFirst({
-          where: { restaurantId, tableNo: String(tableNo) },
-          select: { id: true },
+        const matching = await prisma.diningTable.findMany({
+          where: { restaurantId, tableNo: String(tableNo).trim() },
+          select: { id: true, section: true },
         });
-        if (found) resolvedTableId = found.id;
+        if (matching.length === 1) {
+          resolvedTableId = matching[0].id;
+        } else if (matching.length > 1 && section) {
+          const matchWithSection = matching.find(
+            (m) => String(m.section || "").trim().toLowerCase() === String(section).trim().toLowerCase()
+          );
+          if (matchWithSection) resolvedTableId = matchWithSection.id;
+        }
       }
 
       const staffId = req.staffActor?.id || req.staffActor?.userId;
@@ -1114,10 +1121,18 @@ export default async function staffTaskRoutes(app, deps = {}) {
             if (dt?.assignedWaiterId) waiterId = Number(dt.assignedWaiterId);
           }
           if (!waiterId && kotTableNo && rid) {
-            const dt = await prisma.diningTable.findFirst({
+            const matching = await prisma.diningTable.findMany({
               where: { restaurantId: rid, tableNo: String(kotTableNo).trim() },
-              select: { assignedWaiterId: true },
+              select: { assignedWaiterId: true, section: true },
             });
+            let dt = null;
+            if (matching.length === 1) {
+              dt = matching[0];
+            } else if (matching.length > 1 && kotSection) {
+              dt = matching.find(
+                (m) => String(m.section || "").trim().toLowerCase() === String(kotSection).trim().toLowerCase()
+              );
+            }
             if (dt?.assignedWaiterId) waiterId = Number(dt.assignedWaiterId);
           }
           if (!waiterId) {

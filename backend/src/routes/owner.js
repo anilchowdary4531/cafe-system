@@ -3885,12 +3885,15 @@ export default async function ownerRoutes(app, deps = {}) {
       });
     }
     if (!diningTable && rawParam) {
-      diningTable = await prisma.diningTable.findFirst({
+      const matches = await prisma.diningTable.findMany({
         where: {
           restaurantId,
           tableNo: { equals: rawParam, mode: "insensitive" },
         },
       });
+      if (matches.length === 1) {
+        diningTable = matches[0];
+      }
     }
 
     const effectiveTableNo = diningTable?.tableNo || tableParam;

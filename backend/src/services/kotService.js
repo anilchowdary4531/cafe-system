@@ -91,10 +91,18 @@ export const createKotsForOrder = async ({ prisma, tx = prisma, order, actor, id
             effectiveWaiterName = session.waiterName || effectiveWaiterName;
         }
     } else if (order.tableNo) {
-        const dTable = await tx.diningTable.findFirst({
+        const matching = await tx.diningTable.findMany({
             where: { restaurantId, tableNo: String(order.tableNo).trim() },
-            select: { assignedWaiterId: true, assignedWaiterName: true },
+            select: { assignedWaiterId: true, assignedWaiterName: true, section: true },
         });
+        let dTable = null;
+        if (matching.length === 1) {
+            dTable = matching[0];
+        } else if (matching.length > 1 && order.section) {
+            dTable = matching.find(
+                (m) => String(m.section || "").trim().toLowerCase() === String(order.section).trim().toLowerCase()
+            );
+        }
         if (dTable?.assignedWaiterId) {
             effectiveWaiterId = dTable.assignedWaiterId;
             effectiveWaiterName = dTable.assignedWaiterName || effectiveWaiterName;
