@@ -30,6 +30,19 @@ vi.mock("../context/StaffSocketContext", () => ({
     }),
 }));
 
+vi.mock("../hooks/useConnectivity", () => ({
+    useConnectivity: () => ({
+        isLive: mockIsConnected,
+        isOffline: !mockIsConnected,
+        isReconnecting: false,
+    }),
+    default: () => ({
+        isLive: mockIsConnected,
+        isOffline: !mockIsConnected,
+        isReconnecting: false,
+    }),
+}));
+
 vi.mock("../context/AuthContext", () => ({
     useAuth: () => ({
         user: { id: 101, name: "Cashier Alice", role: "CASHIER", designation: "Cashier", restaurantId: 1, restaurant: { id: 1, name: "Tiffzy Diner" } },
