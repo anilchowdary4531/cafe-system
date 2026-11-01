@@ -467,15 +467,58 @@ export const placeQrOrder = async ({
   // Emit WebSocket updates if io is available
   if (io) {
     try {
-      io.to(`restaurant_${restaurantId}`).emit("order_created", {
-        order,
-        session: updatedSession,
-        source: "QR",
-      });
-      io.to(`restaurant_${restaurantId}`).emit("table_session_updated", {
-        tableId: table.id,
-        session: updatedSession,
-      });
+      const staff = typeof io.of === "function" ? io.of("/staff") : null;
+      const rooms = [`restaurant_${restaurantId}`, `restaurant:${restaurantId}`];
+      for (const room of rooms) {
+        io.to(room).emit("order_created", {
+          order,
+          session: updatedSession,
+          source: "QR",
+        });
+        io.to(room).emit("order:created", order);
+        io.to(room).emit("table_session_updated", {
+          tableId: table.id,
+          session: updatedSession,
+        });
+        io.to(room).emit("table:session_updated", updatedSession);
+        io.to(room).emit("table:updated", {
+          tableId: table.id,
+          id: table.id,
+          tableNo: table.tableNo,
+          status: "OCCUPIED",
+          isOccupied: true,
+        });
+
+        if (Array.isArray(order.kots)) {
+          for (const kot of order.kots) {
+            io.to(room).emit("kot:created", kot);
+            io.to(room).emit("kot_created", kot);
+          }
+        }
+
+        if (staff) {
+          staff.to(room).emit("order:created", order);
+          staff.to(room).emit("order_created", {
+            order,
+            session: updatedSession,
+            source: "QR",
+          });
+          staff.to(room).emit("table:session_updated", updatedSession);
+          staff.to(room).emit("table:updated", {
+            tableId: table.id,
+            id: table.id,
+            tableNo: table.tableNo,
+            status: "OCCUPIED",
+            isOccupied: true,
+          });
+          if (Array.isArray(order.kots)) {
+            for (const kot of order.kots) {
+              staff.to(room).emit("kot:created", kot);
+              staff.to(room).emit("kot_created", kot);
+            }
+          }
+        }
+      }
     } catch (_) {}
   }
 

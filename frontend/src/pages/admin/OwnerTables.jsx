@@ -655,9 +655,9 @@ export default function OwnerTables() {
             if (!session.status || session.status === "CLOSED" || session.status === "CANCELLED") {
                 setTables((prev) =>
                     prev.map((t) => {
-                        const match =
-                            (session.tableId && String(t.id) === String(session.tableId)) ||
-                            (session.tableNo && String(t.tableNo).trim().toLowerCase() === String(session.tableNo).trim().toLowerCase());
+                        const match = session.tableId
+                            ? (Number(t.id) === Number(session.tableId) || String(t.id) === String(session.tableId))
+                            : (session.tableNo && String(t.tableNo).trim().toLowerCase() === String(session.tableNo).trim().toLowerCase());
                         if (match) {
                             return {
                                 ...t,
@@ -737,9 +737,9 @@ export default function OwnerTables() {
                 }
                 setTables((prev) =>
                     prev.map((t) => {
-                        const match =
-                            (targetId && String(t.id) === String(targetId)) ||
-                            (targetNo && String(t.tableNo).trim().toLowerCase() === String(targetNo).trim().toLowerCase());
+                        const match = targetId
+                            ? (Number(t.id) === Number(targetId) || String(t.id) === String(targetId))
+                            : (targetNo && String(t.tableNo).trim().toLowerCase() === String(targetNo).trim().toLowerCase());
                         if (match) {
                             return {
                                 ...t,
@@ -766,9 +766,9 @@ export default function OwnerTables() {
                 const wname = payload.assignedWaiterName || null;
                 setTables((prev) =>
                     prev.map((t) => {
-                        const match =
-                            (targetId && String(t.id) === String(targetId)) ||
-                            (targetNo && String(t.tableNo).trim().toLowerCase() === String(targetNo).trim().toLowerCase());
+                        const match = targetId
+                            ? (Number(t.id) === Number(targetId) || String(t.id) === String(targetId))
+                            : (targetNo && String(t.tableNo).trim().toLowerCase() === String(targetNo).trim().toLowerCase());
                         if (match) {
                             return {
                                 ...t,

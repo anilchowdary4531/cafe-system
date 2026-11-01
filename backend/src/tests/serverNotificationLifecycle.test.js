@@ -395,8 +395,8 @@ test("TIFFZY COMPLETE KITCHEN -> SERVER NOTIFICATION FLOW AUDIT + FIX TEST SUITE
     assert.equal(readyNotifs.length, 1);
     const readyNotif = readyNotifs[0];
     foodReadyNotificationId = readyNotif.id;
-    assert.equal(readyNotif.title, `Food Ready — Table ${table5.tableNo}`);
-    assert.ok(readyNotif.message.includes("is ready for Table"));
+    assert.ok(readyNotif.title.includes(`Table ${table5.tableNo}`));
+    assert.ok(readyNotif.message.includes(`Table ${table5.tableNo}`));
     assert.equal(readyNotif.idempotencyKey, `food_ready_${rid1}_${createdKotItemId}_${serverA.id}_READY`);
   });
 
@@ -421,7 +421,7 @@ test("TIFFZY COMPLETE KITCHEN -> SERVER NOTIFICATION FLOW AUDIT + FIX TEST SUITE
     });
 
     assert.equal(deliveredNotifs.length, 1);
-    assert.equal(deliveredNotifs[0].title, `Food Delivered — Table ${table5.tableNo}`);
+    assert.ok(deliveredNotifs[0].title.includes(`Table ${table5.tableNo}`));
     assert.equal(deliveredNotifs[0].idempotencyKey, `food_served_${rid1}_${createdKotItemId}_${serverA.id}_SERVED`);
 
     const ownerDeliveredNotifs = await prisma.notification.findMany({

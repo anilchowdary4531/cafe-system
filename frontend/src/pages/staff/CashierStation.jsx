@@ -636,7 +636,13 @@ export default function CashierStation() {
             const activeOrder = orders.find((o) => {
                 const oTid = Number(o.tableId || o.tableSession?.tableId || 0);
                 if (tid && oTid) return oTid === tid;
-                return !oTid && String(o.tableNo || "").trim() === tNo;
+                if (!oTid && String(o.tableNo || "").trim() === tNo) {
+                    if (o.section && t.section) {
+                        return String(o.section).trim().toLowerCase() === String(t.section).trim().toLowerCase();
+                    }
+                    return true;
+                }
+                return false;
             });
             const status = t.canonicalStatus || (t.isOccupied ? "OCCUPIED" : "AVAILABLE");
             const billTotal = activeOrder ? getAuthoritativeTotal(activeOrder) : Number(t.sessionTotal || 0);
@@ -909,7 +915,8 @@ export default function CashierStation() {
                                             const isSelected = selectedOrder && (
                                                 (selectedOrder.tableId && t.id)
                                                     ? Number(selectedOrder.tableId) === Number(t.id)
-                                                    : String(selectedOrder.tableNo || "").trim() === String(t.tableNo).trim()
+                                                    : (String(selectedOrder.tableNo || "").trim() === String(t.tableNo).trim() &&
+                                                       (!selectedOrder.section || !t.section || String(selectedOrder.section).trim().toLowerCase() === String(t.section).trim().toLowerCase()))
                                             );
                                             const isBilling = t.status === "BILLING" || t.activeOrder?.status === "BILL_REQUESTED";
 

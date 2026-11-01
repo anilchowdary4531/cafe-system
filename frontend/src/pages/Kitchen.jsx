@@ -42,6 +42,10 @@ import ServerNotificationsView from "../components/ServerNotificationsView";
 import ChefWorkloadPanel from "../components/ChefWorkloadPanel";
 import KitchenAssignmentDrawer from "../components/KitchenAssignmentDrawer";
 import StaffWorkHistoryTabs from "../components/StaffWorkHistoryTabs";
+import ChefAssignmentActions from "../components/ChefAssignmentActions";
+import ReassignChefModal from "../components/ReassignChefModal";
+import AssignmentDetailsModal from "../components/AssignmentDetailsModal";
+import UnassignConfirmModal from "../components/UnassignConfirmModal";
 
 const KOT_STATUSES = ["ALL", "PENDING", "PREPARING", "READY", "SERVED", "CANCELLED"];
 const PRIORITIES = ["ALL", "NORMAL", "HIGH", "URGENT"];
@@ -195,6 +199,11 @@ export default function Kitchen() {
     const [drawerKot, setDrawerKot] = useState(null);
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [isSubmittingAssignment, setIsSubmittingAssignment] = useState(false);
+
+    // Item-level assignment modal states
+    const [reassignModalData, setReassignModalData] = useState(null); // { item, kot }
+    const [detailsModalData, setDetailsModalData] = useState(null);   // { item, kot }
+    const [unassignModalData, setUnassignModalData] = useState(null); // { item, kot }
 
     // Filters
     const [selectedStationId, setSelectedStationId] = useState("ALL");
@@ -612,7 +621,14 @@ export default function Kitchen() {
             loadHistoryData(1, true);
         };
 
+        const handleDeliveryAndHistorySync = () => {
+            loadKots({ silent: true });
+            loadWorkload();
+            loadHistoryData(1, true);
+        };
+
         socket.on("kot_created", onKotCreated);
+        socket.on("kot:created", onKotCreated);
         socket.on("kot:status_updated", onKotUpdated);
         socket.on("kot:item_updated", onKotItemUpdated);
         socket.on("kot:priority_updated", onKotUpdated);
@@ -622,15 +638,17 @@ export default function Kitchen() {
         socket.on("kitchen:workload_updated", handleKitchenWorkloadUpdated);
         socket.on("kitchen:item_assigned", handleKitchenAssignmentEvent);
         socket.on("kitchen:item_reassigned", handleKitchenAssignmentEvent);
+        socket.on("kitchen:item_unassigned", handleKitchenAssignmentEvent);
         socket.on("kitchen:item_self_picked", handleKitchenAssignmentEvent);
         socket.on("kitchen:item_status_updated", handleKitchenAssignmentEvent);
         socket.on("kitchen:item_status_updated", onKitchenHistoryUpdated);
-        socket.on("kitchen:item_served", onKitchenHistoryUpdated);
-        socket.on("food:delivered", onKitchenHistoryUpdated);
-        socket.on("kitchen:item_ready", onKitchenHistoryUpdated);
+        socket.on("kitchen:item_served", handleDeliveryAndHistorySync);
+        socket.on("food:delivered", handleDeliveryAndHistorySync);
+        socket.on("kitchen:item_ready", handleDeliveryAndHistorySync);
 
         return () => {
             socket.off("kot_created", onKotCreated);
+            socket.off("kot:created", onKotCreated);
             socket.off("kot:status_updated", onKotUpdated);
             socket.off("kot:item_updated", onKotItemUpdated);
             socket.off("kot:priority_updated", onKotUpdated);
@@ -640,12 +658,13 @@ export default function Kitchen() {
             socket.off("kitchen:workload_updated", handleKitchenWorkloadUpdated);
             socket.off("kitchen:item_assigned", handleKitchenAssignmentEvent);
             socket.off("kitchen:item_reassigned", handleKitchenAssignmentEvent);
+            socket.off("kitchen:item_unassigned", handleKitchenAssignmentEvent);
             socket.off("kitchen:item_self_picked", handleKitchenAssignmentEvent);
             socket.off("kitchen:item_status_updated", handleKitchenAssignmentEvent);
             socket.off("kitchen:item_status_updated", onKitchenHistoryUpdated);
-            socket.off("kitchen:item_served", onKitchenHistoryUpdated);
-            socket.off("food:delivered", onKitchenHistoryUpdated);
-            socket.off("kitchen:item_ready", onKitchenHistoryUpdated);
+            socket.off("kitchen:item_served", handleDeliveryAndHistorySync);
+            socket.off("food:delivered", handleDeliveryAndHistorySync);
+            socket.off("kitchen:item_ready", handleDeliveryAndHistorySync);
         };
     }, [socket, soundMuted, loadWorkload, loadKots, loadHistoryData]);
 
@@ -814,6 +833,51 @@ export default function Kitchen() {
             setIsSubmittingAssignment(false);
         }
     };
+
+    const handleUnassignItem = async (itemId) => {
+        setIsSubmittingAssignment(true);
+        try {
+            const res = await api.post(`/owner/${restaurantId}/kitchen/items/${itemId}/unassign`);
+            if (res.data?.ok) {
+                showToast("Chef unassigned successfully", "success");
+                setKots((prev) =>
+                    prev.map((k) => ({
+                        ...k,
+                        items: (k.items || []).map((it) =>
+                            it.id === itemId || it.orderItemId === itemId
+                                ? {
+                                      ...it,
+                                      assignedChefId: null,
+                                      assignedChefName: null,
+                                      assignmentSource: null,
+                                      assignedAt: null,
+                                  }
+                                : it
+                        ),
+                    }))
+                );
+                await Promise.all([loadKots({ silent: true }), loadWorkload()]);
+                setIsDrawerOpen(false);
+            }
+        } catch (err) {
+            showToast(err?.response?.data?.message || "Failed to unassign item", "error");
+            throw err;
+        } finally {
+            setIsSubmittingAssignment(false);
+        }
+    };
+
+    const handleOpenReassignModal = useCallback((item, kot) => {
+        setReassignModalData({ item, kot });
+    }, []);
+
+    const handleOpenDetailsModal = useCallback((item, kot) => {
+        setDetailsModalData({ item, kot });
+    }, []);
+
+    const handleOpenUnassignModal = useCallback((item, kot) => {
+        setUnassignModalData({ item, kot });
+    }, []);
 
     // Calculate unassigned items and list for prominent queue
     const unassignedItemsList = useMemo(() => {
@@ -2122,6 +2186,9 @@ export default function Kitchen() {
                                                 onUpdatePriority={handleUpdatePriority}
                                                 onReprintKot={handleReprintKot}
                                                 onOpenAssignDrawer={handleOpenAssignDrawer}
+                                                onOpenReassignModal={handleOpenReassignModal}
+                                                onOpenDetailsModal={handleOpenDetailsModal}
+                                                onOpenUnassignModal={handleOpenUnassignModal}
                                             />
                                         ))}
                                         {groupedKots.NEW.length === 0 && (
@@ -2156,6 +2223,9 @@ export default function Kitchen() {
                                                 onUpdatePriority={handleUpdatePriority}
                                                 onReprintKot={handleReprintKot}
                                                 onOpenAssignDrawer={handleOpenAssignDrawer}
+                                                onOpenReassignModal={handleOpenReassignModal}
+                                                onOpenDetailsModal={handleOpenDetailsModal}
+                                                onOpenUnassignModal={handleOpenUnassignModal}
                                             />
                                         ))}
                                         {groupedKots.PREPARING.length === 0 && (
@@ -2190,6 +2260,9 @@ export default function Kitchen() {
                                                 onUpdatePriority={handleUpdatePriority}
                                                 onReprintKot={handleReprintKot}
                                                 onOpenAssignDrawer={handleOpenAssignDrawer}
+                                                onOpenReassignModal={handleOpenReassignModal}
+                                                onOpenDetailsModal={handleOpenDetailsModal}
+                                                onOpenUnassignModal={handleOpenUnassignModal}
                                             />
                                         ))}
                                         {groupedKots.READY.length === 0 && (
@@ -2216,6 +2289,33 @@ export default function Kitchen() {
                 onAssignKot={handleAssignKot}
                 onReassign={handleReassignItem}
                 isSubmitting={isSubmittingAssignment}
+            />
+
+            {/* Reassign Chef Modal */}
+            <ReassignChefModal
+                isOpen={Boolean(reassignModalData)}
+                onClose={() => setReassignModalData(null)}
+                item={reassignModalData?.item}
+                kot={reassignModalData?.kot}
+                chefs={workload.chefs}
+                onReassign={handleReassignItem}
+            />
+
+            {/* Assignment Details Modal */}
+            <AssignmentDetailsModal
+                isOpen={Boolean(detailsModalData)}
+                onClose={() => setDetailsModalData(null)}
+                item={detailsModalData?.item}
+                kot={detailsModalData?.kot}
+            />
+
+            {/* Unassign Confirm Modal */}
+            <UnassignConfirmModal
+                isOpen={Boolean(unassignModalData)}
+                onClose={() => setUnassignModalData(null)}
+                item={unassignModalData?.item}
+                kot={unassignModalData?.kot}
+                onConfirm={handleUnassignItem}
             />
 
             {/* Sound Notification Modal */}
@@ -2293,6 +2393,9 @@ function KotCard({
     onUpdatePriority,
     onReprintKot,
     onOpenAssignDrawer,
+    onOpenReassignModal,
+    onOpenDetailsModal,
+    onOpenUnassignModal,
 }) {
     const sla = getSlaStatus(kot.createdAt, kot.estimatedPrepTimeMinutes);
     const orderSource = kot.order?.orderSource || "POS";
@@ -2345,14 +2448,17 @@ function KotCard({
                             {sla.label} ({sla.elapsed}m / {kot.estimatedPrepTimeMinutes || 15}m)
                         </span>
 
-                        <button
-                            type="button"
-                            onClick={() => onOpenAssignDrawer && onOpenAssignDrawer(kot)}
-                            className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-600 hover:text-orange-700 hover:bg-orange-50 px-2 py-0.5 rounded transition border border-orange-200"
-                        >
-                            <ChefHat size={12} />
-                            Assign
-                        </button>
+                        {!allAssigned && (
+                            <button
+                                type="button"
+                                data-testid={`kot-header-assign-btn-${kot.id}`}
+                                onClick={() => onOpenAssignDrawer && onOpenAssignDrawer(kot)}
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-600 hover:text-orange-700 hover:bg-orange-50 px-2 py-0.5 rounded transition border border-orange-200 cursor-pointer"
+                            >
+                                <ChefHat size={12} />
+                                Assign
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -2363,13 +2469,13 @@ function KotCard({
                 )}
             </div>
 
-            {/* Items Checklist with Chef Assignment Chips */}
+            {/* Items Checklist with Item-Level Assignment Actions */}
             <div className="divide-y divide-slate-100 px-3.5 py-1">
                 {items.map((it) => {
                     const isCancelled = it.status === "CANCELLED";
                     const isReady = it.status === "READY";
                     const isPrep = it.status === "PREPARING";
-                    const isAssigned = Boolean(it.assignedChefId);
+                    const isServed = it.status === "SERVED" || it.status === "DELIVERED";
 
                     return (
                         <div
@@ -2378,35 +2484,23 @@ function KotCard({
                                 isCancelled ? "opacity-50" : ""
                             }`}
                         >
-                            <div className="space-y-0.5 min-w-0">
-                                <div className="flex items-center gap-1.5 text-sm flex-wrap">
+                            <div className="space-y-0.5 min-w-0 flex-1">
+                                <div className="flex items-center gap-2 text-sm flex-wrap">
                                     <span className="text-orange-600 font-bold">{it.qty || it.quantity || 1}×</span>
                                     <span className={`text-slate-900 font-medium ${isCancelled ? "line-through text-slate-400" : ""}`}>
                                         {it.itemName || it.name}
                                     </span>
 
-                                    {/* Assignment Chip */}
-                                    {isAssigned ? (
-                                        <button
-                                            type="button"
-                                            onClick={() => onOpenAssignDrawer && onOpenAssignDrawer(kot)}
-                                            className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 hover:bg-orange-100 hover:text-orange-800 transition flex items-center gap-1 border border-slate-200"
-                                            title="Click to reassign"
-                                        >
-                                            <ChefHat size={10} className="text-orange-500" />
-                                            <span>{it.assignedChefName || `Chef #${it.assignedChefId}`}</span>
-                                            <span className="text-[9px] text-slate-400">({it.assignmentSource === "SELF_PICKED" ? "SELF" : "DISP"})</span>
-                                        </button>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            onClick={() => onOpenAssignDrawer && onOpenAssignDrawer(kot)}
-                                            className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition"
-                                            title="Click to assign"
-                                        >
-                                            UNASSIGNED
-                                        </button>
-                                    )}
+                                    {/* Authoritative Assignment Actions */}
+                                    <ChefAssignmentActions
+                                        item={it}
+                                        kot={kot}
+                                        onOpenAssignDrawer={onOpenAssignDrawer}
+                                        onOpenReassignModal={onOpenReassignModal}
+                                        onOpenDetailsModal={onOpenDetailsModal}
+                                        onOpenUnassignModal={onOpenUnassignModal}
+                                        disabled={isCancelled}
+                                    />
                                 </div>
 
                                 {(it.variantName || it.variant) && (
@@ -2433,14 +2527,17 @@ function KotCard({
                             {/* Item Status Toggle Action */}
                             <button
                                 type="button"
-                                disabled={isCancelled}
+                                disabled={isCancelled || isServed}
                                 onClick={() => {
+                                    if (isServed) return;
                                     const next = isPrep ? "READY" : isReady ? "PENDING" : "PREPARING";
                                     onUpdateItemStatus(kot.id, it.id, next);
                                 }}
                                 className={`rounded-md px-2 py-0.5 text-[11px] font-bold transition shrink-0 ${
                                     isCancelled
                                         ? "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
+                                        : isServed
+                                        ? "bg-blue-50 text-blue-700 border border-blue-200 cursor-default"
                                         : isReady
                                         ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
                                         : isPrep
@@ -2448,7 +2545,7 @@ function KotCard({
                                         : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
                                 }`}
                             >
-                                {it.status || "PENDING"}
+                                {isServed ? "DELIVERED" : it.status || "PENDING"}
                             </button>
                         </div>
                     );

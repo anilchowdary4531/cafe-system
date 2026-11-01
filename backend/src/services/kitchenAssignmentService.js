@@ -1220,9 +1220,9 @@ export const getAvailableKitchenWork = async ({ prisma = defaultPrisma, restaura
 /**
  * Helper to calculate timezone offset difference in milliseconds
  */
-function getTimezoneOffsetMs(timeZone, dateStr) {
+function getTimezoneOffsetMs(timeZone, dateInput = new Date()) {
   try {
-    const d = new Date(dateStr);
+    const d = typeof dateInput === "string" && !dateInput.endsWith("Z") ? new Date(dateInput + "Z") : new Date(dateInput);
     const utcDate = new Date(d.toLocaleString("en-US", { timeZone: "UTC" }));
     const tzDate = new Date(d.toLocaleString("en-US", { timeZone }));
     return tzDate.getTime() - utcDate.getTime();
@@ -1360,61 +1360,61 @@ export const getChefHistory = async ({
 
   if (date) {
     // Single date: "YYYY-MM-DD"
-    const startStr = `${date}T00:00:00.000`;
-    const endStr = `${date}T23:59:59.999`;
+    const startStr = `${date}T00:00:00.000Z`;
+    const endStr = `${date}T23:59:59.999Z`;
     const offset = getTimezoneOffsetMs(tz, startStr);
-    const start = new Date(new Date(startStr).getTime() - offset);
-    const end = new Date(new Date(endStr).getTime() - offset);
+    const start = new Date(Date.parse(startStr) - offset);
+    const end = new Date(Date.parse(endStr) - offset);
     dateBounds = { start, end };
   } else if (from || to) {
     let start = null;
     let end = null;
     if (from) {
-      const startStr = `${from}T00:00:00.000`;
+      const startStr = `${from}T00:00:00.000Z`;
       const offset = getTimezoneOffsetMs(tz, startStr);
-      start = new Date(new Date(startStr).getTime() - offset);
+      start = new Date(Date.parse(startStr) - offset);
     }
     if (to) {
-      const endStr = `${to}T23:59:59.999`;
+      const endStr = `${to}T23:59:59.999Z`;
       const offset = getTimezoneOffsetMs(tz, endStr);
-      end = new Date(new Date(endStr).getTime() - offset);
+      end = new Date(Date.parse(endStr) - offset);
     }
     dateBounds = { start, end };
   } else if (normalizedRange === "today") {
     const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date());
-    const startStr = `${todayStr}T00:00:00.000`;
-    const endStr = `${todayStr}T23:59:59.999`;
+    const startStr = `${todayStr}T00:00:00.000Z`;
+    const endStr = `${todayStr}T23:59:59.999Z`;
     const offset = getTimezoneOffsetMs(tz, startStr);
     dateBounds = {
-      start: new Date(new Date(startStr).getTime() - offset),
-      end: new Date(new Date(endStr).getTime() - offset),
+      start: new Date(Date.parse(startStr) - offset),
+      end: new Date(Date.parse(endStr) - offset),
     };
   } else if (normalizedRange === "yesterday") {
     const yesterdayDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const yestStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(yesterdayDate);
-    const startStr = `${yestStr}T00:00:00.000`;
-    const endStr = `${yestStr}T23:59:59.999`;
+    const startStr = `${yestStr}T00:00:00.000Z`;
+    const endStr = `${yestStr}T23:59:59.999Z`;
     const offset = getTimezoneOffsetMs(tz, startStr);
     dateBounds = {
-      start: new Date(new Date(startStr).getTime() - offset),
-      end: new Date(new Date(endStr).getTime() - offset),
+      start: new Date(Date.parse(startStr) - offset),
+      end: new Date(Date.parse(endStr) - offset),
     };
   } else if (normalizedRange === "7d") {
     const pastDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const pastStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(pastDate);
-    const startStr = `${pastStr}T00:00:00.000`;
+    const startStr = `${pastStr}T00:00:00.000Z`;
     const offset = getTimezoneOffsetMs(tz, startStr);
     dateBounds = {
-      start: new Date(new Date(startStr).getTime() - offset),
+      start: new Date(Date.parse(startStr) - offset),
       end: new Date(),
     };
   } else if (normalizedRange === "30d") {
     const pastDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const pastStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(pastDate);
-    const startStr = `${pastStr}T00:00:00.000`;
+    const startStr = `${pastStr}T00:00:00.000Z`;
     const offset = getTimezoneOffsetMs(tz, startStr);
     dateBounds = {
-      start: new Date(new Date(startStr).getTime() - offset),
+      start: new Date(Date.parse(startStr) - offset),
       end: new Date(),
     };
   }
@@ -1769,61 +1769,61 @@ export const getServerHistory = async ({
   const normalizedRange = String(range || "all").toLowerCase().trim();
 
   if (date) {
-    const startStr = `${date}T00:00:00.000`;
-    const endStr = `${date}T23:59:59.999`;
+    const startStr = `${date}T00:00:00.000Z`;
+    const endStr = `${date}T23:59:59.999Z`;
     const offset = getTimezoneOffsetMs(tz, startStr);
-    const start = new Date(new Date(startStr).getTime() - offset);
-    const end = new Date(new Date(endStr).getTime() - offset);
+    const start = new Date(Date.parse(startStr) - offset);
+    const end = new Date(Date.parse(endStr) - offset);
     dateBounds = { start, end };
   } else if (from || to) {
     let start = null;
     let end = null;
     if (from) {
-      const startStr = `${from}T00:00:00.000`;
+      const startStr = `${from}T00:00:00.000Z`;
       const offset = getTimezoneOffsetMs(tz, startStr);
-      start = new Date(new Date(startStr).getTime() - offset);
+      start = new Date(Date.parse(startStr) - offset);
     }
     if (to) {
-      const endStr = `${to}T23:59:59.999`;
+      const endStr = `${to}T23:59:59.999Z`;
       const offset = getTimezoneOffsetMs(tz, endStr);
-      end = new Date(new Date(endStr).getTime() - offset);
+      end = new Date(Date.parse(endStr) - offset);
     }
     dateBounds = { start, end };
   } else if (normalizedRange === "today") {
     const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date());
-    const startStr = `${todayStr}T00:00:00.000`;
-    const endStr = `${todayStr}T23:59:59.999`;
+    const startStr = `${todayStr}T00:00:00.000Z`;
+    const endStr = `${todayStr}T23:59:59.999Z`;
     const offset = getTimezoneOffsetMs(tz, startStr);
     dateBounds = {
-      start: new Date(new Date(startStr).getTime() - offset),
-      end: new Date(new Date(endStr).getTime() - offset),
+      start: new Date(Date.parse(startStr) - offset),
+      end: new Date(Date.parse(endStr) - offset),
     };
   } else if (normalizedRange === "yesterday") {
     const yesterdayDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const yestStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(yesterdayDate);
-    const startStr = `${yestStr}T00:00:00.000`;
-    const endStr = `${yestStr}T23:59:59.999`;
+    const startStr = `${yestStr}T00:00:00.000Z`;
+    const endStr = `${yestStr}T23:59:59.999Z`;
     const offset = getTimezoneOffsetMs(tz, startStr);
     dateBounds = {
-      start: new Date(new Date(startStr).getTime() - offset),
-      end: new Date(new Date(endStr).getTime() - offset),
+      start: new Date(Date.parse(startStr) - offset),
+      end: new Date(Date.parse(endStr) - offset),
     };
   } else if (normalizedRange === "7d") {
     const pastDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const pastStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(pastDate);
-    const startStr = `${pastStr}T00:00:00.000`;
+    const startStr = `${pastStr}T00:00:00.000Z`;
     const offset = getTimezoneOffsetMs(tz, startStr);
     dateBounds = {
-      start: new Date(new Date(startStr).getTime() - offset),
+      start: new Date(Date.parse(startStr) - offset),
       end: new Date(),
     };
   } else if (normalizedRange === "30d") {
     const pastDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const pastStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(pastDate);
-    const startStr = `${pastStr}T00:00:00.000`;
+    const startStr = `${pastStr}T00:00:00.000Z`;
     const offset = getTimezoneOffsetMs(tz, startStr);
     dateBounds = {
-      start: new Date(new Date(startStr).getTime() - offset),
+      start: new Date(Date.parse(startStr) - offset),
       end: new Date(),
     };
   }
@@ -1835,7 +1835,6 @@ export const getServerHistory = async ({
     if (timeFilter.gte || timeFilter.lte) {
       andClauses.push({
         OR: [
-          { kot: { updatedAt: timeFilter } },
           { readyAt: timeFilter },
           { createdAt: timeFilter },
         ],
@@ -1949,7 +1948,7 @@ export const getServerHistory = async ({
   const yesterdayKey = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(yesterdayDate);
 
   const formattedItems = rawItems.map((it) => {
-    const servedDate = it.kot?.updatedAt || it.readyAt || it.createdAt;
+    const servedDate = it.readyAt ? new Date(it.readyAt) : new Date(it.createdAt);
     const sDate = new Date(servedDate);
     const dateKey = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(sDate);
 

@@ -117,6 +117,9 @@ export default async function staffRoutes(app, deps = {}) {
               tableId: true,
               tableNo: true,
               status: true,
+              table: {
+                select: { id: true, tableNo: true, section: true },
+              },
             },
           },
         },
@@ -126,7 +129,8 @@ export default async function staffRoutes(app, deps = {}) {
 
       const enrichedOrders = orders.map((o) => ({
         ...o,
-        tableId: o.tableSession?.tableId ? Number(o.tableSession.tableId) : null,
+        tableId: o.tableSession?.tableId || o.tableSession?.table?.id ? Number(o.tableSession?.tableId || o.tableSession?.table?.id) : null,
+        section: o.tableSession?.table?.section || null,
       }));
 
       return { orders: enrichedOrders };

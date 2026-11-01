@@ -20,6 +20,7 @@ import { computeBill } from "../services/billingService.js";
 import defaultPrisma from "../prisma.js";
 import { toSubunit, fromSubunit } from "../services/moneyService.js";
 import { getOrCreateActiveSession, recalculateSessionTotals } from "../services/tableSessionService.js";
+import { createKotsForOrder } from "../services/kotService.js";
 
 const normalizeDeliveryAddress = (value) => {
   if (!value) return "";
@@ -684,14 +685,46 @@ export default async function customerRoutes(app, deps = {}) {
         },
       });
 
+      // 🎫 Create KOTs for Kitchen immediately upon customer order creation
+      try {
+        const kots = await createKotsForOrder({
+          prisma,
+          order,
+        });
+        order.kots = kots;
+      } catch (kotErr) {
+        console.warn("[CustomerOrder] KOT creation warning:", kotErr?.message);
+      }
+
       realtime?.emitOrderCreated?.(order);
 
       // 🔔 Dispatch Realtime Notifications & Save in DB
       try {
         const io = req.server.io;
-        if (io) {
-          io.to(`restaurant_${restaurant.id}`).emit("new_order", order);
-          io.to(`restaurant:${restaurant.id}`).emit("new_order", order);
+        const staff = req.server.staff || (typeof io?.of === "function" ? io.of("/staff") : null);
+        const rooms = [`restaurant_${restaurant.id}`, `restaurant:${restaurant.id}`];
+
+        for (const room of rooms) {
+          if (io) {
+            io.to(room).emit("new_order", order);
+            io.to(room).emit("order:created", order);
+            if (Array.isArray(order.kots)) {
+              for (const kot of order.kots) {
+                io.to(room).emit("kot:created", kot);
+                io.to(room).emit("kot_created", kot);
+              }
+            }
+          }
+          if (staff) {
+            staff.to(room).emit("order:created", order);
+            staff.to(room).emit("new_order", order);
+            if (Array.isArray(order.kots)) {
+              for (const kot of order.kots) {
+                staff.to(room).emit("kot:created", kot);
+                staff.to(room).emit("kot_created", kot);
+              }
+            }
+          }
         }
 
         const summaryText = `New order #${order.orderNo} for ₹${order.total}${order.customerName ? ` from ${order.customerName}` : ""}${order.tableNo ? ` (Table ${order.tableNo})` : ""}.`;

@@ -18,6 +18,19 @@ vi.mock("../utils/toast", () => ({
 }));
 vi.mock("../utils/soundPlayer", () => ({
     playNotificationSound: () => mockPlayNotificationSound(),
+    getActiveSoundConfig: () => ({ id: "sound-1", name: "Chime", soundId: "sound-1", file: "chime.mp3" }),
+    saveSoundConfig: vi.fn(),
+    isSoundEnabled: () => true,
+    setSoundEnabled: vi.fn(),
+    isVibrationEnabled: () => true,
+    setVibrationEnabled: vi.fn(),
+    VIBRATION_PATTERNS: { standard: [200, 100, 200] },
+    isVibrationSupported: () => true,
+    getVibrationPattern: () => "standard",
+    setVibrationPattern: vi.fn(),
+    triggerNotificationVibration: vi.fn(),
+    BUILTIN_SOUNDS: [{ id: "sound-1", name: "Chime" }],
+    resetSoundAndVibrationState: vi.fn(),
 }));
 
 // Mock API calls

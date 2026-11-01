@@ -449,42 +449,80 @@ export default async function staffTaskRoutes(app, deps = {}) {
         });
 
         if (remainingCleaning === 0) {
+          // Check if there is an active session on this table before resetting occupancy
+          const activeSession = await prisma.tableSession.findFirst({
+            where: {
+              tableId: existing.tableId,
+              status: { in: ["OPEN", "BILLING", "PAID"] },
+            },
+            include: {
+              orders: {
+                where: {
+                  status: { notIn: ["CANCELLED", "COMPLETED"] },
+                },
+                select: { id: true, status: true },
+              },
+            },
+          });
+
+          const isStillOccupied = !!activeSession;
+
           // Mark Table CLEAN
           await prisma.diningTable.update({
             where: { id: existing.tableId },
             data: {
               cleaningStatus: "CLEAN",
-              assignedWaiterId: null,
-              assignedWaiterName: null,
+              ...(isStillOccupied
+                ? {}
+                : {
+                    assignedWaiterId: null,
+                    assignedWaiterName: null,
+                  }),
             },
           });
 
           const nowTimestamp = Date.now();
           const nowIso = new Date(nowTimestamp).toISOString();
-          const tableClearPayload = {
-            type: "TABLE_UPDATED",
-            restaurantId: effectiveRid,
-            tableId: existing.tableId,
-            id: existing.tableId,
-            tableNo: existing.table?.tableNo,
-            status: "AVAILABLE",
-            cleaningStatus: "CLEAN",
-            isOccupied: false,
-            activeOrderCount: 0,
-            activeOrders: [],
-            activeOrderStatus: null,
-            paymentStatus: null,
-            occupiedSince: null,
-            assignedServer: null,
-            assignedServerId: null,
-            assignedServerName: null,
-            assignedWaiterId: null,
-            assignedWaiterName: null,
-            session: { status: "CLOSED" },
-            activeSession: null,
-            version: nowTimestamp,
-            updatedAt: nowIso,
-          };
+          const tableClearPayload = isStillOccupied
+            ? {
+                type: "TABLE_UPDATED",
+                restaurantId: effectiveRid,
+                tableId: existing.tableId,
+                id: existing.tableId,
+                tableNo: existing.table?.tableNo,
+                status: "OCCUPIED",
+                cleaningStatus: "CLEAN",
+                isOccupied: true,
+                activeOrderCount: activeSession.orders?.length || 0,
+                session: { id: activeSession.id, status: activeSession.status },
+                activeSession: { id: activeSession.id, status: activeSession.status },
+                version: nowTimestamp,
+                updatedAt: nowIso,
+              }
+            : {
+                type: "TABLE_UPDATED",
+                restaurantId: effectiveRid,
+                tableId: existing.tableId,
+                id: existing.tableId,
+                tableNo: existing.table?.tableNo,
+                status: "AVAILABLE",
+                cleaningStatus: "CLEAN",
+                isOccupied: false,
+                activeOrderCount: 0,
+                activeOrders: [],
+                activeOrderStatus: null,
+                paymentStatus: null,
+                occupiedSince: null,
+                assignedServer: null,
+                assignedServerId: null,
+                assignedServerName: null,
+                assignedWaiterId: null,
+                assignedWaiterName: null,
+                session: { status: "CLOSED" },
+                activeSession: null,
+                version: nowTimestamp,
+                updatedAt: nowIso,
+              };
 
           if (io) {
             io.to(`restaurant_${effectiveRid}`).emit("table:updated", tableClearPayload);
@@ -573,13 +611,35 @@ export default async function staffTaskRoutes(app, deps = {}) {
         return reply.code(403).send({ message: "Forbidden: Table belongs to another restaurant" });
       }
 
+      // Check if there is an active session on this table before resetting occupancy
+      const activeSession = await prisma.tableSession.findFirst({
+        where: {
+          tableId,
+          status: { in: ["OPEN", "BILLING", "PAID"] },
+        },
+        include: {
+          orders: {
+            where: {
+              status: { notIn: ["CANCELLED", "COMPLETED"] },
+            },
+            select: { id: true, status: true },
+          },
+        },
+      });
+
+      const isStillOccupied = !!activeSession;
+
       // Mark Table CLEAN
       const updatedTable = await prisma.diningTable.update({
         where: { id: tableId },
         data: {
           cleaningStatus: "CLEAN",
-          assignedWaiterId: null,
-          assignedWaiterName: null,
+          ...(isStillOccupied
+            ? {}
+            : {
+                assignedWaiterId: null,
+                assignedWaiterName: null,
+              }),
         },
       });
 
@@ -605,30 +665,46 @@ export default async function staffTaskRoutes(app, deps = {}) {
       const nowTimestamp = Date.now();
       const nowIso = new Date(nowTimestamp).toISOString();
 
-      const tableClearPayload = {
-        type: "TABLE_UPDATED",
-        restaurantId: effectiveRid,
-        tableId: table.id,
-        id: table.id,
-        tableNo: table.tableNo,
-        status: "AVAILABLE",
-        cleaningStatus: "CLEAN",
-        isOccupied: false,
-        activeOrderCount: 0,
-        activeOrders: [],
-        activeOrderStatus: null,
-        paymentStatus: null,
-        occupiedSince: null,
-        assignedServer: null,
-        assignedServerId: null,
-        assignedServerName: null,
-        assignedWaiterId: null,
-        assignedWaiterName: null,
-        session: { status: "CLOSED" },
-        activeSession: null,
-        version: nowTimestamp,
-        updatedAt: nowIso,
-      };
+      const tableClearPayload = isStillOccupied
+        ? {
+            type: "TABLE_UPDATED",
+            restaurantId: effectiveRid,
+            tableId: table.id,
+            id: table.id,
+            tableNo: table.tableNo,
+            status: "OCCUPIED",
+            cleaningStatus: "CLEAN",
+            isOccupied: true,
+            activeOrderCount: activeSession.orders?.length || 0,
+            session: { id: activeSession.id, status: activeSession.status },
+            activeSession: { id: activeSession.id, status: activeSession.status },
+            version: nowTimestamp,
+            updatedAt: nowIso,
+          }
+        : {
+            type: "TABLE_UPDATED",
+            restaurantId: effectiveRid,
+            tableId: table.id,
+            id: table.id,
+            tableNo: table.tableNo,
+            status: "AVAILABLE",
+            cleaningStatus: "CLEAN",
+            isOccupied: false,
+            activeOrderCount: 0,
+            activeOrders: [],
+            activeOrderStatus: null,
+            paymentStatus: null,
+            occupiedSince: null,
+            assignedServer: null,
+            assignedServerId: null,
+            assignedServerName: null,
+            assignedWaiterId: null,
+            assignedWaiterName: null,
+            session: { status: "CLOSED" },
+            activeSession: null,
+            version: nowTimestamp,
+            updatedAt: nowIso,
+          };
 
       if (io) {
         io.to(`restaurant_${effectiveRid}`).emit("table:updated", tableClearPayload);
@@ -1462,29 +1538,32 @@ export default async function staffTaskRoutes(app, deps = {}) {
           });
         }
 
+        // Atomically complete session and release table inside the transaction
+        const effectiveSessionId = targetSession?.id || targetOrder?.tableSessionId;
+        const completionResult = await completeSessionAndReleaseTable({
+          prisma: tx,
+          tableSessionId: effectiveSessionId,
+          orderId: targetOrder?.id,
+          tableNo: targetOrder?.tableNo || targetSession?.tableNo,
+          restaurantId,
+          paymentMode: req.body?.paymentMethod || "CASH",
+          realtime,
+          actor: req.staffActor,
+        });
+
         return {
           payment,
           authoritativeTotal,
           targetOrder,
           targetSession,
           effectiveShiftId,
+          completionResult,
         };
       });
 
-      // 8. Complete session and release table into strict DIRTY sanitation
-      const { targetOrder, targetSession, authoritativeTotal, payment, effectiveShiftId } = result;
+      // 8. Completed atomically inside transaction
+      const { targetOrder, targetSession, authoritativeTotal, payment, effectiveShiftId, completionResult } = result;
       const effectiveSessionId = targetSession?.id || targetOrder?.tableSessionId;
-
-      const completionResult = await completeSessionAndReleaseTable({
-        prisma,
-        tableSessionId: effectiveSessionId,
-        orderId: targetOrder?.id,
-        tableNo: targetOrder?.tableNo || targetSession?.tableNo,
-        restaurantId,
-        paymentMode: req.body?.paymentMethod || "CASH",
-        realtime,
-        actor: req.staffActor,
-      });
 
       // 9. Emit realtime events
       const io = realtime?.io || null;

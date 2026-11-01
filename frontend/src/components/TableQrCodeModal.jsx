@@ -15,6 +15,7 @@ import {
 import axios from "axios";
 import { API } from "../config";
 import { showToast } from "../utils/toast";
+import { resolveCanonicalSection } from "../context/TableStateContext";
 
 export default function TableQrCodeModal({
   isOpen,
@@ -35,7 +36,7 @@ export default function TableQrCodeModal({
 
   const currentTable = table || (tables.length > 0 ? tables[0] : null);
   const qrToken = currentTable?.qrToken || currentTable?.id;
-  
+
   const getQrTargetUrl = (tbl) => {
     const token = tbl?.qrToken || tbl?.id;
     return `${window.location.origin}/order/table/${token}`;
@@ -133,21 +134,19 @@ export default function TableQrCodeModal({
             <div className="flex bg-gray-800/80 p-1 rounded-xl border border-gray-700/50">
               <button
                 onClick={() => setActiveTab("SINGLE")}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                  activeTab === "SINGLE"
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${activeTab === "SINGLE"
                     ? "bg-indigo-600 text-white shadow-md"
                     : "text-gray-400 hover:text-white"
-                }`}
+                  }`}
               >
                 Table {currentTable?.tableNo || "Card"}
               </button>
               <button
                 onClick={() => setActiveTab("BATCH")}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                  activeTab === "BATCH"
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${activeTab === "BATCH"
                     ? "bg-indigo-600 text-white shadow-md"
                     : "text-gray-400 hover:text-white"
-                }`}
+                  }`}
               >
                 Batch Sheet ({tables.length || 1})
               </button>
@@ -325,7 +324,7 @@ export default function TableQrCodeModal({
                           Table {tbl.tableNo}
                         </div>
                         <p className="text-[10px] text-gray-400">
-                          {tbl.section || "Main Floor"} • Seats {tbl.seats || 4}
+                          {resolveCanonicalSection(tbl)} • Seats {tbl.seats || 4}
                         </p>
                       </div>
 

@@ -96,10 +96,12 @@ export const getOrCreateActiveSession = async ({
       });
 
       // Authoritative DiningTable version bump on session creation
-      await tx.diningTable.update({
-        where: { id: tid },
-        data: { updatedAt: new Date() },
-      }).catch(() => {});
+      if (typeof tx.diningTable?.update === "function") {
+        await tx.diningTable.update({
+          where: { id: tid },
+          data: { updatedAt: new Date() },
+        }).catch(() => {});
+      }
     }
 
     return session;
@@ -275,7 +277,7 @@ export const addOrderToTableSession = async ({
   // 3. Recalculate table session running totals
   const updatedSession = await recalculateSessionTotals({ prisma, sessionId: session.id });
 
-  if (session.tableId) {
+  if (session.tableId && typeof prisma?.diningTable?.update === "function") {
     await prisma.diningTable.update({
       where: { id: session.tableId },
       data: { updatedAt: new Date() },
@@ -310,7 +312,7 @@ export const generateSessionBill = async ({ prisma, sessionId, discountAmount = 
     },
   });
 
-  if (session.tableId) {
+  if (session.tableId && typeof prisma?.diningTable?.update === "function") {
     await prisma.diningTable.update({
       where: { id: session.tableId },
       data: { updatedAt: new Date() },
@@ -376,7 +378,7 @@ export const updateSessionPaymentStatus = async ({
       },
     });
 
-    if (session.tableId) {
+    if (session.tableId && typeof prisma?.diningTable?.update === "function") {
       await prisma.diningTable.update({
         where: { id: session.tableId },
         data: {
@@ -450,7 +452,7 @@ export const closeTableSession = async ({
     },
   });
 
-  if (session.tableId) {
+  if (session.tableId && typeof prisma?.diningTable?.update === "function") {
     await prisma.diningTable.update({
       where: { id: session.tableId },
       data: {
@@ -555,7 +557,7 @@ export const completeSessionAndReleaseTable = async ({
   }
 
   if (!sid) {
-    if (tableId) {
+    if (tableId && typeof prisma?.diningTable?.update === "function") {
       const tid = Number(tableId);
       // STRICT CANONICAL ISOLATION: Update ONLY the specific table by id.
       await prisma.diningTable.update({
@@ -668,7 +670,7 @@ export const completeSessionAndReleaseTable = async ({
   }
 
   // 4. All orders are financially complete! Execute atomic closure and table release
-  const updatedSession = await prisma.$transaction(async (tx) => {
+  const executeClosure = async (tx) => {
     // A. Ensure all non-cancelled orders in session are marked PAID
     await tx.order.updateMany({
       where: {
@@ -725,15 +727,17 @@ export const completeSessionAndReleaseTable = async ({
     // Clear waiter assignment from table and set cleaning status based on cleaner availability
     // STRICT CANONICAL ISOLATION: Update ONLY the specific table by tableId. Never use fuzzy tableNo OR clauses.
     if (session.tableId) {
-      await tx.diningTable.update({
-        where: { id: session.tableId },
-        data: {
-          assignedWaiterId: null,
-          assignedWaiterName: null,
-          cleaningStatus: cleanerExists ? "DIRTY" : "CLEAN",
-          updatedAt: new Date(),
-        },
-      }).catch(() => {});
+      if (typeof tx?.diningTable?.update === "function") {
+        await tx.diningTable.update({
+          where: { id: session.tableId },
+          data: {
+            assignedWaiterId: null,
+            assignedWaiterName: null,
+            cleaningStatus: cleanerExists ? "DIRTY" : "CLEAN",
+            updatedAt: new Date(),
+          },
+        }).catch(() => {});
+      }
     } else if (session.tableNo) {
       // Fallback only if session.tableId was genuinely null: resolve single unique exact table
       const matchingTables = await tx.diningTable.findMany({
@@ -743,7 +747,7 @@ export const completeSessionAndReleaseTable = async ({
         },
         select: { id: true },
       });
-      if (matchingTables.length === 1) {
+      if (matchingTables.length === 1 && typeof tx?.diningTable?.update === "function") {
         await tx.diningTable.update({
           where: { id: matchingTables[0].id },
           data: {
@@ -807,7 +811,11 @@ export const completeSessionAndReleaseTable = async ({
     }
 
     return { ...closed, _cleanerExists: cleanerExists };
-  });
+  };
+
+  const updatedSession = typeof prisma.$transaction === "function"
+    ? await prisma.$transaction(executeClosure)
+    : await executeClosure(prisma);
 
   // 5. Emit Realtime Events after successful transaction commit
   const effectiveRid = session.restaurantId;

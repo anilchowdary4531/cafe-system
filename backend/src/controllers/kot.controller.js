@@ -204,7 +204,7 @@ export const getKots = async (req, res) => {
 };
 
 const resolveKotTableDetails = async ({ prisma: db, kot, order }) => {
-  let tableId = kot?.tableId || kot?.tableSession?.tableId || kot?.tableSession?.table?.id || order?.tableId || order?.tableSession?.tableId || order?.tableSession?.table?.id || null;
+  let tableId = kot?.tableSession?.tableId || kot?.tableSession?.table?.id || order?.tableSession?.tableId || order?.tableSession?.table?.id || null;
   let section = kot?.tableSession?.table?.section || order?.tableSession?.table?.section || null;
   let tableNo = kot?.tableSession?.table?.tableNo || order?.tableSession?.table?.tableNo || kot?.tableNo || order?.tableNo || null;
 
@@ -226,14 +226,14 @@ const resolveKotTableDetails = async ({ prisma: db, kot, order }) => {
     const ordId = Number(kot?.orderId || order?.id);
     const ord = await db.order.findUnique({
       where: { id: ordId },
-      select: { tableId: true, tableNo: true, tableSession: { select: { tableId: true, table: { select: { id: true, tableNo: true, section: true } } } } },
+      select: { tableNo: true, tableSession: { select: { tableId: true, table: { select: { id: true, tableNo: true, section: true } } } } },
     });
     if (ord?.tableSession?.table) {
       tableId = ord.tableSession.table.id;
       tableNo = ord.tableSession.table.tableNo;
       section = ord.tableSession.table.section;
-    } else if (ord?.tableId) {
-      tableId = ord.tableId;
+    } else if (ord?.tableSession?.tableId) {
+      tableId = ord.tableSession.tableId;
       tableNo = ord.tableNo || tableNo;
     }
   }
@@ -430,7 +430,7 @@ export const updateStatus = async (req, res) => {
     }
 
     if (updatedOrder) {
-      const orderTableId = kotTableId || (updatedOrder.tableId ? Number(updatedOrder.tableId) : (updatedOrder.tableSession?.tableId ? Number(updatedOrder.tableSession.tableId) : null));
+      const orderTableId = kotTableId || (updatedOrder.tableSession?.tableId ? Number(updatedOrder.tableSession.tableId) : null);
       const orderTableNo = kotTableNo || updatedOrder.tableNo || null;
       if (staff) {
         staff.to(`restaurant_${restaurantId}`).emit("order:updated", updatedOrder);
@@ -676,7 +676,7 @@ export const updateItemStatus = async (req, res) => {
     });
 
     if (order) {
-      const orderTableId = kotTableId || (order.tableId ? Number(order.tableId) : (order.tableSession?.tableId ? Number(order.tableSession.tableId) : null));
+      const orderTableId = kotTableId || (order.tableSession?.tableId ? Number(order.tableSession.tableId) : null);
       const orderTableNo = kotTableNo || order.tableNo || null;
       if (staff) {
         staff.to(`restaurant_${restaurantId}`).emit("order:updated", order);

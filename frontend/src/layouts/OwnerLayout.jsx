@@ -445,8 +445,11 @@ const normalizeTableRows = (rows) => {
             const rawActiveOrders = Array.isArray(table?.activeOrders)
                 ? table.activeOrders
                       .filter((order) => {
-                          const orderTableId = order?.targetTableId || order?.tableId;
-                          return Boolean(orderTableId && String(orderTableId) === String(table?.id));
+                          const orderTableId = order?.targetTableId || order?.tableId || order?.tableSession?.tableId;
+                          if (orderTableId) {
+                              return String(orderTableId) === String(table?.id);
+                          }
+                          return true;
                       })
                       .map((order) => ({
                       id: order?.id,

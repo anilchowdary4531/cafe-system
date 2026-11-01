@@ -1175,16 +1175,6 @@ export default async function ownerRoutes(app, deps = {}) {
           const hasPendingCleaning = pendingCleaningTableIds.has(tid);
           let isDirty = table.cleaningStatus === "DIRTY" || table.status === "DIRTY";
 
-          // If a table is flagged DIRTY in DB but has NO pending cleaning tasks and NO active session,
-          // it is an orphaned dirty state (from historical bugs or orphaned updates). Reconcile it to CLEAN.
-          if (isDirty && !hasPendingCleaning && !activeSession) {
-            isDirty = false;
-            prisma.diningTable.update({
-              where: { id: table.id },
-              data: { cleaningStatus: "CLEAN" },
-            }).catch(() => {});
-          }
-
           let canonicalStatus = "AVAILABLE";
           if (isBlocked) {
             canonicalStatus = "BLOCKED";
@@ -4157,22 +4147,22 @@ export default async function ownerRoutes(app, deps = {}) {
           results.push(updatedOrder);
         }
 
+        for (const order of results) {
+          await completeSessionAndReleaseTable({
+            prisma: tx,
+            tableSessionId: order.tableSessionId,
+            tableId: diningTable?.id,
+            tableNo: effectiveTableNo,
+            restaurantId,
+            orderId: order.id,
+            paymentMode,
+            realtime,
+            actor,
+          });
+        }
+
         return results;
       });
-
-      for (const order of updatedOrders) {
-        await completeSessionAndReleaseTable({
-          prisma,
-          tableSessionId: order.tableSessionId,
-          tableId: diningTable?.id,
-          tableNo: effectiveTableNo,
-          restaurantId,
-          orderId: order.id,
-          paymentMode,
-          realtime,
-          actor,
-        });
-      }
 
       updatedOrders.forEach((order) => {
         realtime?.emitOrderUpdated?.(order);

@@ -420,7 +420,7 @@ export default function ServerNotificationsView({
                                     {(tableNo || tableId) && handleSelectTable && (
                                         <button
                                             type="button"
-                                            onClick={() => handleSelectTable(tableNo, tableId)}
+                                            onClick={() => (tableId ? handleSelectTable(tableNo, tableId) : handleSelectTable(tableNo))}
                                             className="rounded-lg bg-orange-500/10 hover:bg-orange-500 text-orange-600 dark:text-orange-400 hover:text-white px-2 py-0.5 font-bold transition flex items-center gap-0.5 cursor-pointer"
                                             title={tableNo ? `View Table ${tableNo}` : "View Table"}
                                         >

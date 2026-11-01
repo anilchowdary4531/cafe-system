@@ -588,12 +588,23 @@ export default function NewOrder() {
     const restaurantName = String(user?.restaurant?.name || "Restaurant").trim() || "Restaurant";
 
     const [tables, setTables] = useState([]);
+    const [selectedTableId, setSelectedTableId] = useState(
+        () => {
+            const raw = searchParams.get("tableId") || searchParams.get("table_id");
+            return raw ? Number(raw) : null;
+        }
+    );
     const [selectedTableNo, setSelectedTableNo] = useState(
         () => String(searchParams.get("table") || "").trim() || null
     );
     const [showTablePickerModal, setShowTablePickerModal] = useState(false);
 
     useEffect(() => {
+        const qTableId = searchParams.get("tableId") || searchParams.get("table_id");
+        const tid = qTableId ? Number(qTableId) : null;
+        if (tid !== selectedTableId) {
+            setSelectedTableId(tid);
+        }
         const qTable = String(searchParams.get("table") || "").trim() || null;
         if (qTable !== selectedTableNo) {
             setSelectedTableNo(qTable);
@@ -631,6 +642,10 @@ export default function NewOrder() {
     }, [socket, loadTables]);
 
     const currentTableObj = useMemo(() => {
+        if (selectedTableId) {
+            const byId = tables.find((t) => Number(t.id) === Number(selectedTableId));
+            if (byId) return byId;
+        }
         if (!selectedTableNo) return null;
         return (
             tables.find(
@@ -639,7 +654,7 @@ export default function NewOrder() {
                     String(selectedTableNo || "").trim().toLowerCase()
             ) || null
         );
-    }, [tables, selectedTableNo]);
+    }, [tables, selectedTableId, selectedTableNo]);
 
     const assignedServerName =
         currentTableObj?.assignedWaiterName ||
@@ -650,14 +665,25 @@ export default function NewOrder() {
         currentTableObj?.assignedWaiter?.id ||
         null;
 
-    const handleSelectTable = (newTableNo) => {
+    const handleSelectTable = (tableArg) => {
         const currentPath = location.pathname || "/owner/pos";
-        if (newTableNo) {
-            setSelectedTableNo(newTableNo);
-            navigate(`${currentPath}?table=${encodeURIComponent(newTableNo)}`, { replace: true });
-        } else {
+        if (!tableArg) {
             setSelectedTableNo(null);
+            setSelectedTableId(null);
             navigate(currentPath, { replace: true });
+        } else if (typeof tableArg === "object") {
+            const tid = Number(tableArg.id || tableArg.tableId || 0);
+            const tno = String(tableArg.tableNo || "").trim();
+            setSelectedTableId(tid || null);
+            setSelectedTableNo(tno || null);
+            const params = new URLSearchParams();
+            if (tid) params.set("tableId", String(tid));
+            if (tno) params.set("table", tno);
+            navigate(`${currentPath}?${params.toString()}`, { replace: true });
+        } else {
+            const tno = String(tableArg).trim();
+            setSelectedTableNo(tno);
+            navigate(`${currentPath}?table=${encodeURIComponent(tno)}`, { replace: true });
         }
         setShowTablePickerModal(false);
     };
@@ -1206,7 +1232,9 @@ export default function NewOrder() {
                 const tempOrderNo = `#OFF-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
                 const offlineOrderPayload = {
-                    tableNo: String(orderType || "").toUpperCase() === "DINE_IN" ? tableNo : null,
+                    tableId: String(orderType || "").toUpperCase() === "DINE_IN" ? (currentTableObj?.id || selectedTableId || null) : null,
+                    tableSessionId: currentTableObj?.activeSession?.id || currentTableObj?.session?.id || null,
+                    tableNo: String(orderType || "").toUpperCase() === "DINE_IN" ? (currentTableObj?.tableNo || tableNo) : null,
                     waiterId: String(orderType || "").toUpperCase() === "DINE_IN" ? (assignedServerId || null) : null,
                     waiterName: String(orderType || "").toUpperCase() === "DINE_IN" ? (assignedServerName || null) : null,
                     notes: finalNotes,
@@ -1267,7 +1295,9 @@ export default function NewOrder() {
             "order:create",
             {
                 orderType: String(orderType || "TAKEAWAY").toUpperCase(),
-                tableNo: String(orderType || "").toUpperCase() === "DINE_IN" ? tableNo : null,
+                tableId: String(orderType || "").toUpperCase() === "DINE_IN" ? (currentTableObj?.id || selectedTableId || null) : null,
+                tableSessionId: currentTableObj?.activeSession?.id || currentTableObj?.session?.id || null,
+                tableNo: String(orderType || "").toUpperCase() === "DINE_IN" ? (currentTableObj?.tableNo || tableNo) : null,
                 waiterId: String(orderType || "").toUpperCase() === "DINE_IN" ? (assignedServerId || null) : null,
                 waiterName: String(orderType || "").toUpperCase() === "DINE_IN" ? (assignedServerName || null) : null,
                 notes: finalNotes,
@@ -1915,13 +1945,15 @@ export default function NewOrder() {
                             {/* Dine-In Tables Grid */}
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
                                 {tables.map((t) => {
-                                    const isSelected = String(t.tableNo).trim().toLowerCase() === String(tableNo || "").trim().toLowerCase();
+                                    const isSelected = selectedTableId
+                                        ? Number(t.id) === Number(selectedTableId)
+                                        : String(t.tableNo).trim().toLowerCase() === String(tableNo || "").trim().toLowerCase();
                                     const sName = t.assignedWaiterName || t.assignedWaiter?.name;
                                     return (
                                         <button
                                             key={t.id}
                                             type="button"
-                                            onClick={() => handleSelectTable(t.tableNo)}
+                                            onClick={() => handleSelectTable(t)}
                                             className={`flex flex-col justify-between p-3 rounded-xl border text-left transition ${
                                                 isSelected
                                                     ? "border-orange-500 bg-orange-500/10 shadow-md shadow-orange-500/10"

@@ -53,6 +53,7 @@ import BrandLogo from "../components/BrandLogo";
 import { useCanonicalTables } from "../context/TableStateContext";
 import TablePaymentSettlementModal from "../components/TablePaymentSettlementModal";
 import ServerProfileView from "../components/ServerProfileView";
+import { getTableId, isSameTable, formatTableDisplayLabel } from "../utils/tableIdentity";
 import ServerNotificationsView from "../components/ServerNotificationsView";
 import ServerHistoryView from "../components/ServerHistoryView";
 
@@ -381,9 +382,9 @@ export default function Server() {
 
         setSelectedTable((prev) => {
             if (!prev) return prev;
-            const matchesPrev =
-                (targetId && (Number(prev.id) === Number(targetId) || String(prev.id) === String(targetId))) ||
-                (targetNo && String(prev.tableNo).trim().toLowerCase() === String(targetNo).trim().toLowerCase());
+            const matchesPrev = targetId
+                ? (Number(prev.id) === Number(targetId) || String(prev.id) === String(targetId))
+                : (targetNo && String(prev.tableNo).trim().toLowerCase() === String(targetNo).trim().toLowerCase());
             if (matchesPrev) {
                 return {
                     ...prev,
@@ -795,7 +796,7 @@ export default function Server() {
 
             if (data?.tableId) {
                 setSelectedTable((prev) => {
-                    if (!prev || (prev.id !== data.tableId && String(prev.tableNo) !== String(data.tableNo))) {
+                    if (!prev || Number(prev.id) !== Number(data.tableId)) {
                         return prev;
                     }
                     if (isReleaseEvent) {
@@ -1071,7 +1072,12 @@ export default function Server() {
     useEffect(() => {
         if (!selectedTable) return;
         const fresh = tables.find(
-            (t) => t.id === selectedTable.id || String(t.tableNo).trim() === String(selectedTable.tableNo).trim()
+            (t) => selectedTable.id
+                ? Number(t.id) === Number(selectedTable.id)
+                : (
+                    String(t.tableNo).trim() === String(selectedTable.tableNo).trim() &&
+                    (!selectedTable.section || String(t.section || "").trim().toLowerCase() === String(selectedTable.section || "").trim().toLowerCase())
+                )
         );
         if (
             fresh &&
