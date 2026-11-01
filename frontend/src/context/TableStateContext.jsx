@@ -615,6 +615,8 @@ export function TableStateProvider({ children }) {
         socket.on("order:updated", handleOrderOrPayment);
         socket.on("order:status_updated", handleOrderOrPayment);
         socket.on("payment:updated", handleOrderOrPayment);
+        socket.on("food:delivered", handleOrderOrPayment);
+        socket.on("kitchen:item_served", handleOrderOrPayment);
 
         return () => {
             socket.off("table:updated", handleTableUpdated);
@@ -629,6 +631,8 @@ export function TableStateProvider({ children }) {
             socket.off("order:updated", handleOrderOrPayment);
             socket.off("order:status_updated", handleOrderOrPayment);
             socket.off("payment:updated", handleOrderOrPayment);
+            socket.off("food:delivered", handleOrderOrPayment);
+            socket.off("kitchen:item_served", handleOrderOrPayment);
         };
     }, [socket, restaurantId, upsertTable, refreshTables]);
 

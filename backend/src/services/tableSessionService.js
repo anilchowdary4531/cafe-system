@@ -21,6 +21,8 @@ export const getOrCreateActiveSession = async ({
   waiterId = null,
   waiterName = null,
   guestCount = 1,
+  allowDirty = false,
+  force = false,
 } = {}) => {
   const rid = Number(restaurantId);
   const tid = Number(tableId);
@@ -67,7 +69,7 @@ export const getOrCreateActiveSession = async ({
     });
 
     if (!session) {
-      if (table.cleaningStatus === "DIRTY") {
+      if (table.cleaningStatus === "DIRTY" && !allowDirty && !force) {
         const err = new Error(`Table ${table.tableNo} is DIRTY and awaiting sanitation. Cannot seat guests until cleaned.`);
         err.code = "table_dirty";
         throw err;

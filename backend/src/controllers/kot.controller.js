@@ -682,7 +682,16 @@ export const updateItemStatus = async (req, res) => {
         staff.to(`restaurant_${restaurantId}`).emit("order:updated", order);
         staff.to(`restaurant:${restaurantId}`).emit("order:updated", order);
         if (orderTableNo || orderTableId) {
-          const tableUpdatePayload = { restaurantId, id: orderTableId, tableId: orderTableId, tableNo: orderTableNo, section: kotSection };
+          const tableUpdatePayload = {
+            restaurantId,
+            id: orderTableId,
+            tableId: orderTableId,
+            tableNo: orderTableNo,
+            section: kotSection,
+            status: order.status === "DELIVERED" ? "DELIVERED" : "OCCUPIED",
+            activeOrderStatus: order.status === "DELIVERED" ? "DELIVERED" : undefined,
+            isOccupied: true,
+          };
           staff.to(`restaurant_${restaurantId}`).emit("table:updated", tableUpdatePayload);
           staff.to(`restaurant:${restaurantId}`).emit("table:updated", tableUpdatePayload);
         }
@@ -691,7 +700,16 @@ export const updateItemStatus = async (req, res) => {
         io.to(`restaurant_${restaurantId}`).emit("order:updated", order);
         io.to(`restaurant:${restaurantId}`).emit("order:updated", order);
         if (orderTableNo || orderTableId) {
-          const tableUpdatePayload = { restaurantId, id: orderTableId, tableId: orderTableId, tableNo: orderTableNo, section: kotSection };
+          const tableUpdatePayload = {
+            restaurantId,
+            id: orderTableId,
+            tableId: orderTableId,
+            tableNo: orderTableNo,
+            section: kotSection,
+            status: order.status === "DELIVERED" ? "DELIVERED" : "OCCUPIED",
+            activeOrderStatus: order.status === "DELIVERED" ? "DELIVERED" : undefined,
+            isOccupied: true,
+          };
           io.to(`restaurant_${restaurantId}`).emit("table:updated", tableUpdatePayload);
           io.to(`restaurant:${restaurantId}`).emit("table:updated", tableUpdatePayload);
         }

@@ -3,6 +3,7 @@ import axios from "axios";
 import { LoaderCircle, RefreshCw, Search, X, ShoppingBag, ArrowLeft } from "lucide-react";
 import { API } from "../../config";
 import OwnerMenuButton from "../../components/OwnerMenuButton";
+import { useStaffSocket } from "../../context/StaffSocketContext";
 
 const STATUSES = ["PLACED", "ACCEPTED", "PREPARING", "READY", "DELIVERED", "CANCELLED"];
 const ACTIVE_STATUSES = new Set(["PLACED", "ACCEPTED", "PREPARING", "READY"]);
@@ -94,6 +95,7 @@ export default function OwnerOrders({ sourceFilter = "" } = {}) {
     const [itemsModalOrder, setItemsModalOrder] = useState(null);
 
     const [user] = useState(readStoredUser);
+    const { socket } = useStaffSocket();
 
     const restaurantId = Number(user?.restaurantId);
     const normalizedSourceFilter = String(sourceFilter || "").trim().toUpperCase();
@@ -131,6 +133,71 @@ export default function OwnerOrders({ sourceFilter = "" } = {}) {
     useEffect(() => {
         loadOrders();
     }, [restaurantId, status, normalizedSourceFilter]);
+
+    useEffect(() => {
+        if (!socket || !restaurantId) return undefined;
+
+        const handleOrderSync = (updatedOrder) => {
+            if (!updatedOrder) {
+                loadOrders({ silent: true });
+                return;
+            }
+            const updatedId = Number(updatedOrder.id || updatedOrder.orderId || 0);
+            const updatedRid = Number(updatedOrder.restaurantId || 0);
+            if (updatedRid && restaurantId && updatedRid !== restaurantId) return;
+
+            setOrders((prev) => {
+                const list = Array.isArray(prev) ? prev : [];
+                const idx = list.findIndex((o) => Number(o?.id || 0) === updatedId);
+                if (idx === -1) {
+                    loadOrders({ silent: true });
+                    return prev;
+                }
+                const copy = list.slice();
+                copy[idx] = { ...copy[idx], ...updatedOrder };
+                return copy;
+            });
+        };
+
+        const handleFoodDelivered = (payload) => {
+            if (!payload) return;
+            const rid = Number(payload.restaurantId || payload.order?.restaurantId || 0);
+            if (rid && restaurantId && rid !== restaurantId) return;
+
+            const orderId = Number(payload.orderId || payload.order?.id || 0);
+            if (orderId) {
+                setOrders((prev) => {
+                    const list = Array.isArray(prev) ? prev : [];
+                    const idx = list.findIndex((o) => Number(o?.id || 0) === orderId);
+                    if (idx !== -1) {
+                        const copy = list.slice();
+                        copy[idx] = {
+                            ...copy[idx],
+                            status: "DELIVERED",
+                            ...(payload.order || {}),
+                        };
+                        return copy;
+                    }
+                    return prev;
+                });
+            }
+            loadOrders({ silent: true });
+        };
+
+        socket.on("order:updated", handleOrderSync);
+        socket.on("order:status_updated", handleOrderSync);
+        socket.on("order:created", () => loadOrders({ silent: true }));
+        socket.on("food:delivered", handleFoodDelivered);
+        socket.on("kitchen:item_served", () => loadOrders({ silent: true }));
+
+        return () => {
+            socket.off("order:updated", handleOrderSync);
+            socket.off("order:status_updated", handleOrderSync);
+            socket.off("order:created");
+            socket.off("food:delivered", handleFoodDelivered);
+            socket.off("kitchen:item_served");
+        };
+    }, [socket, restaurantId]);
 
     useEffect(() => {
         if (isOnlineOrders) {

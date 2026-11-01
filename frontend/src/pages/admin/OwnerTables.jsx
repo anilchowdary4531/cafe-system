@@ -784,12 +784,23 @@ export default function OwnerTables() {
             handleReservationChange();
         };
 
+        const handleOrderChange = () => {
+            loadActiveSessions();
+            if (typeof refreshCanonicalTables === "function") {
+                refreshCanonicalTables({ force: true });
+            }
+            loadTables();
+        };
+
         socket.on("table:session_updated", onSessionUpdated);
         socket.on("table:updated", handleTableUpdated);
         socket.on("table:waiter_assigned", handleTableUpdated);
         socket.on("table:layout_updated", loadTables);
-        socket.on("order:created", loadActiveSessions);
-        socket.on("order:updated", loadActiveSessions);
+        socket.on("order:created", handleOrderChange);
+        socket.on("order:updated", handleOrderChange);
+        socket.on("order:status_updated", handleOrderChange);
+        socket.on("food:delivered", handleOrderChange);
+        socket.on("kitchen:item_served", handleOrderChange);
         socket.on("reservation:updated", handleReservationChange);
         socket.on("cleaner:table_dirty", handleReservationChange);
         socket.on("cleaner:table_cleaned", handleReservationChange);
@@ -802,8 +813,11 @@ export default function OwnerTables() {
                 socket.off("table:updated", handleTableUpdated);
                 socket.off("table:waiter_assigned", handleReservationChange);
                 socket.off("table:layout_updated", loadTables);
-                socket.off("order:created", loadActiveSessions);
-                socket.off("order:updated", loadActiveSessions);
+                socket.off("order:created", handleOrderChange);
+                socket.off("order:updated", handleOrderChange);
+                socket.off("order:status_updated", handleOrderChange);
+                socket.off("food:delivered", handleOrderChange);
+                socket.off("kitchen:item_served", handleOrderChange);
                 socket.off("reservation:updated", handleReservationChange);
                 socket.off("cleaner:table_dirty", handleReservationChange);
                 socket.off("cleaner:table_cleaned", handleReservationChange);
@@ -1752,9 +1766,18 @@ export default function OwnerTables() {
                                 const hasOrders = Array.isArray(table.activeOrders) && table.activeOrders.length > 0;
                                 const isDirty = table.cleaningStatus === "DIRTY" || table.status === "DIRTY";
                                 const sessionStatus = session?.status || table.status || "AVAILABLE";
+
+                                const allDelivered = hasOrders && table.activeOrders.every(
+                                    (o) => ["DELIVERED", "SERVED", "COMPLETED"].includes(String(o?.status || "").toUpperCase())
+                                );
+                                const allPaid = hasOrders && table.activeOrders.every(
+                                    (o) => ["PAID", "SUCCESS"].includes(String(o?.paymentStatus || "").toUpperCase())
+                                );
+
                                 const isOccupied = !isDirty && (table.isOccupied || sessionStatus === "OPEN" || hasOrders);
-                                const isBilling = !isDirty && !isOccupied && (sessionStatus === "BILLING" || table.status === "BILLING" || table.status === "PAYMENT_PENDING");
-                                const isPaid = !isDirty && !isOccupied && !isBilling && (sessionStatus === "PAID" || table.status === "PAID");
+                                const isDelivered = !isDirty && isOccupied && allDelivered && !allPaid && sessionStatus !== "BILLING" && table.status !== "BILLING";
+                                const isBilling = !isDirty && !isDelivered && (sessionStatus === "BILLING" || table.status === "BILLING" || table.status === "PAYMENT_PENDING");
+                                const isPaid = !isDirty && (allPaid || sessionStatus === "PAID" || table.status === "PAID");
                                 const isAvailable = !isOccupied && !isBilling && !isPaid && !isDirty;
 
                                 const layoutData = isEditingLayout && editedLayoutTables[table.id]
@@ -1807,7 +1830,9 @@ export default function OwnerTables() {
                                                 ? "ring-2 ring-orange-500 shadow-orange-500/50 shadow-xl z-30"
                                                 : ""
                                         } ${
-                                            isOccupied
+                                            isDelivered
+                                                ? "border-purple-500/80 bg-gradient-to-br from-purple-950/80 via-[#0f172a] to-purple-900/40 text-purple-200 shadow-purple-500/20 shadow-lg"
+                                                : isOccupied
                                                 ? "border-blue-500/80 bg-gradient-to-br from-blue-950/80 via-[#0f172a] to-blue-900/40 text-blue-200 shadow-blue-500/20 shadow-lg"
                                                 : isBilling
                                                 ? "border-amber-500/80 bg-gradient-to-br from-amber-950/80 via-[#0f172a] to-amber-900/40 text-amber-200 shadow-amber-500/20 shadow-lg"
@@ -1937,9 +1962,18 @@ export default function OwnerTables() {
                                         const hasOrders = Array.isArray(table.activeOrders) && table.activeOrders.length > 0;
                                         const isDirty = table.cleaningStatus === "DIRTY" || table.status === "DIRTY";
                                         const sessionStatus = session?.status || table.status || "AVAILABLE";
+
+                                        const allDelivered = hasOrders && table.activeOrders.every(
+                                            (o) => ["DELIVERED", "SERVED", "COMPLETED"].includes(String(o?.status || "").toUpperCase())
+                                        );
+                                        const allPaid = hasOrders && table.activeOrders.every(
+                                            (o) => ["PAID", "SUCCESS"].includes(String(o?.paymentStatus || "").toUpperCase())
+                                        );
+
                                         const isOccupied = !isDirty && (table.isOccupied || sessionStatus === "OPEN" || hasOrders);
-                                        const isBilling = !isDirty && !isOccupied && (sessionStatus === "BILLING" || table.status === "BILLING" || table.status === "PAYMENT_PENDING");
-                                        const isPaid = !isDirty && !isOccupied && !isBilling && (sessionStatus === "PAID" || table.status === "PAID");
+                                        const isDelivered = !isDirty && isOccupied && allDelivered && !allPaid && sessionStatus !== "BILLING" && table.status !== "BILLING";
+                                        const isBilling = !isDirty && !isDelivered && (sessionStatus === "BILLING" || table.status === "BILLING" || table.status === "PAYMENT_PENDING");
+                                        const isPaid = !isDirty && (allPaid || sessionStatus === "PAID" || table.status === "PAID");
                                         const isAvailable = !isOccupied && !isBilling && !isPaid && !isDirty;
                                         const resForTable = reservations.find((r) =>
                                             Number(r.tableId || r.table?.id) === Number(table.id)
@@ -1949,7 +1983,9 @@ export default function OwnerTables() {
                                             <article
                                                 key={table.id}
                                                 className={`relative flex flex-col justify-between rounded-xl border p-3.5 transition ${
-                                                    isOccupied
+                                                    isDelivered
+                                                        ? "border-purple-500/50 bg-purple-500/5"
+                                                        : isOccupied
                                                         ? "border-blue-500/50 bg-blue-500/5"
                                                         : isBilling
                                                         ? "border-amber-500/50 bg-amber-500/5"
@@ -2023,7 +2059,9 @@ export default function OwnerTables() {
                                                     <div className="flex items-center gap-1.5">
                                                         <span
                                                             className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                                                                isOccupied
+                                                                isDelivered
+                                                                    ? "bg-purple-500/20 text-purple-300 border border-purple-500/40"
+                                                                    : isOccupied
                                                                     ? "bg-blue-500/20 text-blue-300 border border-blue-500/40"
                                                                     : isBilling
                                                                     ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
@@ -2036,7 +2074,7 @@ export default function OwnerTables() {
                                                                     : "bg-emerald-400/20 text-emerald-300 border border-emerald-400/30"
                                                             }`}
                                                         >
-                                                            {isOccupied ? "Running" : isBilling ? "Billing" : isPaid ? "Paid" : isDirty ? "Cleaning" : resForTable || table.isReserved ? "Reserved" : "Available"}
+                                                            {isDirty ? "Cleaning" : isPaid ? "Paid" : isBilling ? "Billing" : isDelivered ? "Delivered" : isOccupied ? "Running" : resForTable || table.isReserved ? "Reserved" : "Available"}
                                                         </span>
 
                                                         <div className="relative" data-table-actions-menu>

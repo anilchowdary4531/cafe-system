@@ -841,6 +841,11 @@ body,
     --table-state-bg: color-mix(in srgb, #f59e0b 18%, transparent);
 }
 
+.theme-table-box.state-delivered-table {
+    --table-state-color: #a855f7;
+    --table-state-bg: color-mix(in srgb, #a855f7 18%, transparent);
+}
+
 .theme-table-box.is-occupied {
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--table-state-color) 40%, transparent);
 }
@@ -909,6 +914,10 @@ body,
 
 .theme-table-legend-item.state-cleaning-table .theme-table-legend-dot {
     background: #f59e0b;
+}
+
+.theme-table-legend-item.state-delivered-table .theme-table-legend-dot {
+    background: #a855f7;
 }
 
 .theme-table-icon-btn {

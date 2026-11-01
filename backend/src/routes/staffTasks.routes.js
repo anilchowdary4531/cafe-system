@@ -1057,6 +1057,9 @@ export default async function staffTaskRoutes(app, deps = {}) {
           id: kotTableId,
           section: kotSection,
           tableNo: kotTableNo,
+          status: updatedOrder?.status === "DELIVERED" ? "DELIVERED" : "OCCUPIED",
+          activeOrderStatus: updatedOrder?.status === "DELIVERED" ? "DELIVERED" : undefined,
+          isOccupied: true,
           version: nowTimestamp,
           updatedAt: nowIso,
         };

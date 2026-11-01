@@ -562,7 +562,7 @@ const TABLE_STATE_LABELS = {
     [TABLE_STATE_KEYS.PRINTED]: "Printed Table",
     [TABLE_STATE_KEYS.PAID]: "Paid Table",
     [TABLE_STATE_KEYS.RUNNING_KOT]: "Running KOT Table",
-    [TABLE_STATE_KEYS.DELIVERED]: "Payment Pending",
+    [TABLE_STATE_KEYS.DELIVERED]: "Delivered Table",
     [TABLE_STATE_KEYS.FAILED]: "Payment Failed",
     [TABLE_STATE_KEYS.CANCELLED]: "Payment Cancelled",
 };
@@ -595,8 +595,8 @@ const resolveTableState = (table, printedTableKeys = new Set()) => {
         const assignmentKey = String(table?.assignmentKey || table?.key || "");
         const isPrinted = printedTableKeys.has(assignmentKey);
 
-        const allDelivered = activeOrders.every(
-            (order) => String(order?.status || "").toUpperCase() === "DELIVERED"
+        const allDelivered = activeOrders.every((order) =>
+            ["DELIVERED", "SERVED", "COMPLETED"].includes(String(order?.status || "").toUpperCase())
         );
 
         if (allDelivered) {
@@ -670,8 +670,8 @@ const resolveTableCardBadge = (table, tableStateKey, printedTableKeys) => {
                 };
             }
 
-            const allDelivered = activeOrders.every(
-                (o) => String(o?.status || "").toUpperCase() === "DELIVERED"
+            const allDelivered = activeOrders.every((o) =>
+                ["DELIVERED", "SERVED", "COMPLETED"].includes(String(o?.status || "").toUpperCase())
             );
             const allPaid = activeOrders.every(
                 (o) => ["PAID", "SUCCESS"].includes(String(o?.paymentStatus || "").toUpperCase())
@@ -699,8 +699,8 @@ const resolveTableCardBadge = (table, tableStateKey, printedTableKeys) => {
                     };
                 }
                 return {
-                    label: "Payment Pending",
-                    className: "bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/40",
+                    label: "Delivered",
+                    className: "bg-purple-500/20 text-purple-600 dark:text-purple-300 border border-purple-500/40",
                 };
             }
 
@@ -3419,6 +3419,8 @@ export default function OwnerLayout() {
                                                         ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
                                                         : status === "PREPARING"
                                                         ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
+                                                        : status === "DELIVERED" || status === "SERVED"
+                                                        ? "border-purple-500/30 bg-purple-500/10 text-purple-400"
                                                         : "border-cyan-500/30 bg-cyan-500/10 text-cyan-300";
                                                 return (
                                                     <button

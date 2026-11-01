@@ -1151,7 +1151,7 @@ export default async function ownerRoutes(app, deps = {}) {
               const allDelivered = orders.every((o) => ["DELIVERED", "SERVED", "COMPLETED", "PAYMENT_PENDING"].includes(String(o.status || "").toUpperCase()));
               if (allDelivered) {
                 const anyUnpaid = orders.some((o) => !["PAID", "SUCCESS"].includes(String(o.paymentStatus || "").toUpperCase()));
-                if (anyUnpaid) return "PAYMENT_PENDING";
+                if (anyUnpaid) return "DELIVERED";
                 return "PAID";
               }
               return orders[orders.length - 1]?.status || null;
@@ -1161,7 +1161,7 @@ export default async function ownerRoutes(app, deps = {}) {
               const ls = String(fallbackLatest.status || "").toUpperCase();
               const lp = String(fallbackLatest.paymentStatus || "").toUpperCase();
               if (["DELIVERED", "SERVED", "COMPLETED", "PAYMENT_PENDING"].includes(ls)) {
-                if (lp !== "PAID" && lp !== "SUCCESS") return "PAYMENT_PENDING";
+                if (lp !== "PAID" && lp !== "SUCCESS") return "DELIVERED";
                 return "PAID";
               }
               return ls;
@@ -1179,10 +1179,12 @@ export default async function ownerRoutes(app, deps = {}) {
           if (isBlocked) {
             canonicalStatus = "BLOCKED";
           } else if (isOccupied) {
-            canonicalStatus = activeOrderStatus === "PAYMENT_PENDING"
-              ? "PAYMENT_PENDING"
-              : activeSession?.status === "BILLING"
+            canonicalStatus = activeSession?.status === "BILLING"
               ? "BILLING"
+              : activeOrderStatus === "DELIVERED"
+              ? "DELIVERED"
+              : activeOrderStatus === "PAYMENT_PENDING"
+              ? "PAYMENT_PENDING"
               : "OCCUPIED";
           } else if (isDirty) {
             canonicalStatus = "DIRTY";
@@ -1285,7 +1287,7 @@ export default async function ownerRoutes(app, deps = {}) {
             activeItemCount,
             activeOrders: tableActiveOrders,
             activeOrderStatus,
-            paymentStatus: activeOrderStatus === "PAYMENT_PENDING" ? "PENDING" : null,
+            paymentStatus: (activeOrderStatus === "DELIVERED" || activeOrderStatus === "PAYMENT_PENDING") ? "PENDING" : null,
             session: activeSession ? {
               id: activeSession.id,
               status: activeSession.status,
