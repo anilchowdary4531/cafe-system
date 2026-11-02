@@ -120,6 +120,7 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
           nextStatus: status,
           notes: payload?.notes,
           changedByName: payload?.changedByName,
+          realtime: { io, staff },
         });
         emitOrderUpdated(updated);
         if (status === "DELIVERED" && Array.isArray(updated.kots)) {

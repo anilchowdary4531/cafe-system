@@ -67,6 +67,7 @@ import {
 } from "../utils/ownerNotifications";
 import { API } from "../config";
 import { api } from "../utils/apiClient";
+import { getActiveStaffToken } from "../utils/staffSessionStorage";
 import { useStaffSocket } from "../context/StaffSocketContext";
 import { playNotificationSound } from "../utils/soundPlayer";
 import { useCanonicalTables } from "../context/TableStateContext";
@@ -1090,14 +1091,14 @@ export default function OwnerLayout() {
     useEffect(() => {
         let isMounted = true;
         const fetchUnread = async () => {
-            const token = localStorage.getItem("token") || localStorage.getItem("staffToken");
+            const token = getActiveStaffToken() || localStorage.getItem("token") || localStorage.getItem("staffToken") || sessionStorage.getItem("token");
             if (!token) {
                 if (isMounted) setUnreadCount(getOwnerUnreadCount());
                 return;
             }
             try {
-                const res = await axios.get(`${API}/api/notifications/unread-count`, {
-                    headers: { Authorization: `Bearer ${token}` },
+                const res = await api.get("/api/notifications/unread-count", {
+                    headers: token ? { Authorization: `Bearer ${token}` } : {},
                 });
                 if (isMounted && res.data && typeof res.data.count === "number") {
                     setUnreadCount(res.data.count);

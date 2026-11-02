@@ -14,6 +14,8 @@ import {
     CheckCircle2,
 } from "lucide-react";
 import axios from "axios";
+import { api } from "../utils/apiClient";
+import { getActiveStaffToken } from "../utils/staffSessionStorage";
 import { useAuth } from "../context/AuthContext";
 import { useStaffSocket } from "../context/StaffSocketContext";
 import { API } from "../config";
@@ -65,7 +67,8 @@ export default function ServerNotificationsView({
     const handleSelectTable = onNavigateToTable || onSelectTable;
 
     const authHeaders = useMemo(() => {
-        return token ? { Authorization: `Bearer ${token}` } : {};
+        const effectiveToken = token || getActiveStaffToken() || (typeof window !== "undefined" ? (window.sessionStorage?.getItem("token") || window.localStorage?.getItem("staffToken") || window.localStorage?.getItem("token")) : null);
+        return effectiveToken ? { Authorization: `Bearer ${effectiveToken}` } : {};
     }, [token]);
 
     // Fetch notifications from API
@@ -79,7 +82,8 @@ export default function ServerNotificationsView({
             }
 
             try {
-                const res = await axios.get(`${API}/api/notifications?page=${pageNum}&limit=20`, {
+                const requestFn = typeof axios?.get === "function" ? axios.get : api.get;
+                const res = await requestFn(`${API}/api/notifications?page=${pageNum}&limit=20`, {
                     headers: authHeaders,
                     withCredentials: true,
                 });
@@ -192,7 +196,8 @@ export default function ServerNotificationsView({
                 return nextCount;
             });
 
-            await axios.patch(
+            const patchFn = typeof axios?.patch === "function" ? axios.patch : api.patch;
+            await patchFn(
                 `${API}/api/notifications/${notificationId}/read`,
                 {},
                 {
@@ -214,7 +219,8 @@ export default function ServerNotificationsView({
                 onUnreadCountChangeRef.current(0);
             }
 
-            await axios.patch(
+            const patchFn = typeof axios?.patch === "function" ? axios.patch : api.patch;
+            await patchFn(
                 `${API}/api/notifications/read-all`,
                 {},
                 {
@@ -370,7 +376,7 @@ export default function ServerNotificationsView({
                         const isSuccess = typeUpper.includes("SUCCESS") || typeUpper.includes("PAYMENT") || typeUpper.includes("DELIVERED") || typeUpper.includes("ACCEPTED");
                         const isOrder = typeUpper.includes("ORDER") && !isSuccess;
 
-                        const tableNo = item.data?.tableNo || item.data?.table_number || item.metadata?.tableNo || item.data?.table;
+                        const tableNo = item.data?.tableNo || item.data?.table_number || item.metadata?.tableNo || item.data?.table || item.tableNo;
                         const tableId = item.data?.tableId ? Number(item.data.tableId) : (item.tableId ? Number(item.tableId) : null);
 
                         return (

@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import { API } from "../../config";
+import { api } from "../../utils/apiClient";
+import { getActiveStaffToken } from "../../utils/staffSessionStorage";
 import { useStaffSocket } from "../../context/StaffSocketContext";
 import { playNotificationSound } from "../../utils/soundPlayer";
 import {
@@ -36,7 +38,7 @@ const formatTime = (value) => {
 };
 
 export default function OwnerNotifications() {
-    const [notifications, setNotifications] = useState(() => getOwnerNotifications());
+    const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [filterType, setFilterType] = useState("ALL"); // ALL | UNREAD | ORDERS | TABLES | SUCCESS | INFO
@@ -49,7 +51,7 @@ export default function OwnerNotifications() {
     );
 
     const fetchBackendNotifications = useCallback(async (isRefresh = false) => {
-        const token = localStorage.getItem("token") || localStorage.getItem("staffToken");
+        const token = getActiveStaffToken() || localStorage.getItem("token") || localStorage.getItem("staffToken") || sessionStorage.getItem("token");
         if (!token) {
             setNotifications(getOwnerNotifications());
             return;
@@ -59,9 +61,9 @@ export default function OwnerNotifications() {
         else setLoading(true);
 
         try {
-            const res = await axios.get(`${API}/api/notifications`, {
-                headers: { Authorization: `Bearer ${token}` },
+            const res = await api.get("/api/notifications", {
                 params: { page: 1, limit: 100 },
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
             });
             const list = res.data?.notifications || res.data?.data || [];
             if (Array.isArray(list)) {
@@ -76,9 +78,13 @@ export default function OwnerNotifications() {
                 }));
                 setNotifications(mapped);
             }
-        } catch {
-            // Graceful fallback to local cache
-            setNotifications(getOwnerNotifications());
+        } catch (err) {
+            console.warn("[OwnerNotifications] Backend fetch error:", err?.message);
+            // Only fallback to local if local has non-empty list
+            const local = getOwnerNotifications();
+            if (Array.isArray(local) && local.length > 0) {
+                setNotifications((prev) => (prev.length > 0 ? prev : local));
+            }
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -88,16 +94,6 @@ export default function OwnerNotifications() {
     useEffect(() => {
         fetchBackendNotifications();
     }, [fetchBackendNotifications]);
-
-    // Local storage subscription for backward compatibility / fallback
-    useEffect(() => {
-        const unsubscribe = subscribeOwnerNotifications((next) => {
-            if (Array.isArray(next) && next.length > 0 && notifications.length === 0) {
-                setNotifications(next);
-            }
-        });
-        return unsubscribe;
-    }, [notifications.length]);
 
     // Realtime notification socket listener
     useEffect(() => {
@@ -121,7 +117,7 @@ export default function OwnerNotifications() {
             });
 
             appendOwnerNotification(notif);
-            playNotificationSound("default").catch(() => {});
+            Promise.resolve(playNotificationSound?.("default")).catch(() => {});
             window.dispatchEvent(new CustomEvent("notifications:updated"));
         };
 
@@ -136,23 +132,12 @@ export default function OwnerNotifications() {
         markAllOwnerNotificationsRead();
         window.dispatchEvent(new CustomEvent("notifications:updated"));
 
-        const token = localStorage.getItem("token") || localStorage.getItem("staffToken");
-        if (token) {
+        try {
+            await api.patch("/api/notifications/read-all", {});
+        } catch {
             try {
-                await axios.put(
-                    `${API}/api/notifications/read-all`,
-                    {},
-                    { headers: { Authorization: `Bearer ${token}` } }
-                );
-            } catch {
-                try {
-                    await axios.patch(
-                        `${API}/api/notifications/read-all`,
-                        {},
-                        { headers: { Authorization: `Bearer ${token}` } }
-                    );
-                } catch (_) {}
-            }
+                await api.put("/api/notifications/read-all", {});
+            } catch (_) {}
         }
     };
 
@@ -163,21 +148,12 @@ export default function OwnerNotifications() {
         markOwnerNotificationRead(id);
         window.dispatchEvent(new CustomEvent("notifications:updated"));
 
-        const token = localStorage.getItem("token") || localStorage.getItem("staffToken");
-        if (token && typeof id === "number") {
+        if (id && !String(id).startsWith("seed_")) {
             try {
-                await axios.put(
-                    `${API}/api/notifications/${id}/read`,
-                    {},
-                    { headers: { Authorization: `Bearer ${token}` } }
-                );
+                await api.patch(`/api/notifications/${id}/read`, {});
             } catch {
                 try {
-                    await axios.patch(
-                        `${API}/api/notifications/${id}/read`,
-                        {},
-                        { headers: { Authorization: `Bearer ${token}` } }
-                    );
+                    await api.put(`/api/notifications/${id}/read`, {});
                 } catch (_) {}
             }
         }
@@ -186,12 +162,15 @@ export default function OwnerNotifications() {
     // Filter & Search Notifications
     const filteredNotifications = useMemo(() => {
         return notifications.filter((item) => {
+            const isUnread = !item.read;
+            const typeUpper = String(item.type || "").toUpperCase();
+
             // Type / Unread filter
-            if (filterType === "UNREAD" && item.read) return false;
-            if (filterType === "ORDERS" && !String(item.type || "").toUpperCase().includes("ORDER")) return false;
-            if (filterType === "TABLES" && !String(item.type || "").toUpperCase().includes("TABLE")) return false;
-            if (filterType === "SUCCESS" && !String(item.type || "").toUpperCase().includes("SUCCESS")) return false;
-            if (filterType === "INFO" && !["INFO", "SYSTEM"].some((t) => String(item.type || "").toUpperCase().includes(t))) return false;
+            if (filterType === "UNREAD" && !isUnread) return false;
+            if (filterType === "ORDERS" && !typeUpper.includes("ORDER") && !typeUpper.includes("DELIVER")) return false;
+            if (filterType === "TABLES" && !typeUpper.includes("TABLE")) return false;
+            if (filterType === "SUCCESS" && !["SUCCESS", "PAYMENT", "DELIVERED", "SERVED", "CLEANED", "ACCEPTED"].some((t) => typeUpper.includes(t))) return false;
+            if (filterType === "INFO" && !["INFO", "SYSTEM"].some((t) => typeUpper.includes(t))) return false;
 
             // Search query
             if (searchQuery.trim()) {
@@ -292,9 +271,10 @@ export default function OwnerNotifications() {
                     {filteredNotifications.map((item) => {
                         const isUnread = !item.read;
                         const typeUpper = String(item.type || "INFO").toUpperCase();
-                        const isSuccess = typeUpper.includes("SUCCESS") || typeUpper.includes("CLEANED");
-                        const isOrder = typeUpper.includes("ORDER") || typeUpper.includes("BILL");
+                        const isSuccess = typeUpper.includes("SUCCESS") || typeUpper.includes("CLEANED") || typeUpper.includes("DELIVER") || typeUpper.includes("SERVED");
+                        const isOrder = (typeUpper.includes("ORDER") || typeUpper.includes("BILL")) && !isSuccess;
                         const isTable = typeUpper.includes("TABLE") || typeUpper.includes("CLEAN");
+                        const tableNo = item.data?.tableNo || item.data?.table_number || item.metadata?.tableNo;
 
                         return (
                             <div
@@ -313,17 +293,22 @@ export default function OwnerNotifications() {
                                             {item.title}
                                         </h4>
                                         <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                            isSuccess ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" :
                                             isOrder ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" :
                                             isTable ? "bg-purple-500/15 text-purple-600 dark:text-purple-400" :
-                                            isSuccess ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" :
                                             "bg-sky-500/15 text-sky-600 dark:text-sky-400"
                                         }`}>
                                             {item.type}
                                         </span>
+                                        {tableNo && (
+                                            <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-md bg-orange-500/10 text-orange-600 dark:text-orange-400">
+                                                Table {tableNo}
+                                            </span>
+                                        )}
                                     </div>
 
                                     {/* Line 2: Message Content */}
-                                    <p className="text-[11px] theme-muted leading-relaxed truncate">
+                                    <p className="text-[11px] theme-muted leading-relaxed">
                                         {item.message}
                                     </p>
                                 </div>

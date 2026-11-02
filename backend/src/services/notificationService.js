@@ -147,6 +147,8 @@ export const createAndDispatchNotification = async ({
         if (restaurantId) {
           emitToTargetRooms(realtime.io, [`restaurant:${restaurantId}`, `restaurant_${restaurantId}`], "notification:new", payload);
           const ownerManagerRooms = [
+            `restaurant:${restaurantId}`,
+            `restaurant_${restaurantId}`,
             `restaurant:${restaurantId}:role:OWNER`,
             `restaurant_${restaurantId}_role_OWNER`,
             `restaurant:${restaurantId}:role:MANAGER`,
@@ -158,7 +160,7 @@ export const createAndDispatchNotification = async ({
             emitToTargetRooms(realtime.io.of("/staff"), ownerManagerRooms, "notification:new", payload);
           }
         }
-      } else if (["OWNER", "MANAGER", "CLEANER", "STEWARD", "WAITER", "CHEF", "CASHIER", "SWIPER"].includes(String(recipientType).toUpperCase())) {
+      } else if (["OWNER", "MANAGER", "CLEANER", "STEWARD", "WAITER", "SERVER", "CHEF", "CASHIER", "SWIPER"].includes(String(recipientType).toUpperCase())) {
         // Designation / Role-targeted notification
         const rid = Number(restaurantId || recipientId);
         const normRole = String(recipientType).toUpperCase();

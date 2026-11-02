@@ -1168,6 +1168,33 @@ export default async function staffTaskRoutes(app, deps = {}) {
             }).catch((e) => console.warn("[staffTasks] Food delivered notification error:", e?.message));
           }
 
+          const actingUserId = Number(req.staffActor?.userId || 0);
+          if (actingUserId && actingUserId !== waiterId && rid) {
+            await createAndDispatchNotification({
+              prisma,
+              realtime: { io, staff },
+              recipientType: RECIPIENT_TYPES.USER,
+              recipientId: actingUserId,
+              orderId: updatedItem.kot?.orderId ? Number(updatedItem.kot.orderId) : null,
+              restaurantId: rid,
+              notificationType: NOTIFICATION_TYPES.ORDER_DELIVERED,
+              title: `Food Delivered — ${tableLabel}`,
+              message: `${updatedItem.itemName || "Food item"} delivered to ${tableLabel}.`,
+              idempotencyKey: `food_served_${rid}_${itemId}_act_${actingUserId}_SERVED`,
+              data: {
+                restaurantId: rid,
+                orderId: updatedItem.kot?.orderId ? Number(updatedItem.kot.orderId) : null,
+                kotId: Number(updatedItem.kotId),
+                kotItemId: Number(itemId),
+                tableId: kotTableId,
+                section: kotSection,
+                tableSessionId: updatedItem.kot?.tableSessionId ? Number(updatedItem.kot.tableSessionId) : null,
+                tableNo: kotTableNo,
+                recipientId: actingUserId,
+              },
+            }).catch((e) => console.warn("[staffTasks] Acting server delivery notification error:", e?.message));
+          }
+
           // Also dispatch persistent delivery notification for Restaurant / Owner
           if (rid) {
             await createAndDispatchNotification({

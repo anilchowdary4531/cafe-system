@@ -599,7 +599,7 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
   }
 };
 
-export const updateOrderStatus = async ({ prisma, actor, orderId, nextStatus, notes, changedByName } = {}) => {
+export const updateOrderStatus = async ({ prisma, actor, orderId, nextStatus, notes, changedByName, realtime } = {}) => {
   const id = Number(orderId || 0);
   if (!id) {
     const err = new Error("invalid_order_id");
@@ -841,6 +841,7 @@ export const updateOrderStatus = async ({ prisma, actor, orderId, nextStatus, no
         if (responsibleServerId) {
           await createAndDispatchNotification({
             prisma,
+            realtime,
             recipientType: RECIPIENT_TYPES.USER,
             recipientId: Number(responsibleServerId),
             orderId: id,
@@ -864,6 +865,7 @@ export const updateOrderStatus = async ({ prisma, actor, orderId, nextStatus, no
         // 2. Dispatch persistent delivery notification for Restaurant / Owner
         await createAndDispatchNotification({
           prisma,
+          realtime,
           recipientType: RECIPIENT_TYPES.RESTAURANT,
           recipientId: updated.restaurantId,
           orderId: id,

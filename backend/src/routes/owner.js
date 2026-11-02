@@ -3842,6 +3842,8 @@ export default async function ownerRoutes(app, deps = {}) {
         return reply.code(403).send({ message: "Forbidden" });
       }
 
+      const io = req.server?.io || realtime?.io;
+      const staff = req.server?.staff || realtime?.staff;
       const updated = await updateOrderStatus({
         prisma,
         actor,
@@ -3849,6 +3851,7 @@ export default async function ownerRoutes(app, deps = {}) {
         nextStatus: req.body?.status,
         notes: req.body?.notes,
         changedByName: req.body?.changedByName,
+        realtime: { io, staff },
       });
 
       realtime?.emitOrderUpdated?.(updated);

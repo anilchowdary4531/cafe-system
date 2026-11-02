@@ -11,16 +11,19 @@ const stableStringify = (value) => {
     return `{${keys.map((k) => `${k}:${stableStringify(value[k])}`).join(",")}}`;
 };
 
-export const api = axios.create({
-    baseURL: API,
-    timeout: 15000,
-});
+export const api = typeof axios.create === "function"
+    ? axios.create({ baseURL: API, timeout: 15000 })
+    : axios;
 
 // Prevent duplicate in-flight requests for the same cache key.
 const inFlight = new Map();
 
-api.interceptors.request.use(applyAuthHeaders);
-api.interceptors.response.use((res) => res, handleAuth401);
+if (api?.interceptors?.request?.use) {
+    api.interceptors.request.use(applyAuthHeaders);
+}
+if (api?.interceptors?.response?.use) {
+    api.interceptors.response.use((res) => res, handleAuth401);
+}
 
 export const makeGetCacheKey = ({ url, params, scope = "public" }) => {
     return `GET:${scope}:${API}:${url}?${stableStringify(params || {})}`;
