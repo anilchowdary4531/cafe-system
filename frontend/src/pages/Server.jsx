@@ -888,28 +888,50 @@ export default function Server() {
             const typeUpper = String(notif?.notificationType || notif?.type || "").toUpperCase();
             const isAssigned = typeUpper === "TABLE_ASSIGNMENT" || notif?.data?.action === "ASSIGNED" || notif?.data?.action === "REASSIGNED";
             const isUnassigned = typeUpper === "TABLE_UNASSIGNED" || notif?.data?.action === "UNASSIGNED";
-            const isKotSent = typeUpper === "KOT_SENT" || notif?.data?.action === "KOT_SENT";
+            const isKotSent = typeUpper === "KOT_SENT" || typeUpper === "ORDER_PLACED" || notif?.data?.action === "KOT_SENT" || notif?.data?.action === "ORDER_PLACED" || String(notif?.title || "").toLowerCase().includes("kitchen");
+            const isDelivered = typeUpper === "ORDER_DELIVERED" || notif?.data?.action === "DELIVERED";
 
-            if (isAssigned || isUnassigned || isKotSent) {
+            if (isAssigned || isUnassigned || isKotSent || isDelivered) {
                 playNotificationSound();
                 const targetTableNo = notif.tableNo || notif.data?.tableNo || "";
                 const targetTableId = notif.tableId || notif.data?.tableId || null;
 
-                showToast({
-                    title: notif.title || (isAssigned ? (targetTableNo ? `📋 Table Assigned — Table ${targetTableNo}` : "📋 Table Assigned") : isKotSent ? (targetTableNo ? `🍳 Order Sent to Kitchen — Table ${targetTableNo}` : "🍳 Order Sent to Kitchen") : "Table Unassigned"),
-                    message: notif.message || (isAssigned
+                const toastTitle = notif.title || (
+                    isAssigned
+                        ? (targetTableNo ? `📋 Table Assigned — Table ${targetTableNo}` : "📋 Table Assigned")
+                        : isKotSent
+                            ? (targetTableNo ? `🍳 Order Sent to Kitchen — Table ${targetTableNo}` : "🍳 Order Sent to Kitchen")
+                            : isDelivered
+                                ? (targetTableNo ? `🍽️ Food Delivered — Table ${targetTableNo}` : "🍽️ Food Delivered")
+                                : "Table Unassigned"
+                );
+
+                const toastMessage = notif.message || (
+                    isAssigned
                         ? (targetTableNo ? `Table ${targetTableNo} has been assigned to you. Please check/attend Table ${targetTableNo}.` : "A table has been assigned to you.")
                         : isKotSent
                             ? (targetTableNo ? `Order sent to kitchen for Table ${targetTableNo}` : "Order sent to kitchen")
-                            : (targetTableNo ? `Table ${targetTableNo} assignment updated.` : "Table assignment updated.")),
-                    variant: isAssigned || isKotSent ? "success" : "info",
-                    actionLabel: (isAssigned || isKotSent) && (targetTableNo || targetTableId) ? "View Table" : undefined,
-                    durationMs: (isAssigned || isKotSent) ? 8000 : 4000,
-                    onAction: (isAssigned || isKotSent) && (targetTableNo || targetTableId) ? () => {
+                            : isDelivered
+                                ? (targetTableNo ? `Food delivered to Table ${targetTableNo}.` : "Food delivered.")
+                                : (targetTableNo ? `Table ${targetTableNo} assignment updated.` : "Table assignment updated.")
+                );
+
+                showToast({
+                    title: toastTitle,
+                    message: toastMessage,
+                    variant: (isAssigned || isKotSent || isDelivered) ? "success" : "info",
+                    actionLabel: (isAssigned || isKotSent || isDelivered) && (targetTableNo || targetTableId) ? "View Table" : undefined,
+                    durationMs: (isAssigned || isKotSent || isDelivered) ? 8000 : 4000,
+                    onAction: (isAssigned || isKotSent || isDelivered) && (targetTableNo || targetTableId) ? () => {
                         callbacksRef.current.handleViewAssignedTable?.(targetTableNo, targetTableId);
                     } : undefined,
                 });
                 callbacksRef.current.refreshTables?.({ force: true });
+                if (isDelivered || isKotSent) {
+                    callbacksRef.current.refreshLiveOrders?.({ force: true });
+                    callbacksRef.current.refreshReadyKots?.({ force: true });
+                    callbacksRef.current.refreshReadyRunnerData?.({ force: true });
+                }
             }
         };
 

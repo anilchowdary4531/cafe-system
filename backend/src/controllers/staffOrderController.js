@@ -29,6 +29,7 @@ export const buildStaffOrderController = ({ prisma, realtime }) => {
         nextStatus: status,
         notes: req.body?.notes,
         changedByName: req.body?.changedByName,
+        realtime: realtime?.io ? realtime : { io: req.server?.io, staff: req.server?.staff },
       });
       realtime?.emitOrderUpdated(updated);
       return { message: "Order updated", order: updated };

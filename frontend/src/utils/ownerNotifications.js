@@ -89,11 +89,7 @@ const emitChange = () => {
 const getNormalized = () => sortNewestFirst(readRaw().map((item, idx) => normalizeOne(item, idx)));
 
 export const ensureOwnerNotifications = () => {
-    const current = getNormalized();
-    if (current.length) return current;
-    const seed = seededNotifications();
-    writeRaw(seed);
-    return sortNewestFirst(seed.map((item, idx) => normalizeOne(item, idx)));
+    return getNormalized();
 };
 
 export const getOwnerNotifications = () => ensureOwnerNotifications();

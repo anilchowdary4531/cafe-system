@@ -738,7 +738,7 @@ export default async function customerRoutes(app, deps = {}) {
 
         await createAndDispatchNotification({
           prisma,
-          realtime: { io },
+          realtime: { io, staff },
           recipientType: RECIPIENT_TYPES.RESTAURANT,
           recipientId: restaurant.id,
           restaurantId: restaurant.id,
@@ -753,7 +753,7 @@ export default async function customerRoutes(app, deps = {}) {
         if (customerRecord?.id) {
           await createAndDispatchNotification({
             prisma,
-            realtime: { io },
+            realtime: { io, staff },
             recipientType: RECIPIENT_TYPES.CUSTOMER,
             recipientId: customerRecord.id,
             restaurantId: restaurant.id,

@@ -114,6 +114,9 @@ export const createAndDispatchNotification = async ({
         createdAt: notification.createdAt,
       };
 
+      const ioTarget = realtime?.io || (typeof realtime?.to === "function" ? realtime : null);
+      const staffTarget = realtime?.staff || (typeof ioTarget?.of === "function" ? ioTarget.of("/staff") : null);
+
       const emitToTargetRooms = (target, rooms, event, data) => {
         if (!target || typeof target.to !== "function") return;
         const validRooms = rooms.filter(Boolean);
@@ -131,34 +134,25 @@ export const createAndDispatchNotification = async ({
       };
 
       if (recipientType === RECIPIENT_TYPES.CUSTOMER) {
-        emitToTargetRooms(realtime.io, [`customer:${recipientId}`, `customer_${recipientId}`], "notification:new", payload);
+        emitToTargetRooms(ioTarget, [`customer:${recipientId}`, `customer_${recipientId}`, `user:${recipientId}`, `user_${recipientId}`], "notification:new", payload);
       } else if (recipientType === "SUPPLIER") {
-        emitToTargetRooms(realtime.io, [`supplier:${recipientId}`, `supplier_${recipientId}`], "notification:new", payload);
+        emitToTargetRooms(ioTarget, [`supplier:${recipientId}`, `supplier_${recipientId}`], "notification:new", payload);
+        emitToTargetRooms(staffTarget, [`supplier:${recipientId}`, `supplier_${recipientId}`], "notification:new", payload);
       } else if (recipientType === RECIPIENT_TYPES.USER) {
         // User-targeted notification: dispatch ONLY to user room, never broadcast restaurant-wide
-        emitToTargetRooms(realtime.io, [`user:${recipientId}`, `user_${recipientId}`], "notification:new", payload);
-        if (realtime?.staff) {
-          emitToTargetRooms(realtime.staff, [`user:${recipientId}`, `user_${recipientId}`], "notification:new", payload);
-        } else if (typeof realtime?.io?.of === "function") {
-          emitToTargetRooms(realtime.io.of("/staff"), [`user:${recipientId}`, `user_${recipientId}`], "notification:new", payload);
-        }
+        emitToTargetRooms(ioTarget, [`user:${recipientId}`, `user_${recipientId}`], "notification:new", payload);
+        emitToTargetRooms(staffTarget, [`user:${recipientId}`, `user_${recipientId}`], "notification:new", payload);
       } else if (recipientType === RECIPIENT_TYPES.RESTAURANT) {
         // Restaurant-wide notification: broadcast to root restaurant rooms and staff Owner/Manager rooms
         if (restaurantId) {
-          emitToTargetRooms(realtime.io, [`restaurant:${restaurantId}`, `restaurant_${restaurantId}`], "notification:new", payload);
+          emitToTargetRooms(ioTarget, [`restaurant:${restaurantId}`, `restaurant_${restaurantId}`], "notification:new", payload);
           const ownerManagerRooms = [
-            `restaurant:${restaurantId}`,
-            `restaurant_${restaurantId}`,
             `restaurant:${restaurantId}:role:OWNER`,
             `restaurant_${restaurantId}_role_OWNER`,
             `restaurant:${restaurantId}:role:MANAGER`,
             `restaurant_${restaurantId}_role_MANAGER`,
           ];
-          if (realtime?.staff) {
-            emitToTargetRooms(realtime.staff, ownerManagerRooms, "notification:new", payload);
-          } else if (typeof realtime?.io?.of === "function") {
-            emitToTargetRooms(realtime.io.of("/staff"), ownerManagerRooms, "notification:new", payload);
-          }
+          emitToTargetRooms(staffTarget, ownerManagerRooms, "notification:new", payload);
         }
       } else if (["OWNER", "MANAGER", "CLEANER", "STEWARD", "WAITER", "SERVER", "CHEF", "CASHIER", "SWIPER"].includes(String(recipientType).toUpperCase())) {
         // Designation / Role-targeted notification
@@ -169,12 +163,8 @@ export const createAndDispatchNotification = async ({
             `restaurant:${rid}:role:${normRole}`,
             `restaurant_${rid}_role_${normRole}`,
           ];
-          emitToTargetRooms(realtime.io, roleRooms, "notification:new", payload);
-          if (realtime?.staff) {
-            emitToTargetRooms(realtime.staff, roleRooms, "notification:new", payload);
-          } else if (typeof realtime?.io?.of === "function") {
-            emitToTargetRooms(realtime.io.of("/staff"), roleRooms, "notification:new", payload);
-          }
+          emitToTargetRooms(ioTarget, roleRooms, "notification:new", payload);
+          emitToTargetRooms(staffTarget, roleRooms, "notification:new", payload);
         }
       }
     }

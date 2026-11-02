@@ -53,7 +53,7 @@ export default function OwnerNotifications() {
     const fetchBackendNotifications = useCallback(async (isRefresh = false) => {
         const token = getActiveStaffToken() || localStorage.getItem("token") || localStorage.getItem("staffToken") || sessionStorage.getItem("token");
         if (!token) {
-            setNotifications(getOwnerNotifications());
+            setNotifications([]);
             return;
         }
 
@@ -80,11 +80,6 @@ export default function OwnerNotifications() {
             }
         } catch (err) {
             console.warn("[OwnerNotifications] Backend fetch error:", err?.message);
-            // Only fallback to local if local has non-empty list
-            const local = getOwnerNotifications();
-            if (Array.isArray(local) && local.length > 0) {
-                setNotifications((prev) => (prev.length > 0 ? prev : local));
-            }
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -167,10 +162,10 @@ export default function OwnerNotifications() {
 
             // Type / Unread filter
             if (filterType === "UNREAD" && !isUnread) return false;
-            if (filterType === "ORDERS" && !typeUpper.includes("ORDER") && !typeUpper.includes("DELIVER")) return false;
-            if (filterType === "TABLES" && !typeUpper.includes("TABLE")) return false;
-            if (filterType === "SUCCESS" && !["SUCCESS", "PAYMENT", "DELIVERED", "SERVED", "CLEANED", "ACCEPTED"].some((t) => typeUpper.includes(t))) return false;
-            if (filterType === "INFO" && !["INFO", "SYSTEM"].some((t) => typeUpper.includes(t))) return false;
+            if (filterType === "ORDERS" && !typeUpper.includes("ORDER") && !typeUpper.includes("DELIVER") && !typeUpper.includes("FOOD") && !typeUpper.includes("KOT")) return false;
+            if (filterType === "TABLES" && !typeUpper.includes("TABLE") && !typeUpper.includes("WAITER") && !typeUpper.includes("BILL")) return false;
+            if (filterType === "SUCCESS" && !["SUCCESS", "PAYMENT", "DELIVERED", "SERVED", "CLEANED", "ACCEPTED", "COMPLETED"].some((t) => typeUpper.includes(t))) return false;
+            if (filterType === "INFO" && !["INFO", "SYSTEM", "TASK", "ALERT", "STOCK", "EXPIRY", "BATCH", "GRN", "BARGAIN", "WASTAGE", "SECURITY"].some((t) => typeUpper.includes(t)) && (typeUpper.includes("ORDER") || typeUpper.includes("TABLE") || typeUpper.includes("WAITER") || typeUpper.includes("BILL") || typeUpper.includes("FOOD") || typeUpper.includes("KOT"))) return false;
 
             // Search query
             if (searchQuery.trim()) {

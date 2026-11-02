@@ -786,8 +786,9 @@ export const updateOrderStatus = async ({ prisma, actor, orderId, nextStatus, no
           CANCELLED: `Your order #${updated.orderNo || id} was cancelled.`,
         };
 
-        createAndDispatchNotification({
+        await createAndDispatchNotification({
           prisma,
+          realtime,
           recipientType: "CUSTOMER",
           recipientId: updated.customer.id,
           orderId: id,

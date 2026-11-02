@@ -10,7 +10,7 @@ import { requireStaffJwt } from "../services/staffAuthService.js";
 import { getOrCreateActiveSession } from "../services/tableSessionService.js";
 
 test("FORENSIC INVESTIGATION: SERVER DELIVERY -> OWNER NOTIFICATION PATH", async (t) => {
-  const testSuffix = Date.now();
+  const testSuffix = `${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
   let app = null;
   let realtime = null;
   let ownerSocket = null;

@@ -575,7 +575,7 @@ describe("ServerNotificationsView Unit Tests", () => {
         fireEvent.click(ordersTab);
         expect(screen.getByText("Order Sent to Kitchen")).toBeInTheDocument();
         expect(screen.queryByText("Food Ready — Table 5")).not.toBeInTheDocument();
-        expect(screen.queryByText("Food Delivered — Table 5")).not.toBeInTheDocument();
+        expect(screen.getByText("Food Delivered — Table 5")).toBeInTheDocument();
 
         // Check KITCHEN category tab
         const kitchenTab = screen.getByRole("button", { name: "KITCHEN" });

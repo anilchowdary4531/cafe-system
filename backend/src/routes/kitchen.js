@@ -61,6 +61,9 @@ export default async function (fastify) {
                 });
             }
 
+            const io = fastify.io || fastify.server?.io;
+            const staff = fastify.staff || fastify.server?.staff;
+
             const updated = await updateOrderStatus({
                 prisma,
                 actor: req.staffActor || { role: "KITCHEN", userId: null },
@@ -68,10 +71,9 @@ export default async function (fastify) {
                 nextStatus: status,
                 notes: req.body?.notes,
                 changedByName: req.body?.changedByName || "Kitchen",
+                realtime: { io, staff },
             });
 
-            const io = fastify.io || fastify.server?.io;
-            const staff = fastify.staff || fastify.server?.staff;
             const rid = Number(updated.restaurantId || 0);
 
             if (rid) {
@@ -214,6 +216,9 @@ export default async function (fastify) {
                 });
             }
 
+            const io = fastify.io || fastify.server?.io;
+            const staff = fastify.staff || fastify.server?.staff;
+
             const updated = await updateOrderStatus({
                 prisma,
                 actor: req.staffActor || { role: "KITCHEN", userId: null },
@@ -221,10 +226,9 @@ export default async function (fastify) {
                 nextStatus: status,
                 notes: req.body?.notes,
                 changedByName: req.body?.changedByName || "Kitchen",
+                realtime: { io, staff },
             });
 
-            const io = fastify.io || fastify.server?.io;
-            const staff = fastify.staff || fastify.server?.staff;
             const rid = Number(updated.restaurantId || 0);
 
             if (rid) {

@@ -42,7 +42,7 @@ function waitForSocketEvent(socket, eventName, predicate = () => true, timeoutMs
 
 test("DETERMINISTIC LIVE FORENSIC REPRODUCTION: SERVER DELIVERY -> OWNER PANEL RUNTIME CHAIN", async (t) => {
   const testStartTime = Date.now();
-  const testSuffix = Date.now();
+  const testSuffix = `${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
   let app = null;
   let realtime = null;
   let ownerSocket = null;

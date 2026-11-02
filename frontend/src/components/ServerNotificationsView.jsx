@@ -249,13 +249,14 @@ export default function ServerNotificationsView({
             if (filterType === "UNREAD" && !isUnread) return false;
 
             if (filterType === "ORDERS") {
-                if (!typeUpper.includes("ORDER") || typeUpper.includes("DELIVERED")) return false;
+                if (!typeUpper.includes("ORDER") && !typeUpper.includes("DELIVER")) return false;
             } else if (filterType === "KITCHEN") {
                 if (!typeUpper.includes("KOT") && !typeUpper.includes("KITCHEN") && !typeUpper.includes("FOOD") && !typeUpper.includes("PASS") && !typeUpper.includes("READY")) return false;
             } else if (filterType === "SUCCESS") {
-                if (!typeUpper.includes("SUCCESS") && !typeUpper.includes("PAYMENT") && !typeUpper.includes("DELIVERED") && !typeUpper.includes("ACCEPTED")) return false;
+                if (!["SUCCESS", "PAYMENT", "DELIVERED", "ACCEPTED", "CLEANED", "SERVED"].some((t) => typeUpper.includes(t))) return false;
             } else if (filterType === "INFO") {
-                if (typeUpper.includes("ORDER") || typeUpper.includes("KOT") || typeUpper.includes("KITCHEN") || typeUpper.includes("SUCCESS") || typeUpper.includes("DELIVERED")) return false;
+                if (["ORDER", "KOT"].some((t) => typeUpper.includes(t)) && !typeUpper.includes("TASK")) return false;
+                if (["FOOD_READY", "FOOD_PREPARING"].some((t) => typeUpper.includes(t))) return false;
             }
 
             // Search Query
