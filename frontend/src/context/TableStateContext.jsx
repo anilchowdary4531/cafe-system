@@ -611,12 +611,23 @@ export function TableStateProvider({ children }) {
         socket.on("cleaner:table_cleaned", refreshTables);
         socket.on("cleaner:task_created", refreshTables);
         socket.on("cleaner:task_completed", refreshTables);
+        const handleNotificationNew = (payload) => {
+            if (!payload) return;
+            const rid = Number(payload.restaurantId || restaurantId);
+            if (rid && rid !== restaurantId) return;
+            const typeUpper = String(payload.notificationType || payload.type || "").toUpperCase();
+            if (typeUpper.includes("DELIVER") || typeUpper.includes("ORDER") || typeUpper.includes("TABLE")) {
+                refreshTables({ force: true });
+            }
+        };
+
         socket.on("order:created", handleOrderOrPayment);
         socket.on("order:updated", handleOrderOrPayment);
         socket.on("order:status_updated", handleOrderOrPayment);
         socket.on("payment:updated", handleOrderOrPayment);
         socket.on("food:delivered", handleOrderOrPayment);
         socket.on("kitchen:item_served", handleOrderOrPayment);
+        socket.on("notification:new", handleNotificationNew);
 
         return () => {
             socket.off("table:updated", handleTableUpdated);
@@ -633,6 +644,7 @@ export function TableStateProvider({ children }) {
             socket.off("payment:updated", handleOrderOrPayment);
             socket.off("food:delivered", handleOrderOrPayment);
             socket.off("kitchen:item_served", handleOrderOrPayment);
+            socket.off("notification:new", handleNotificationNew);
         };
     }, [socket, restaurantId, upsertTable, refreshTables]);
 

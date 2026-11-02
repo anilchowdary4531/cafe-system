@@ -184,18 +184,33 @@ export default function OwnerOrders({ sourceFilter = "" } = {}) {
             loadOrders({ silent: true });
         };
 
+        const handleNotificationNew = (payload) => {
+            if (!payload) return;
+            const rid = Number(payload.restaurantId || 0);
+            if (rid && restaurantId && rid !== restaurantId) return;
+            const typeUpper = String(payload.notificationType || payload.type || "").toUpperCase();
+            if (typeUpper.includes("ORDER") || typeUpper.includes("DELIVER")) {
+                loadOrders({ silent: true });
+            }
+        };
+
+        const handleOrderCreated = () => loadOrders({ silent: true });
+        const handleKitchenItemServed = () => loadOrders({ silent: true });
+
         socket.on("order:updated", handleOrderSync);
         socket.on("order:status_updated", handleOrderSync);
-        socket.on("order:created", () => loadOrders({ silent: true }));
+        socket.on("order:created", handleOrderCreated);
         socket.on("food:delivered", handleFoodDelivered);
-        socket.on("kitchen:item_served", () => loadOrders({ silent: true }));
+        socket.on("kitchen:item_served", handleKitchenItemServed);
+        socket.on("notification:new", handleNotificationNew);
 
         return () => {
             socket.off("order:updated", handleOrderSync);
             socket.off("order:status_updated", handleOrderSync);
-            socket.off("order:created");
+            socket.off("order:created", handleOrderCreated);
             socket.off("food:delivered", handleFoodDelivered);
-            socket.off("kitchen:item_served");
+            socket.off("kitchen:item_served", handleKitchenItemServed);
+            socket.off("notification:new", handleNotificationNew);
         };
     }, [socket, restaurantId]);
 

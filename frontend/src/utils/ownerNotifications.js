@@ -22,9 +22,10 @@ const normalizeOne = (raw, index = 0) => {
         id: toSafeText(raw?.id, `notif_${Date.now()}_${index}`),
         title: toSafeText(raw?.title, "Notification"),
         message: toSafeText(raw?.message, "You have a new update."),
-        type: toSafeText(raw?.type, "info"),
+        type: toSafeText(raw?.notificationType || raw?.type, "info"),
         createdAt: toSafeTime(raw?.createdAt),
-        read: Boolean(raw?.read),
+        read: Boolean(raw?.read || raw?.isRead),
+        data: raw?.data || null,
     };
 };
 
@@ -118,27 +119,40 @@ export const markAllOwnerNotificationsRead = () => {
 };
 
 export const appendOwnerNotification = ({
+    id,
     title = "Notification",
     message = "You have a new update.",
     type = "info",
+    notificationType,
     read = false,
     playSound = true,
+    data = null,
+    createdAt,
 } = {}) => {
+    const targetId = id || `notif_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const current = getOwnerNotifications();
+    if (current.some((n) => String(n.id) === String(targetId))) {
+        return current.find((n) => String(n.id) === String(targetId));
+    }
+
     const newItem = normalizeOne({
-        id: `notif_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        id: targetId,
         title,
         message,
-        type,
-        createdAt: new Date().toISOString(),
+        type: notificationType || type,
+        createdAt: createdAt || new Date().toISOString(),
         read: Boolean(read),
+        data,
     });
 
-    const updated = [newItem, ...getOwnerNotifications()].slice(0, MAX_NOTIFICATIONS);
+    const updated = [newItem, ...current].slice(0, MAX_NOTIFICATIONS);
     writeRaw(updated);
     emitChange();
 
     if (playSound) {
-        playNotificationSound();
+        try {
+            playNotificationSound()?.catch?.(() => {});
+        } catch (_) {}
     }
 
     return newItem;

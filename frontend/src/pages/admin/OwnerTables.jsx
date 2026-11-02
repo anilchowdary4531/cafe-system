@@ -792,6 +792,19 @@ export default function OwnerTables() {
             loadTables();
         };
 
+        const handleNotificationNew = (payload) => {
+            if (!payload) return;
+            const rid = Number(payload.restaurantId || 0);
+            if (rid && restaurantId && rid !== restaurantId) return;
+            const typeUpper = String(payload.notificationType || payload.type || "").toUpperCase();
+            if (typeUpper.includes("ORDER") || typeUpper.includes("DELIVER") || typeUpper.includes("TABLE")) {
+                loadTables();
+                if (typeof refreshCanonicalTables === "function") {
+                    refreshCanonicalTables({ force: true });
+                }
+            }
+        };
+
         socket.on("table:session_updated", onSessionUpdated);
         socket.on("table:updated", handleTableUpdated);
         socket.on("table:waiter_assigned", handleTableUpdated);
@@ -801,6 +814,7 @@ export default function OwnerTables() {
         socket.on("order:status_updated", handleOrderChange);
         socket.on("food:delivered", handleOrderChange);
         socket.on("kitchen:item_served", handleOrderChange);
+        socket.on("notification:new", handleNotificationNew);
         socket.on("reservation:updated", handleReservationChange);
         socket.on("cleaner:table_dirty", handleReservationChange);
         socket.on("cleaner:table_cleaned", handleReservationChange);
@@ -811,13 +825,14 @@ export default function OwnerTables() {
             if (typeof socket.off === "function") {
                 socket.off("table:session_updated", onSessionUpdated);
                 socket.off("table:updated", handleTableUpdated);
-                socket.off("table:waiter_assigned", handleReservationChange);
+                socket.off("table:waiter_assigned", handleTableUpdated);
                 socket.off("table:layout_updated", loadTables);
                 socket.off("order:created", handleOrderChange);
                 socket.off("order:updated", handleOrderChange);
                 socket.off("order:status_updated", handleOrderChange);
                 socket.off("food:delivered", handleOrderChange);
                 socket.off("kitchen:item_served", handleOrderChange);
+                socket.off("notification:new", handleNotificationNew);
                 socket.off("reservation:updated", handleReservationChange);
                 socket.off("cleaner:table_dirty", handleReservationChange);
                 socket.off("cleaner:table_cleaned", handleReservationChange);

@@ -17,6 +17,7 @@ import {
     markAllOwnerNotificationsRead,
     markOwnerNotificationRead,
     subscribeOwnerNotifications,
+    appendOwnerNotification,
 } from "../../utils/ownerNotifications";
 import OwnerMenuButton from "../../components/OwnerMenuButton";
 
@@ -119,6 +120,7 @@ export default function OwnerNotifications() {
                 return [mapped, ...prev];
             });
 
+            appendOwnerNotification(notif);
             playNotificationSound("default").catch(() => {});
             window.dispatchEvent(new CustomEvent("notifications:updated"));
         };

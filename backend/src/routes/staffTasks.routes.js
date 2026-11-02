@@ -1186,10 +1186,10 @@ export default async function staffTaskRoutes(app, deps = {}) {
                 orderId: updatedItem.kot?.orderId ? Number(updatedItem.kot.orderId) : null,
                 kotId: Number(updatedItem.kotId),
                 kotItemId: Number(itemId),
-                tableId: kotTableId,
+                tableId: kotTableId ? Number(kotTableId) : null,
+                tableNo: kotTableNo ? String(kotTableNo) : null,
                 section: kotSection,
                 tableSessionId: updatedItem.kot?.tableSessionId ? Number(updatedItem.kot.tableSessionId) : null,
-                tableNo: kotTableNo,
               },
             }).catch((e) => console.warn("[staffTasks] Restaurant food delivered notification error:", e?.message));
           }

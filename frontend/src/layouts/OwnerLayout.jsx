@@ -63,6 +63,7 @@ import NewOrderPopup from "../components/NewOrderPopup";
 import {
     getOwnerUnreadCount,
     subscribeOwnerNotifications,
+    appendOwnerNotification,
 } from "../utils/ownerNotifications";
 import { API } from "../config";
 import { api } from "../utils/apiClient";
@@ -508,7 +509,15 @@ const normalizeTableRows = (rows) => {
                 ...table,
                 tableNo: String(table?.tableNo || "").trim(),
                 cleaningStatus: isDirty ? "DIRTY" : (table?.cleaningStatus || "CLEAN"),
-                status: isDirty ? "DIRTY" : (isOccupied ? "OCCUPIED" : "AVAILABLE"),
+                status: isDirty
+                    ? "DIRTY"
+                    : isOccupied
+                        ? (table?.status === "DELIVERED" || activeOrderStatus === "DELIVERED"
+                            ? "DELIVERED"
+                            : (table?.status && table?.status !== "AVAILABLE" && table?.status !== "DIRTY"
+                                ? table.status
+                                : "OCCUPIED"))
+                        : (table?.status === "RESERVED" || table?.isReserved ? "RESERVED" : "AVAILABLE"),
                 assignedWaiterId,
                 assignedWaiterName,
                 assignedServer,
@@ -1360,9 +1369,18 @@ export default function OwnerLayout() {
             loadTableOverview();
         };
 
-        const handleNotificationNew = () => {
-            setUnreadCount((c) => c + 1);
+        const handleNotificationNew = (notif) => {
+            setUnreadCount((c) => (typeof c === "number" ? c + 1 : 1));
             playNotificationSound("default").catch(() => {});
+            if (notif) {
+                appendOwnerNotification(notif);
+                window.dispatchEvent(new CustomEvent("notifications:updated"));
+                showToast({
+                    title: notif.title || "Notification",
+                    message: notif.message || "",
+                    variant: "success",
+                });
+            }
             loadTableOverview();
         };
 

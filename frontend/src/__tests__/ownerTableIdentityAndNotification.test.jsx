@@ -75,7 +75,15 @@ const normalizeTableRows = (rows) => {
             ...table,
             tableNo: String(table?.tableNo || "").trim(),
             cleaningStatus: isDirty ? "DIRTY" : (table?.cleaningStatus || "CLEAN"),
-            status: isDirty ? "DIRTY" : (isOccupied ? "OCCUPIED" : "AVAILABLE"),
+            status: isDirty
+                ? "DIRTY"
+                : isOccupied
+                    ? (table?.status === "DELIVERED" || activeOrderStatus === "DELIVERED"
+                        ? "DELIVERED"
+                        : (table?.status && table?.status !== "AVAILABLE" && table?.status !== "DIRTY"
+                            ? table.status
+                            : "OCCUPIED"))
+                    : (table?.status === "RESERVED" || table?.isReserved ? "RESERVED" : "AVAILABLE"),
             assignedWaiterId,
             assignedWaiterName,
             assignedServer,
@@ -450,6 +458,63 @@ describe("Owner Panel — Strict Table Identity and Server Isolation", () => {
         expect(updated[1].id).toBe(2);
         expect(updated[1].status).toBe("AVAILABLE");
         expect(updated[1].cleaningStatus).toBe("CLEAN");
+    });
+
+    it("11. Table status reliably reflects DELIVERED when orders are delivered", () => {
+        const rawTables = [
+            {
+                id: 101,
+                tableNo: "101",
+                section: "Main Hall",
+                status: "DELIVERED",
+                cleaningStatus: "CLEAN",
+                isOccupied: true,
+                activeSession: {
+                    id: 50,
+                    tableId: 101,
+                    status: "OPEN",
+                    waiterName: "Bob Server",
+                    waiterId: 12,
+                },
+                activeOrders: [
+                    {
+                        id: 500,
+                        tableId: 101,
+                        status: "DELIVERED",
+                        paymentStatus: "PENDING",
+                    },
+                ],
+            },
+        ];
+
+        const normalized = normalizeTableRows(rawTables);
+        expect(normalized[0].status).toBe("DELIVERED");
+        expect(normalized[0].activeOrderStatus).toBe("DELIVERED");
+        expect(normalized[0].isOccupied).toBe(true);
+    });
+
+    it("12. appendOwnerNotification correctly stores ORDER_DELIVERED notification and deduplicates", async () => {
+        const { appendOwnerNotification, getOwnerNotifications, getOwnerUnreadCount } = await import("../utils/ownerNotifications.js");
+        
+        const notifPayload = {
+            id: 99991,
+            title: "Food Delivered — Main Hall · Table 101",
+            message: "Paneer Tikka delivered to Main Hall · Table 101.",
+            notificationType: "ORDER_DELIVERED",
+            orderId: 500,
+            restaurantId: 77,
+        };
+
+        const initialCount = getOwnerUnreadCount();
+        const appended = appendOwnerNotification(notifPayload);
+        expect(appended.id).toBe("99991");
+        expect(appended.type).toBe("ORDER_DELIVERED");
+        expect(getOwnerUnreadCount()).toBe(initialCount + 1);
+
+        // Deduplicate
+        const dup = appendOwnerNotification(notifPayload);
+        expect(dup.id).toBe("99991");
+        expect(getOwnerUnreadCount()).toBe(initialCount + 1);
     });
 });
 
