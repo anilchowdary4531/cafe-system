@@ -151,6 +151,10 @@ export const createAndDispatchNotification = async ({
             `restaurant_${restaurantId}_role_OWNER`,
             `restaurant:${restaurantId}:role:MANAGER`,
             `restaurant_${restaurantId}_role_MANAGER`,
+            `restaurant:${restaurantId}:role:SUPER_ADMIN`,
+            `restaurant_${restaurantId}_role_SUPER_ADMIN`,
+            `restaurant:${restaurantId}:role:ADMIN`,
+            `restaurant_${restaurantId}_role_ADMIN`,
           ];
           emitToTargetRooms(staffTarget, ownerManagerRooms, "notification:new", payload);
         }
@@ -163,6 +167,13 @@ export const createAndDispatchNotification = async ({
             `restaurant:${rid}:role:${normRole}`,
             `restaurant_${rid}_role_${normRole}`,
           ];
+          if (normRole === "WAITER") {
+            roleRooms.push(`restaurant:${rid}:role:SERVER`);
+            roleRooms.push(`restaurant_${rid}_role_SERVER`);
+          } else if (normRole === "SERVER") {
+            roleRooms.push(`restaurant:${rid}:role:WAITER`);
+            roleRooms.push(`restaurant_${rid}_role_WAITER`);
+          }
           emitToTargetRooms(ioTarget, roleRooms, "notification:new", payload);
           emitToTargetRooms(staffTarget, roleRooms, "notification:new", payload);
         }
@@ -372,8 +383,9 @@ export const resolveUserRoleConditions = async ({
       userConditions.push({ recipientType: "CLEANER", recipientId: rid });
     } else if (resolvedRole === "STEWARD") {
       userConditions.push({ recipientType: "STEWARD", recipientId: rid });
-    } else if (resolvedRole === "WAITER") {
+    } else if (resolvedRole === "WAITER" || resolvedRole === "SERVER") {
       userConditions.push({ recipientType: "WAITER", recipientId: rid });
+      userConditions.push({ recipientType: "SERVER", recipientId: rid });
     } else if (resolvedRole === "CHEF") {
       userConditions.push({ recipientType: "CHEF", recipientId: rid });
       userConditions.push({ recipientType: "KITCHEN", recipientId: rid });

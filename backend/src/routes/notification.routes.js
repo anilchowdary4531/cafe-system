@@ -107,10 +107,30 @@ export default async function notificationRoutes(app, deps) {
         const decoded = app.jwt.verify(token);
         if ((decoded?.id || decoded?.supplierId) && String(decoded?.type || "") !== "customer") {
           const supplierId = decoded.supplierId ? Number(decoded.supplierId) : null;
-          const restaurantId = decoded.restaurantId || decoded.restaurant_id ? Number(decoded.restaurantId || decoded.restaurant_id) : null;
+          let restaurantId = decoded.restaurantId || decoded.restaurant_id ? Number(decoded.restaurantId || decoded.restaurant_id) : null;
           const actorId = supplierId || Number(decoded.id);
           const isSupplier = Boolean(supplierId || decoded.role === "SUPPLIER");
-          const effectiveRole = inferRoleFromDesignation(decoded.designation) || String(decoded.role || "").toUpperCase();
+          let effectiveRole = inferRoleFromDesignation(decoded.designation) || String(decoded.role || "").toUpperCase();
+
+          if (!restaurantId && !isSupplier && actorId && prisma) {
+            try {
+              const dbUser = await prisma.user.findUnique({
+                where: { id: actorId },
+                select: { restaurantId: true, role: true, designation: true },
+              });
+              if (dbUser?.restaurantId) {
+                restaurantId = dbUser.restaurantId;
+              }
+              if (!effectiveRole && dbUser?.role) {
+                effectiveRole = inferRoleFromDesignation(dbUser.designation) || String(dbUser.role).toUpperCase();
+              }
+            } catch (_) {}
+          }
+
+          if (!restaurantId && req.headers?.["x-restaurant-id"]) {
+            const headerRid = Number(req.headers["x-restaurant-id"]);
+            if (headerRid && !Number.isNaN(headerRid)) restaurantId = headerRid;
+          }
 
           return {
             recipientType: isSupplier ? "SUPPLIER" : RECIPIENT_TYPES.USER,

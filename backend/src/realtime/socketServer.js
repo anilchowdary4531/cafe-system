@@ -47,9 +47,9 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
     app.staff = staff;
   }
 
-  staff.use((socket, next) => {
+  staff.use(async (socket, next) => {
     try {
-      const token = socket.handshake?.auth?.token || "";
+      const token = socket.handshake?.auth?.token || socket.handshake?.query?.token || "";
       if (!token) return next(new Error("unauthorized"));
       const decoded = app.jwt.verify(String(token));
       if (String(decoded?.type || "") === "customer") return next(new Error("forbidden"));
@@ -60,6 +60,22 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
         restaurantId: Number(decoded?.restaurantId || 0) || null,
         branchId: Number(decoded?.branchId || 0) || null,
       };
+
+      if (!socket.data.actor.restaurantId && socket.data.actor.role !== "SUPER_ADMIN" && socket.data.actor.userId && prisma) {
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: socket.data.actor.userId },
+            select: { restaurantId: true, role: true, designation: true, branchId: true },
+          });
+          if (dbUser?.restaurantId) {
+            socket.data.actor.restaurantId = dbUser.restaurantId;
+            if (!socket.data.actor.branchId && dbUser.branchId) socket.data.actor.branchId = dbUser.branchId;
+            if (!socket.data.actor.role && dbUser.role) socket.data.actor.role = String(dbUser.role).toUpperCase();
+            if (!socket.data.actor.designation && dbUser.designation) socket.data.actor.designation = dbUser.designation;
+          }
+        } catch (_) {}
+      }
+
       if (!socket.data.actor.restaurantId && socket.data.actor.role !== "SUPER_ADMIN") return next(new Error("unauthorized"));
       next();
     } catch {

@@ -839,6 +839,18 @@ export const updateOrderStatus = async ({ prisma, actor, orderId, nextStatus, no
           if (dTable?.assignedWaiterId) responsibleServerId = dTable.assignedWaiterId;
         }
 
+        // If still unassigned and the delivering actor is a staff/waiter/server, assign actor as responsible server
+        if (!responsibleServerId && actor?.userId) {
+          const actorRole = String(actor.role || "").toUpperCase();
+          const isActorServer =
+            actorRole === "WAITER" ||
+            actorRole === "SERVER" ||
+            (actor.designation && String(actor.designation).toUpperCase().includes("SERVER"));
+          if (isActorServer) {
+            responsibleServerId = actor.userId;
+          }
+        }
+
         if (responsibleServerId) {
           await createAndDispatchNotification({
             prisma,
@@ -861,6 +873,28 @@ export const updateOrderStatus = async ({ prisma, actor, orderId, nextStatus, no
               recipientId: Number(responsibleServerId),
             },
           }).catch((e) => console.warn("[updateOrderStatus] Server delivery notification error:", e?.message));
+        } else if (updated.restaurantId) {
+          // If no specific server is assigned, dispatch role-targeted notification to all on-duty waiters
+          await createAndDispatchNotification({
+            prisma,
+            realtime,
+            recipientType: RECIPIENT_TYPES.WAITER,
+            recipientId: updated.restaurantId,
+            orderId: id,
+            restaurantId: updated.restaurantId,
+            notificationType: NOTIFICATION_TYPES.ORDER_DELIVERED,
+            title: `Food Delivered — ${tableLabel}`,
+            message: `Order #${orderNum} delivered to ${tableLabel}.`,
+            idempotencyKey: `order_delivered_waiter_${updated.restaurantId}_${id}`,
+            data: {
+              restaurantId: updated.restaurantId,
+              orderId: id,
+              orderNo: updated.orderNo,
+              tableId: updated.tableId ? Number(updated.tableId) : null,
+              tableSessionId: updated.tableSessionId ? Number(updated.tableSessionId) : null,
+              tableNo: updated.tableNo || null,
+            },
+          }).catch((e) => console.warn("[updateOrderStatus] Waiter delivery notification error:", e?.message));
         }
 
         // 2. Dispatch persistent delivery notification for Restaurant / Owner

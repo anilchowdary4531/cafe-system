@@ -26,7 +26,7 @@ export async function login(req, reply) {
     const token = req.server.jwt.sign({
         id: user.id,
         role: user.role,
-        restaurantId: user.restaurantId || null,
+        restaurantId: user.restaurantId || user.restaurant?.id || null,
     });
 
     return {

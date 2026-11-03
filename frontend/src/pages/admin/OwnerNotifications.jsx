@@ -90,6 +90,19 @@ export default function OwnerNotifications() {
         fetchBackendNotifications();
     }, [fetchBackendNotifications]);
 
+    // Cross-component state sync: refresh when background updates arrive
+    useEffect(() => {
+        const handleSync = (e) => {
+            if (e?.detail?.source !== "OwnerNotifications") {
+                fetchBackendNotifications(true);
+            }
+        };
+        window.addEventListener("notifications:updated", handleSync);
+        return () => {
+            window.removeEventListener("notifications:updated", handleSync);
+        };
+    }, [fetchBackendNotifications]);
+
     // Realtime notification socket listener
     useEffect(() => {
         if (!socket) return;
@@ -113,7 +126,7 @@ export default function OwnerNotifications() {
 
             appendOwnerNotification(notif);
             Promise.resolve(playNotificationSound?.("default")).catch(() => {});
-            window.dispatchEvent(new CustomEvent("notifications:updated"));
+            window.dispatchEvent(new CustomEvent("notifications:updated", { detail: { source: "OwnerNotifications" } }));
         };
 
         socket.on("notification:new", handleNewNotification);

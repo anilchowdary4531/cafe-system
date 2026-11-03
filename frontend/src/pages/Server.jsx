@@ -842,9 +842,16 @@ export default function Server() {
 
             // Defense in depth: Verify recipient if specified in notification payload
             const currentUid = Number(callbacksRef.current.user?.id || callbacksRef.current.user?.userId || 0);
-            const targetUid = Number(notif.recipientId || notif.data?.waiterId || notif.data?.recipientId || 0);
-            if (targetUid && currentUid && targetUid !== currentUid) {
-                return;
+            if (notif.recipientType === "USER" && notif.recipientId) {
+                const targetUid = Number(notif.recipientId);
+                if (targetUid && currentUid && targetUid !== currentUid) {
+                    return;
+                }
+            } else if (notif.data?.waiterId) {
+                const targetUid = Number(notif.data.waiterId);
+                if (targetUid && currentUid && targetUid !== currentUid) {
+                    return;
+                }
             }
 
             // Defensive deduplication using stable identifier (id or idempotencyKey or table+action)
