@@ -1166,6 +1166,30 @@ export default async function staffTaskRoutes(app, deps = {}) {
                 recipientId: waiterId,
               },
             }).catch((e) => console.warn("[staffTasks] Food delivered notification error:", e?.message));
+          } else if (rid) {
+            // Role-level notification to all servers when no specific server is assigned
+            await createAndDispatchNotification({
+              prisma,
+              realtime: { io, staff },
+              recipientType: RECIPIENT_TYPES.WAITER,
+              recipientId: rid,
+              orderId: updatedItem.kot?.orderId ? Number(updatedItem.kot.orderId) : null,
+              restaurantId: rid,
+              notificationType: NOTIFICATION_TYPES.ORDER_DELIVERED,
+              title: `Food Delivered — ${tableLabel}`,
+              message: `${updatedItem.itemName || "Food item"} delivered to ${tableLabel}.`,
+              idempotencyKey: `food_served_waiter_${rid}_${itemId}_SERVED`,
+              data: {
+                restaurantId: rid,
+                orderId: updatedItem.kot?.orderId ? Number(updatedItem.kot.orderId) : null,
+                kotId: Number(updatedItem.kotId),
+                kotItemId: Number(itemId),
+                tableId: kotTableId,
+                section: kotSection,
+                tableSessionId: updatedItem.kot?.tableSessionId ? Number(updatedItem.kot.tableSessionId) : null,
+                tableNo: kotTableNo,
+              },
+            }).catch((e) => console.warn("[staffTasks] Role food delivered notification error:", e?.message));
           }
 
           const actingUserId = Number(req.staffActor?.userId || 0);

@@ -124,12 +124,24 @@ export default async function notificationRoutes(app, deps) {
               if (!effectiveRole && dbUser?.role) {
                 effectiveRole = inferRoleFromDesignation(dbUser.designation) || String(dbUser.role).toUpperCase();
               }
+              if (!restaurantId) {
+                const sa = await prisma.staffAccess.findFirst({
+                  where: { userId: actorId },
+                  select: { restaurantId: true, role: true },
+                });
+                if (sa?.restaurantId) {
+                  restaurantId = sa.restaurantId;
+                  if (!effectiveRole && sa.role) {
+                    effectiveRole = String(sa.role).toUpperCase();
+                  }
+                }
+              }
             } catch (_) {}
           }
 
-          if (!restaurantId && req.headers?.["x-restaurant-id"]) {
-            const headerRid = Number(req.headers["x-restaurant-id"]);
-            if (headerRid && !Number.isNaN(headerRid)) restaurantId = headerRid;
+          if (!restaurantId) {
+            const fallbackRid = Number(req.query?.restaurantId || req.headers?.["x-restaurant-id"] || 0);
+            if (fallbackRid && !Number.isNaN(fallbackRid)) restaurantId = fallbackRid;
           }
 
           return {

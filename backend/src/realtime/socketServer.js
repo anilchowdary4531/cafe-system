@@ -73,7 +73,24 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
             if (!socket.data.actor.role && dbUser.role) socket.data.actor.role = String(dbUser.role).toUpperCase();
             if (!socket.data.actor.designation && dbUser.designation) socket.data.actor.designation = dbUser.designation;
           }
+          if (!socket.data.actor.restaurantId) {
+            const sa = await prisma.staffAccess.findFirst({
+              where: { userId: socket.data.actor.userId },
+              select: { restaurantId: true, role: true },
+            });
+            if (sa?.restaurantId) {
+              socket.data.actor.restaurantId = sa.restaurantId;
+              if (!socket.data.actor.role && sa.role) socket.data.actor.role = String(sa.role).toUpperCase();
+            }
+          }
         } catch (_) {}
+      }
+
+      if (!socket.data.actor.restaurantId && socket.data.actor.role !== "SUPER_ADMIN") {
+        const queryRid = Number(socket.handshake?.query?.restaurantId || socket.handshake?.auth?.restaurantId || 0);
+        if (queryRid && !Number.isNaN(queryRid)) {
+          socket.data.actor.restaurantId = queryRid;
+        }
       }
 
       if (!socket.data.actor.restaurantId && socket.data.actor.role !== "SUPER_ADMIN") return next(new Error("unauthorized"));
@@ -98,6 +115,18 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
       if (effectiveRole) {
         rooms.push(`restaurant:${rid}:role:${effectiveRole}`);
         rooms.push(`restaurant_${rid}_role_${effectiveRole}`);
+        if (effectiveRole === "WAITER" || effectiveRole === "SERVER") {
+          rooms.push(`restaurant:${rid}:role:WAITER`);
+          rooms.push(`restaurant_${rid}_role_WAITER`);
+          rooms.push(`restaurant:${rid}:role:SERVER`);
+          rooms.push(`restaurant_${rid}_role_SERVER`);
+        }
+        if (effectiveRole === "OWNER" || effectiveRole === "MANAGER" || effectiveRole === "ADMIN") {
+          rooms.push(`restaurant:${rid}:role:OWNER`);
+          rooms.push(`restaurant_${rid}_role_OWNER`);
+          rooms.push(`restaurant:${rid}:role:MANAGER`);
+          rooms.push(`restaurant_${rid}_role_MANAGER`);
+        }
       }
     }
     if (rid && bid) rooms.push(branchRoom(rid, bid));

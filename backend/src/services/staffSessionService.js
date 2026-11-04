@@ -140,12 +140,14 @@ export const issueStaffSession = async ({
     process.env.STAFF_REFRESH_TOKEN_EXPIRES_IN ||
     DEFAULT_STAFF_REFRESH_TOKEN_EXPIRES_IN;
 
+  const effectiveRestaurantId = user.restaurantId || user.staffAccess?.restaurantId || null;
+
   const token = app.jwt.sign(
     {
       id: user.id,
       phone: user.phone || "",
       role: effectiveRole,
-      restaurantId: user.restaurantId || null,
+      restaurantId: effectiveRestaurantId,
       branchId: user.branchId || null,
       sessionVersion,
       mustChangePassword,
@@ -157,7 +159,7 @@ export const issueStaffSession = async ({
     {
       id: user.id,
       role: effectiveRole,
-      restaurantId: user.restaurantId || null,
+      restaurantId: effectiveRestaurantId,
       branchId: user.branchId || null,
       sessionVersion,
       tokenType: "staff_refresh",

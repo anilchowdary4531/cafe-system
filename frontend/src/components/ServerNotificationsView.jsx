@@ -47,6 +47,7 @@ export default function ServerNotificationsView({
     const effectiveBackLabel = backLabel || "Floor Plan";
     const { user, token } = useAuth();
     const { socket } = useStaffSocket();
+    const restaurantId = Number(user?.restaurantId || user?.restaurant?.id || 0) || null;
 
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -68,8 +69,11 @@ export default function ServerNotificationsView({
 
     const authHeaders = useMemo(() => {
         const effectiveToken = token || getActiveStaffToken() || (typeof window !== "undefined" ? (window.sessionStorage?.getItem("token") || window.localStorage?.getItem("staffToken") || window.localStorage?.getItem("token")) : null);
-        return effectiveToken ? { Authorization: `Bearer ${effectiveToken}` } : {};
-    }, [token]);
+        return {
+            ...(effectiveToken ? { Authorization: `Bearer ${effectiveToken}` } : {}),
+            ...(restaurantId ? { "x-restaurant-id": String(restaurantId) } : {}),
+        };
+    }, [token, restaurantId]);
 
     // Fetch notifications from API
     const fetchNotifications = useCallback(
@@ -83,7 +87,8 @@ export default function ServerNotificationsView({
 
             try {
                 const requestFn = typeof axios?.get === "function" ? axios.get : api.get;
-                const res = await requestFn(`${API}/api/notifications?page=${pageNum}&limit=20`, {
+                const ridParam = restaurantId ? `&restaurantId=${restaurantId}` : "";
+                const res = await requestFn(`${API}/api/notifications?page=${pageNum}&limit=20${ridParam}`, {
                     headers: authHeaders,
                     withCredentials: true,
                 });
@@ -166,7 +171,10 @@ export default function ServerNotificationsView({
         socket.on("notification:new", handleNewNotification);
         socket.on("table:waiter_assigned", handleRefetch);
         socket.on("order:created", handleRefetch);
+        socket.on("order:updated", handleRefetch);
+        socket.on("food:delivered", handleRefetch);
         socket.on("kot:status_updated", handleRefetch);
+        socket.on("kitchen:item_served", handleRefetch);
         socket.on("bill:requested", handleRefetch);
         socket.on("waiter:called", handleRefetch);
 
@@ -174,7 +182,10 @@ export default function ServerNotificationsView({
             socket.off("notification:new", handleNewNotification);
             socket.off("table:waiter_assigned", handleRefetch);
             socket.off("order:created", handleRefetch);
+            socket.off("order:updated", handleRefetch);
+            socket.off("food:delivered", handleRefetch);
             socket.off("kot:status_updated", handleRefetch);
+            socket.off("kitchen:item_served", handleRefetch);
             socket.off("bill:requested", handleRefetch);
             socket.off("waiter:called", handleRefetch);
         };

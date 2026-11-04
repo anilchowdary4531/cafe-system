@@ -873,6 +873,31 @@ export const updateOrderStatus = async ({ prisma, actor, orderId, nextStatus, no
               recipientId: Number(responsibleServerId),
             },
           }).catch((e) => console.warn("[updateOrderStatus] Server delivery notification error:", e?.message));
+
+          const actorUserId = Number(actor?.userId || 0);
+          if (actorUserId && actorUserId !== Number(responsibleServerId) && updated.restaurantId) {
+            await createAndDispatchNotification({
+              prisma,
+              realtime,
+              recipientType: RECIPIENT_TYPES.USER,
+              recipientId: actorUserId,
+              orderId: id,
+              restaurantId: updated.restaurantId,
+              notificationType: NOTIFICATION_TYPES.ORDER_DELIVERED,
+              title: `Food Delivered — ${tableLabel}`,
+              message: `Order #${orderNum} delivered to ${tableLabel}.`,
+              idempotencyKey: `order_delivered_srv_${updated.restaurantId}_${id}_act_${actorUserId}`,
+              data: {
+                restaurantId: updated.restaurantId,
+                orderId: id,
+                orderNo: updated.orderNo,
+                tableId: updated.tableId ? Number(updated.tableId) : null,
+                tableSessionId: updated.tableSessionId ? Number(updated.tableSessionId) : null,
+                tableNo: updated.tableNo || null,
+                recipientId: actorUserId,
+              },
+            }).catch((e) => console.warn("[updateOrderStatus] Acting server delivery notification error:", e?.message));
+          }
         } else if (updated.restaurantId) {
           // If no specific server is assigned, dispatch role-targeted notification to all on-duty waiters
           await createAndDispatchNotification({

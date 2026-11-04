@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useOutletContext } from "react-router-dom";
 import {
     Bell,
     Check,
@@ -13,6 +14,7 @@ import { API } from "../../config";
 import { api } from "../../utils/apiClient";
 import { getActiveStaffToken } from "../../utils/staffSessionStorage";
 import { useStaffSocket } from "../../context/StaffSocketContext";
+import { useAuth } from "../../context/AuthContext";
 import { playNotificationSound } from "../../utils/soundPlayer";
 import {
     getOwnerNotifications,
@@ -44,6 +46,9 @@ export default function OwnerNotifications() {
     const [filterType, setFilterType] = useState("ALL"); // ALL | UNREAD | ORDERS | TABLES | SUCCESS | INFO
     const [searchQuery, setSearchQuery] = useState("");
     const { socket } = useStaffSocket?.() || {};
+    const outletCtx = typeof useOutletContext === "function" ? useOutletContext() : null;
+    const { user } = useAuth?.() || {};
+    const restaurantId = Number(outletCtx?.restaurantId || user?.restaurantId || user?.restaurant?.id || 0) || null;
 
     const unreadCount = useMemo(
         () => notifications.reduce((sum, item) => sum + (item.read ? 0 : 1), 0),
@@ -62,8 +67,11 @@ export default function OwnerNotifications() {
 
         try {
             const res = await api.get("/api/notifications", {
-                params: { page: 1, limit: 100 },
-                headers: token ? { Authorization: `Bearer ${token}` } : {},
+                params: { page: 1, limit: 100, ...(restaurantId ? { restaurantId } : {}) },
+                headers: {
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    ...(restaurantId ? { "x-restaurant-id": String(restaurantId) } : {}),
+                },
             });
             const list = res.data?.notifications || res.data?.data || [];
             if (Array.isArray(list)) {
@@ -84,7 +92,7 @@ export default function OwnerNotifications() {
             setLoading(false);
             setRefreshing(false);
         }
-    }, []);
+    }, [restaurantId]);
 
     useEffect(() => {
         fetchBackendNotifications();
@@ -129,11 +137,24 @@ export default function OwnerNotifications() {
             window.dispatchEvent(new CustomEvent("notifications:updated", { detail: { source: "OwnerNotifications" } }));
         };
 
+        const handleRefetch = () => {
+            fetchBackendNotifications(true);
+        };
+
         socket.on("notification:new", handleNewNotification);
+        socket.on("food:delivered", handleRefetch);
+        socket.on("order:updated", handleRefetch);
+        socket.on("order:status_updated", handleRefetch);
+        socket.on("kot:status_updated", handleRefetch);
+
         return () => {
             socket.off("notification:new", handleNewNotification);
+            socket.off("food:delivered", handleRefetch);
+            socket.off("order:updated", handleRefetch);
+            socket.off("order:status_updated", handleRefetch);
+            socket.off("kot:status_updated", handleRefetch);
         };
-    }, [socket]);
+    }, [socket, fetchBackendNotifications]);
 
     const onMarkAllRead = async () => {
         setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));

@@ -256,7 +256,7 @@ const resolveKotTableDetails = async ({ prisma: db, kot, order }) => {
   };
 };
 
-const resolveWaiterIdForKot = async ({ prisma: db, kot, order }) => {
+const resolveWaiterIdForKot = async ({ prisma: db, kot, order, actor = null }) => {
   if (kot?.waiterId) return Number(kot.waiterId);
   if (kot?.tableSessionId) {
     const session = await db.tableSession.findUnique({
@@ -276,7 +276,17 @@ const resolveWaiterIdForKot = async ({ prisma: db, kot, order }) => {
   }
   if (order?.waiterId) return Number(order.waiterId);
   if (order?.serverUserId) return Number(order.serverUserId);
+  if (order?.tableId) {
+    try {
+      const dt = await db.diningTable.findUnique({
+        where: { id: Number(order.tableId) },
+        select: { assignedWaiterId: true },
+      });
+      if (dt?.assignedWaiterId) return Number(dt.assignedWaiterId);
+    } catch (_) {}
+  }
   if (order?.createdByUserId) return Number(order.createdByUserId);
+  if (actor?.userId) return Number(actor.userId);
   return null;
 };
 
@@ -322,10 +332,10 @@ export const updateStatus = async (req, res) => {
 
     if (String(status).toUpperCase() === "READY") {
       try {
-        const waiterId = await resolveWaiterIdForKot({ prisma: db, kot: updatedKot, order: updatedOrder });
+        const waiterId = await resolveWaiterIdForKot({ prisma: db, kot: updatedKot, order: updatedOrder, actor });
+        const tableLabel = kotSection ? `${kotSection} — Table ${kotTableNo}` : (kotTableNo ? `Table ${kotTableNo}` : "Takeaway");
+        const orderLabel = updatedOrder?.orderNo ? `Order #${updatedOrder.orderNo}` : (updatedKot?.orderId ? `Order #${updatedKot.orderId}` : "");
         if (waiterId) {
-          const tableLabel = kotSection ? `${kotSection} — Table ${kotTableNo}` : (kotTableNo ? `Table ${kotTableNo}` : "Takeaway");
-          const orderLabel = updatedOrder?.orderNo ? `Order #${updatedOrder.orderNo}` : (updatedKot?.orderId ? `Order #${updatedKot.orderId}` : "");
           await createAndDispatchNotification({
             prisma: db,
             realtime: { io, staff },
@@ -349,6 +359,30 @@ export const updateStatus = async (req, res) => {
               recipientId: waiterId,
             },
           }).catch((e) => console.warn("[kot.controller] KOT ready notification error:", e?.message));
+        } else if (restaurantId) {
+          // If no specific server resolved, dispatch role notification to all on-duty servers
+          await createAndDispatchNotification({
+            prisma: db,
+            realtime: { io, staff },
+            recipientType: RECIPIENT_TYPES.WAITER,
+            recipientId: restaurantId,
+            orderId: updatedKot?.orderId ? Number(updatedKot.orderId) : null,
+            restaurantId,
+            notificationType: NOTIFICATION_TYPES.FOOD_READY,
+            title: `Food Ready — ${tableLabel}`,
+            message: `Food ready for ${tableLabel}${orderLabel ? ` — ${orderLabel}` : ""}.`,
+            idempotencyKey: `kot_ready_waiter_${restaurantId}_${kotId}_READY`,
+            data: {
+              restaurantId,
+              orderId: updatedKot?.orderId ? Number(updatedKot.orderId) : null,
+              orderNo: updatedOrder?.orderNo || (updatedKot?.orderId ? String(updatedKot.orderId) : null),
+              kotId: Number(kotId),
+              tableId: kotTableId,
+              section: kotSection,
+              tableSessionId: updatedKot?.tableSessionId ? Number(updatedKot.tableSessionId) : null,
+              tableNo: kotTableNo,
+            },
+          }).catch((e) => console.warn("[kot.controller] Role KOT ready notification error:", e?.message));
         }
       } catch (notifErr) {
         console.warn("[kot.controller] Failed to dispatch KOT ready notification:", notifErr?.message);
@@ -372,21 +406,24 @@ export const updateStatus = async (req, res) => {
       }
 
       try {
-        const waiterId = await resolveWaiterIdForKot({ prisma: db, kot: updatedKot, order: updatedOrder });
+        const assignedWaiterId = await resolveWaiterIdForKot({ prisma: db, kot: updatedKot, order: updatedOrder, actor });
+        const actingServerId = Number(actor?.userId || req.staffActor?.userId || req.user?.id || 0);
+        const effectiveWaiterId = assignedWaiterId || (actingServerId > 0 ? actingServerId : null);
         const tableLabel = kotSection ? `${kotSection} — Table ${kotTableNo}` : (kotTableNo ? `Table ${kotTableNo}` : "Takeaway");
         const orderLabel = updatedOrder?.orderNo ? `Order #${updatedOrder.orderNo}` : (updatedKot?.orderId ? `Order #${updatedKot.orderId}` : "");
-        if (waiterId) {
+
+        if (effectiveWaiterId) {
           await createAndDispatchNotification({
             prisma: db,
             realtime: { io, staff },
             recipientType: RECIPIENT_TYPES.USER,
-            recipientId: waiterId,
+            recipientId: effectiveWaiterId,
             orderId: updatedKot?.orderId ? Number(updatedKot.orderId) : null,
             restaurantId,
             notificationType: NOTIFICATION_TYPES.ORDER_DELIVERED,
             title: `Food Delivered — ${tableLabel}`,
             message: `KOT #${updatedKot.kotNo || kotId} delivered to ${tableLabel}${orderLabel ? ` (${orderLabel})` : ""}.`,
-            idempotencyKey: `kot_served_${restaurantId}_${kotId}_${waiterId}_SERVED`,
+            idempotencyKey: `kot_served_${restaurantId}_${kotId}_${effectiveWaiterId}_SERVED`,
             data: {
               restaurantId,
               orderId: updatedKot?.orderId ? Number(updatedKot.orderId) : null,
@@ -396,9 +433,59 @@ export const updateStatus = async (req, res) => {
               section: kotSection,
               tableSessionId: updatedKot?.tableSessionId ? Number(updatedKot.tableSessionId) : null,
               tableNo: kotTableNo,
-              recipientId: waiterId,
+              recipientId: effectiveWaiterId,
             },
           }).catch((e) => console.warn("[kot.controller] KOT served notification error:", e?.message));
+
+          if (actingServerId && actingServerId !== effectiveWaiterId) {
+            await createAndDispatchNotification({
+              prisma: db,
+              realtime: { io, staff },
+              recipientType: RECIPIENT_TYPES.USER,
+              recipientId: actingServerId,
+              orderId: updatedKot?.orderId ? Number(updatedKot.orderId) : null,
+              restaurantId,
+              notificationType: NOTIFICATION_TYPES.ORDER_DELIVERED,
+              title: `Food Delivered — ${tableLabel}`,
+              message: `KOT #${updatedKot.kotNo || kotId} delivered to ${tableLabel}${orderLabel ? ` (${orderLabel})` : ""}.`,
+              idempotencyKey: `kot_served_${restaurantId}_${kotId}_act_${actingServerId}_SERVED`,
+              data: {
+                restaurantId,
+                orderId: updatedKot?.orderId ? Number(updatedKot.orderId) : null,
+                orderNo: updatedOrder?.orderNo || (updatedKot?.orderId ? String(updatedKot.orderId) : null),
+                kotId: Number(kotId),
+                tableId: kotTableId,
+                section: kotSection,
+                tableSessionId: updatedKot?.tableSessionId ? Number(updatedKot.tableSessionId) : null,
+                tableNo: kotTableNo,
+                recipientId: actingServerId,
+              },
+            }).catch((e) => console.warn("[kot.controller] Acting server KOT served notification error:", e?.message));
+          }
+        } else if (restaurantId) {
+          // If no specific server resolved, dispatch role notification to all on-duty servers
+          await createAndDispatchNotification({
+            prisma: db,
+            realtime: { io, staff },
+            recipientType: RECIPIENT_TYPES.WAITER,
+            recipientId: restaurantId,
+            orderId: updatedKot?.orderId ? Number(updatedKot.orderId) : null,
+            restaurantId,
+            notificationType: NOTIFICATION_TYPES.ORDER_DELIVERED,
+            title: `Food Delivered — ${tableLabel}`,
+            message: `KOT #${updatedKot.kotNo || kotId} delivered to ${tableLabel}${orderLabel ? ` (${orderLabel})` : ""}.`,
+            idempotencyKey: `kot_served_waiter_${restaurantId}_${kotId}_SERVED`,
+            data: {
+              restaurantId,
+              orderId: updatedKot?.orderId ? Number(updatedKot.orderId) : null,
+              orderNo: updatedOrder?.orderNo || (updatedKot?.orderId ? String(updatedKot.orderId) : null),
+              kotId: Number(kotId),
+              tableId: kotTableId,
+              section: kotSection,
+              tableSessionId: updatedKot?.tableSessionId ? Number(updatedKot.tableSessionId) : null,
+              tableNo: kotTableNo,
+            },
+          }).catch((e) => console.warn("[kot.controller] Role KOT served notification error:", e?.message));
         }
 
         // Also dispatch to Restaurant / Owner
@@ -543,13 +630,13 @@ export const updateItemStatus = async (req, res) => {
 
       // Dispatch persistent notification for the assigned Server / Waiter
       try {
-        const waiterId = await resolveWaiterIdForKot({ prisma: db, kot, order });
-        if (waiterId) {
-          const tableLabel = kotSection ? `${kotSection} — Table ${kotTableNo}` : (kotTableNo ? `Table ${kotTableNo}` : "Takeaway");
-          const orderLabel = order?.orderNo ? `Order #${order.orderNo}` : (kot?.orderId ? `Order #${kot.orderId}` : "");
-          const title = `Food Ready — ${tableLabel}`;
-          const message = `${updatedItem?.itemName || "Food item"} is ready for ${tableLabel}${orderLabel ? ` (${orderLabel})` : ""}.`;
+        const waiterId = await resolveWaiterIdForKot({ prisma: db, kot, order, actor });
+        const tableLabel = kotSection ? `${kotSection} — Table ${kotTableNo}` : (kotTableNo ? `Table ${kotTableNo}` : "Takeaway");
+        const orderLabel = order?.orderNo ? `Order #${order.orderNo}` : (kot?.orderId ? `Order #${kot.orderId}` : "");
+        const title = `Food Ready — ${tableLabel}`;
+        const message = `${updatedItem?.itemName || "Food item"} is ready for ${tableLabel}${orderLabel ? ` (${orderLabel})` : ""}.`;
 
+        if (waiterId) {
           await createAndDispatchNotification({
             prisma: db,
             realtime: { io, staff },
@@ -575,6 +662,32 @@ export const updateItemStatus = async (req, res) => {
               recipientId: waiterId,
             },
           }).catch((e) => console.warn("[kot.controller] Item ready notification error:", e?.message));
+        } else if (restaurantId) {
+          // If no specific server resolved, dispatch role notification to all on-duty servers
+          await createAndDispatchNotification({
+            prisma: db,
+            realtime: { io, staff },
+            recipientType: RECIPIENT_TYPES.WAITER,
+            recipientId: restaurantId,
+            orderId: kot?.orderId ? Number(kot.orderId) : null,
+            restaurantId,
+            notificationType: NOTIFICATION_TYPES.FOOD_READY,
+            title,
+            message,
+            idempotencyKey: `food_ready_waiter_${restaurantId}_${itemId}_READY`,
+            data: {
+              restaurantId,
+              orderId: kot?.orderId ? Number(kot.orderId) : null,
+              orderNo: order?.orderNo || (kot?.orderId ? String(kot.orderId) : null),
+              kotId: Number(kotId),
+              kotItemId: Number(itemId),
+              orderItemId: updatedItem?.orderItemId ? Number(updatedItem.orderItemId) : null,
+              tableId: kotTableId,
+              section: kotSection,
+              tableSessionId: kot?.tableSessionId ? Number(kot.tableSessionId) : null,
+              tableNo: kotTableNo,
+            },
+          }).catch((e) => console.warn("[kot.controller] Role item ready notification error:", e?.message));
         }
       } catch (notifErr) {
         console.warn("[kot.controller] Failed to dispatch item ready notification:", notifErr?.message);
@@ -608,21 +721,24 @@ export const updateItemStatus = async (req, res) => {
 
       // Dispatch persistent notification for server delivery confirmation
       try {
-        const waiterId = await resolveWaiterIdForKot({ prisma: db, kot, order });
+        const assignedWaiterId = await resolveWaiterIdForKot({ prisma: db, kot, order, actor });
+        const actingServerId = Number(actor?.userId || req.staffActor?.userId || req.user?.id || 0);
+        const effectiveWaiterId = assignedWaiterId || (actingServerId > 0 ? actingServerId : null);
         const tableLabel = kotSection ? `${kotSection} — Table ${kotTableNo}` : (kotTableNo ? `Table ${kotTableNo}` : "Takeaway");
         const orderLabel = order?.orderNo ? `Order #${order.orderNo}` : (kot?.orderId ? `Order #${kot.orderId}` : "");
-        if (waiterId) {
+
+        if (effectiveWaiterId) {
           await createAndDispatchNotification({
             prisma: db,
             realtime: { io, staff },
             recipientType: RECIPIENT_TYPES.USER,
-            recipientId: waiterId,
+            recipientId: effectiveWaiterId,
             orderId: kot?.orderId ? Number(kot.orderId) : null,
             restaurantId,
             notificationType: NOTIFICATION_TYPES.ORDER_DELIVERED,
             title: `Food Delivered — ${tableLabel}`,
             message: `${updatedItem?.itemName || "Food item"} delivered to ${tableLabel}${orderLabel ? ` (${orderLabel})` : ""}.`,
-            idempotencyKey: `food_served_${restaurantId}_${itemId}_${waiterId}_SERVED`,
+            idempotencyKey: `food_served_${restaurantId}_${itemId}_${effectiveWaiterId}_SERVED`,
             data: {
               restaurantId,
               orderId: kot?.orderId ? Number(kot.orderId) : null,
@@ -633,9 +749,61 @@ export const updateItemStatus = async (req, res) => {
               section: kotSection,
               tableSessionId: kot?.tableSessionId ? Number(kot.tableSessionId) : null,
               tableNo: kotTableNo,
-              recipientId: waiterId,
+              recipientId: effectiveWaiterId,
             },
           }).catch((e) => console.warn("[kot.controller] Item served notification error:", e?.message));
+
+          if (actingServerId && actingServerId !== effectiveWaiterId) {
+            await createAndDispatchNotification({
+              prisma: db,
+              realtime: { io, staff },
+              recipientType: RECIPIENT_TYPES.USER,
+              recipientId: actingServerId,
+              orderId: kot?.orderId ? Number(kot.orderId) : null,
+              restaurantId,
+              notificationType: NOTIFICATION_TYPES.ORDER_DELIVERED,
+              title: `Food Delivered — ${tableLabel}`,
+              message: `${updatedItem?.itemName || "Food item"} delivered to ${tableLabel}${orderLabel ? ` (${orderLabel})` : ""}.`,
+              idempotencyKey: `food_served_${restaurantId}_${itemId}_act_${actingServerId}_SERVED`,
+              data: {
+                restaurantId,
+                orderId: kot?.orderId ? Number(kot.orderId) : null,
+                orderNo: order?.orderNo || (kot?.orderId ? String(kot.orderId) : null),
+                kotId: Number(kotId),
+                kotItemId: Number(itemId),
+                tableId: kotTableId,
+                section: kotSection,
+                tableSessionId: kot?.tableSessionId ? Number(kot.tableSessionId) : null,
+                tableNo: kotTableNo,
+                recipientId: actingServerId,
+              },
+            }).catch((e) => console.warn("[kot.controller] Acting server item served notification error:", e?.message));
+          }
+        } else if (restaurantId) {
+          // If no specific server resolved, dispatch role notification to all on-duty servers
+          await createAndDispatchNotification({
+            prisma: db,
+            realtime: { io, staff },
+            recipientType: RECIPIENT_TYPES.WAITER,
+            recipientId: restaurantId,
+            orderId: kot?.orderId ? Number(kot.orderId) : null,
+            restaurantId,
+            notificationType: NOTIFICATION_TYPES.ORDER_DELIVERED,
+            title: `Food Delivered — ${tableLabel}`,
+            message: `${updatedItem?.itemName || "Food item"} delivered to ${tableLabel}${orderLabel ? ` (${orderLabel})` : ""}.`,
+            idempotencyKey: `food_served_waiter_${restaurantId}_${itemId}_SERVED`,
+            data: {
+              restaurantId,
+              orderId: kot?.orderId ? Number(kot.orderId) : null,
+              orderNo: order?.orderNo || (kot?.orderId ? String(kot.orderId) : null),
+              kotId: Number(kotId),
+              kotItemId: Number(itemId),
+              tableId: kotTableId,
+              section: kotSection,
+              tableSessionId: kot?.tableSessionId ? Number(kot.tableSessionId) : null,
+              tableNo: kotTableNo,
+            },
+          }).catch((e) => console.warn("[kot.controller] Role item served notification error:", e?.message));
         }
 
         // Also dispatch to Restaurant / Owner

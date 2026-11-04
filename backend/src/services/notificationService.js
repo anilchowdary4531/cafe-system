@@ -31,12 +31,79 @@ export const createAndDispatchNotification = async ({
     return null;
   }
 
-  // 1. Idempotency Check: Avoid sending duplicate notifications for the same event
+  // 1. Idempotency Check: Avoid creating duplicate notification rows for the same event
   if (idempotencyKey) {
     const existing = await prisma.notification.findUnique({
       where: { idempotencyKey },
     });
     if (existing) {
+      // Re-emit existing notification over realtime to ensure live browsers update
+      if (realtime) {
+        try {
+          const payload = {
+            id: existing.id,
+            recipientType: existing.recipientType,
+            recipientId: existing.recipientId,
+            restaurantId: existing.restaurantId,
+            orderId: existing.orderId,
+            notificationType: existing.notificationType,
+            title: existing.title,
+            message: existing.message,
+            priority: existing.priority,
+            tableId: existing.data?.tableId ? Number(existing.data.tableId) : null,
+            tableNo: existing.data?.tableNo || null,
+            data: existing.data,
+            isRead: existing.isRead,
+            createdAt: existing.createdAt,
+          };
+          const ioTarget = realtime?.io || (typeof realtime?.to === "function" ? realtime : null);
+          const staffTarget = realtime?.staff || (typeof ioTarget?.of === "function" ? ioTarget.of("/staff") : null);
+          const emitRooms = (target, rooms) => {
+            if (!target || typeof target.to !== "function") return;
+            const valid = rooms.filter(Boolean);
+            if (!valid.length) return;
+            for (const r of valid) {
+              target.to(r).emit("notification:new", payload);
+            }
+          };
+
+          if (existing.recipientType === RECIPIENT_TYPES.USER) {
+            emitRooms(ioTarget, [`user:${existing.recipientId}`, `user_${existing.recipientId}`]);
+            emitRooms(staffTarget, [`user:${existing.recipientId}`, `user_${existing.recipientId}`]);
+          } else if (existing.recipientType === RECIPIENT_TYPES.RESTAURANT && existing.restaurantId) {
+            const rRooms = [
+              `restaurant:${existing.restaurantId}:role:OWNER`,
+              `restaurant_${existing.restaurantId}_role_OWNER`,
+              `restaurant:${existing.restaurantId}:role:MANAGER`,
+              `restaurant_${existing.restaurantId}_role_MANAGER`,
+              `restaurant:${existing.restaurantId}:role:SUPER_ADMIN`,
+              `restaurant_${existing.restaurantId}_role_SUPER_ADMIN`,
+              `restaurant:${existing.restaurantId}:role:ADMIN`,
+              `restaurant_${existing.restaurantId}_role_ADMIN`,
+            ];
+            emitRooms(ioTarget, [`restaurant:${existing.restaurantId}`, `restaurant_${existing.restaurantId}`]);
+            emitRooms(staffTarget, rRooms);
+          } else if (["OWNER", "MANAGER", "CLEANER", "STEWARD", "WAITER", "SERVER", "CHEF", "CASHIER", "SWIPER"].includes(String(existing.recipientType).toUpperCase())) {
+            const rid = Number(existing.restaurantId || existing.recipientId);
+            const normRole = String(existing.recipientType).toUpperCase();
+            if (rid) {
+              const roleRooms = [
+                `restaurant:${rid}:role:${normRole}`,
+                `restaurant_${rid}_role_${normRole}`,
+              ];
+              if (normRole === "WAITER") {
+                roleRooms.push(`restaurant:${rid}:role:SERVER`);
+                roleRooms.push(`restaurant_${rid}_role_SERVER`);
+              } else if (normRole === "SERVER") {
+                roleRooms.push(`restaurant:${rid}:role:WAITER`);
+                roleRooms.push(`restaurant_${rid}_role_WAITER`);
+              }
+              emitRooms(ioTarget, roleRooms);
+              emitRooms(staffTarget, roleRooms);
+            }
+          }
+        } catch (_) {}
+      }
       return existing;
     }
   }
@@ -352,7 +419,7 @@ export const resolveUserRoleConditions = async ({
   role = null,
 }) => {
   const uid = Number(userId);
-  const rid = restaurantId ? Number(restaurantId) : null;
+  let rid = restaurantId ? Number(restaurantId) : null;
   const userConditions = [{ recipientType: RECIPIENT_TYPES.USER, recipientId: uid }];
 
   let resolvedRole = effectiveRole || inferRoleFromDesignation(designation);
@@ -360,14 +427,31 @@ export const resolveUserRoleConditions = async ({
     resolvedRole = String(role).toUpperCase();
   }
 
-  if (!resolvedRole && prisma && uid) {
+  if (prisma && uid) {
     try {
-      const u = await prisma.user.findUnique({
-        where: { id: uid },
-        select: { role: true, designation: true },
-      });
-      if (u) {
-        resolvedRole = inferRoleFromDesignation(u.designation) || String(u.role || "").toUpperCase();
+      if (!rid || !resolvedRole) {
+        const u = await prisma.user.findUnique({
+          where: { id: uid },
+          select: { restaurantId: true, role: true, designation: true },
+        });
+        if (u) {
+          if (!rid && u.restaurantId) rid = Number(u.restaurantId);
+          if (!resolvedRole) {
+            resolvedRole = inferRoleFromDesignation(u.designation) || String(u.role || "").toUpperCase();
+          }
+        }
+      }
+      if (!rid) {
+        const sa = await prisma.staffAccess.findFirst({
+          where: { userId: uid },
+          select: { restaurantId: true, role: true },
+        });
+        if (sa) {
+          if (!rid && sa.restaurantId) rid = Number(sa.restaurantId);
+          if (!resolvedRole && sa.role) {
+            resolvedRole = String(sa.role).toUpperCase();
+          }
+        }
       }
     } catch {
       // fallback
