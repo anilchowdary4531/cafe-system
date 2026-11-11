@@ -77,14 +77,11 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: |
-            backend/package-lock.json
-            frontend/package-lock.json
+          cache-dependency-path: backend/package-lock.json
 
-      - name: Install backend and frontend dependencies (for shared Socket.IO test imports)
-        run: |
-          npm --prefix backend ci
-          npm --prefix frontend ci
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
 
       - name: Generate Prisma client and push schema to ephemeral CI database
         working-directory: backend
@@ -117,6 +114,7 @@ jobs:
           BACKEND_FULL_EXIT=${PIPESTATUS[0]}
           set -e
           echo "BACKEND_FULL_EXIT=${BACKEND_FULL_EXIT}" >> "$GITHUB_ENV"
+          exit "${BACKEND_FULL_EXIT}"
 
       - name: Publish backend test summary
         if: always()
@@ -315,7 +313,7 @@ jobs:
           if-no-files-found: ignore
 
   android-ci:
-    name: Android CI (Unit Tests)
+    name: Android CI (Unit Tests & Staging APK)
     runs-on: ubuntu-latest
     if: ${{ github.ref == 'refs/heads/feature/twm-pay-integration' }}
 
@@ -339,7 +337,7 @@ jobs:
           java-version: "21"
           distribution: "temurin"
 
-      - name: Check Android SDK 37 support and run unit tests
+      - name: Install required Android SDK platform and accept licenses
         run: |
           set -euo pipefail
           mkdir -p android-test-reports
@@ -353,84 +351,116 @@ jobs:
 
           SDKMANAGER=$(command -v sdkmanager || find "$SDK_ROOT" -name sdkmanager -type f 2>/dev/null | head -n1 || true)
           if [ -z "$SDKMANAGER" ]; then
-            echo "::warning::sdkmanager not found on runner; skipping Android unit tests."
-            echo "ANDROID_STATUS=unsupported_sdk" >> "$GITHUB_ENV"
-            exit 0
+            echo "::error::sdkmanager not found on runner."
+            exit 1
           fi
           echo "Using sdkmanager: ${SDKMANAGER}" | tee -a android-test-reports/env.log
 
+          # Accept SDK licenses directly without android-actions/setup-android calling deprecated 'tools' package
           (set +o pipefail; yes | "$SDKMANAGER" --licenses >/dev/null 2>&1) || true
 
           COMPILE_SDK=$(grep -E 'compileSdk\s*=' app/build.gradle.kts | head -n1 | sed -E 's/[^0-9]//g')
           echo "Project compileSdk=${COMPILE_SDK}" | tee -a android-test-reports/env.log
 
-          SDK_LIST=$(set +o pipefail; "$SDKMANAGER" --list 2>/dev/null || true)
-          if echo "$SDK_LIST" | grep -q "platforms;android-${COMPILE_SDK}"; then
-            echo "Runner SDK repository supports platforms;android-${COMPILE_SDK}. Installing and running unit tests..."
-            (set +o pipefail; yes | "$SDKMANAGER" "platforms;android-${COMPILE_SDK}" "platform-tools")
-            ./gradlew testDebugUnitTest --no-daemon --console=plain 2>&1 | tee android-test-reports/gradle-test.log
-            echo "ANDROID_STATUS=ran" >> "$GITHUB_ENV"
-          else
-            echo "::warning::Runner Android SDK repository does not support platforms;android-${COMPILE_SDK}; skipping Android unit tests."
-            echo "$SDK_LIST" | grep "platforms;android-" | tail -n 15 | tee -a android-test-reports/env.log || true
-            echo "ANDROID_STATUS=unsupported_sdk" >> "$GITHUB_ENV"
+          # Write sdkmanager output to a file first so pipefail never fails on SIGPIPE during early match exit
+          "$SDKMANAGER" --list > /tmp/android-sdk-list.txt 2>/dev/null || true
+          SDK_PLATFORM_PKG=$(awk -v ver="${COMPILE_SDK}" '$1 ~ ("^platforms;android-" ver "(\\.0)?$") {print $1; exit}' /tmp/android-sdk-list.txt || true)
+          if [ -z "$SDK_PLATFORM_PKG" ]; then
+            echo "::error::Runner Android SDK repository does not provide platforms;android-${COMPILE_SDK}(.0)."
+            grep "platforms;android-" /tmp/android-sdk-list.txt | tail -n 20 || true
+            exit 1
           fi
 
-      - name: Publish Android test summary
+          echo "Installing SDK packages: ${SDK_PLATFORM_PKG} platform-tools" | tee -a android-test-reports/env.log
+          (set +o pipefail; yes | "$SDKMANAGER" "${SDK_PLATFORM_PKG}" "platform-tools")
+          chmod +x ./gradlew || true
+
+      - name: Run Android unit tests (including TwmPayHelperTest)
+        run: |
+          set -euo pipefail
+          ./gradlew testDebugUnitTest --no-daemon --console=plain 2>&1 | tee android-test-reports/gradle-test.log
+
+      - name: Build staging debug APK and verify TIFFZY_BASE_URL override
+        run: |
+          set -euo pipefail
+          STAGING_URL="https://staging-api.tiffzy.com/"
+          ./gradlew assembleDebug -PTIFFZY_BASE_URL=https://staging-api.tiffzy.com --no-daemon --console=plain 2>&1 | tee android-test-reports/gradle-apk.log
+          BUILD_CFG="app/build/generated/source/buildConfig/debug/com/tiffzy/app/BuildConfig.java"
+          APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$BUILD_CFG"
+          test -f "$APK_PATH"
+          if ! grep -Fq "BASE_URL = \"${STAGING_URL}\"" "$BUILD_CFG"; then
+            echo "::error::Staging BuildConfig.BASE_URL mismatch in ${BUILD_CFG}:"
+            grep -n "BASE_URL" "$BUILD_CFG" || true
+            exit 1
+          fi
+          APK_SIZE=$(stat -c%s "$APK_PATH" 2>/dev/null || wc -c < "$APK_PATH")
+          {
+            echo "STAGING_BUILD_CONFIG_BASE_URL=${STAGING_URL}"
+            echo "STAGING_APK_PATH=${APK_PATH}"
+            echo "STAGING_APK_BYTES=${APK_SIZE}"
+          } | tee android-test-reports/apk-meta.env
+
+      - name: Publish Android test & APK build summary
         if: always()
         run: |
           python3 - << 'PYEOF'
           import glob, os, xml.etree.ElementTree as ET
 
-          status = os.environ.get("ANDROID_STATUS", "failed")
           summary = ["## Android CI Results", ""]
           summary.append(f"- **Branch**: `{os.environ.get('GITHUB_REF_NAME', '')}`")
           summary.append(f"- **Commit**: `{os.environ.get('GITHUB_SHA', '')}`")
 
-          if status == "unsupported_sdk":
-              summary.append("- **Status**: SKIPPED (runner SDK repository lacks required `platforms;android-37` for `compileSdk = 37`)")
+          xml_files = sorted(glob.glob("app/build/test-results/testDebugUnitTest/TEST-*.xml"))
+          if not xml_files:
+              summary.append("- **Unit Tests**: NO XML TEST REPORTS GENERATED")
           else:
-              xml_files = sorted(glob.glob("app/build/test-results/testDebugUnitTest/TEST-*.xml"))
-              if not xml_files:
-                  summary.append(f"- **Status**: {status.upper()} (no XML test reports generated)")
-              else:
-                  summary.extend(["", "| Test Suite | Tests | Failures | Errors | Skipped |", "| --- | --- | --- | --- | --- |"])
-                  total_t = total_f = total_e = total_s = 0
-                  for xf in xml_files:
-                      root = ET.parse(xf).getroot()
-                      name = root.attrib.get("name", os.path.basename(xf))
-                      t = int(root.attrib.get("tests", 0))
-                      f = int(root.attrib.get("failures", 0))
-                      e = int(root.attrib.get("errors", 0))
-                      s = int(root.attrib.get("skipped", 0))
-                      total_t += t; total_f += f; total_e += e; total_s += s
-                      summary.append(f"| `{name}` | {t} | {f} | {e} | {s} |")
-                  summary.append(f"| **Total** | **{total_t}** | **{total_f}** | **{total_e}** | **{total_s}** |")
+              summary.extend(["", "| Test Suite | Tests | Failures | Errors | Skipped |", "| --- | --- | --- | --- | --- |"])
+              total_t = total_f = total_e = total_s = 0
+              for xf in xml_files:
+                  root = ET.parse(xf).getroot()
+                  name = root.attrib.get("name", os.path.basename(xf))
+                  t = int(root.attrib.get("tests", 0))
+                  f = int(root.attrib.get("failures", 0))
+                  e = int(root.attrib.get("errors", 0))
+                  s = int(root.attrib.get("skipped", 0))
+                  total_t += t; total_f += f; total_e += e; total_s += s
+                  summary.append(f"| `{name}` | {t} | {f} | {e} | {s} |")
+              summary.append(f"| **Total** | **{total_t}** | **{total_f}** | **{total_e}** | **{total_s}** |")
+
+          meta_path = "android-test-reports/apk-meta.env"
+          if os.path.exists(meta_path):
+              meta = dict(line.strip().split("=", 1) for line in open(meta_path, encoding="utf-8") if "=" in line)
+              summary.append("")
+              summary.append(f"- **Staging Debug APK**: `{meta.get('STAGING_APK_PATH', '')}` ({meta.get('STAGING_APK_BYTES', '')} bytes)")
+              summary.append(f"- **Verified BuildConfig.BASE_URL**: `{meta.get('STAGING_BUILD_CONFIG_BASE_URL', '')}`")
 
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as fh:
               fh.write("\n".join(summary) + "\n")
           PYEOF
 
-      - name: Upload Android test reports
+      - name: Upload Android test reports and staging debug APK
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-test-results
+          name: android-test-and-apk-results
           path: |
             android-test-reports/
             app/build/test-results/testDebugUnitTest/
+            app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: ignore
 
   deploy-staging:
     name: Deploy Backend to Isolated AWS Staging
     runs-on: ubuntu-latest
-    needs: [backend-ci, frontend-ci, android-ci]
+    needs: [backend-ci, frontend-ci, android-ci, verify-vercel-preview]
     if: >-
       ${{
         !cancelled() &&
         needs.backend-ci.result == 'success' &&
         needs.frontend-ci.result == 'success' &&
-        (needs.android-ci.result == 'success' || needs.android-ci.result == 'skipped') &&
+        needs.android-ci.result == 'success' &&
+        needs.verify-vercel-preview.result == 'success' &&
         github.ref == 'refs/heads/feature/twm-pay-integration' &&
         (github.event_name == 'push' || (github.event.inputs.deploy_backend != false && github.event.inputs.deploy_backend != 'false'))
       }}
