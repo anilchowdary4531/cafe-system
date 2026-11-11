@@ -10,7 +10,8 @@ import {
 } from "../services/twmPayPaymentService.js";
 import { getTwmPayMetrics } from "../services/twmPay.service.js";
 
-export const buildPaymentController = ({ prisma, fetchImpl } = {}) => {
+export const buildPaymentController = ({ prisma, realtime = null, fetchImpl } = {}) => {
+  const resolveRealtime = (req) => req?.server?.realtime || req?.realtime || realtime || null;
   const createOrder = async (req, reply) => {
     try {
       const body = req.body || {};
@@ -305,7 +306,7 @@ export const buildPaymentController = ({ prisma, fetchImpl } = {}) => {
           orderRef: requestedRef || null,
           restaurantId: query.restaurantId || body.restaurantId || null,
           slug: req.params?.slug || query.slug || null,
-          realtime: req.server?.realtime || req.realtime || null,
+          realtime: resolveRealtime(req),
           fetchImpl,
         });
         return reply.code(200).send(twmStatus);
@@ -416,7 +417,7 @@ export const buildPaymentController = ({ prisma, fetchImpl } = {}) => {
               tableSessionId: existingOrder.tableSessionId,
               orderId: existingOrder.id,
               paymentMode: cfResult.paymentMethod || existingOrder.paymentMode || "ONLINE",
-              realtime: req.server?.realtime || req.realtime || null,
+              realtime: resolveRealtime(req),
             });
           } catch (updateErr) {
             console.error("[PaymentController] Order/Payment DB update error:", updateErr.message);
@@ -774,7 +775,7 @@ export const buildPaymentController = ({ prisma, fetchImpl } = {}) => {
         payload,
         restaurantId: req.query?.restaurantId || req.body?.restaurantId || null,
         slug: req.params?.slug || req.query?.slug || null,
-        realtime: req.server?.realtime || req.realtime || null,
+        realtime: resolveRealtime(req),
         fetchImpl,
       });
       return reply.code(200).send(result);
@@ -797,7 +798,7 @@ export const buildPaymentController = ({ prisma, fetchImpl } = {}) => {
       const result = await processTwmPayNotify({
         prisma,
         payload,
-        realtime: req.server?.realtime || req.realtime || null,
+        realtime: resolveRealtime(req),
       });
       return reply.code(200).send({
         ok: true,
@@ -837,7 +838,7 @@ export const buildPaymentController = ({ prisma, fetchImpl } = {}) => {
         orderRef: orderRef || null,
         restaurantId: query.restaurantId || body.restaurantId || null,
         slug: req.params?.slug || query.slug || null,
-        realtime: req.server?.realtime || req.realtime || null,
+        realtime: resolveRealtime(req),
         fetchImpl,
       });
       return reply.code(200).send(result);

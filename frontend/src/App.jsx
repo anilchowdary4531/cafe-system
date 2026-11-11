@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { IS_MISCONFIGURED_PREVIEW, PREVIEW_CONFIG_ERROR } from "./config";
 
 // ============================
 // PUBLIC PAGES
@@ -150,6 +151,14 @@ export default function App() {
                 <TableStateProvider>
                     <CustomerNotificationProvider>
                         <div className="theme-adaptive min-h-screen">
+                        {IS_MISCONFIGURED_PREVIEW && (
+                            <div
+                                role="alert"
+                                className="bg-amber-50 border-b border-amber-300 px-4 py-2 text-xs font-semibold text-amber-900 text-center"
+                            >
+                                {PREVIEW_CONFIG_ERROR} Production backend fallback is blocked on Preview.
+                            </div>
+                        )}
                         <Routes>
 
                     {/* ================================= */}

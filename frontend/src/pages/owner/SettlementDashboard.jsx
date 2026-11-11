@@ -12,6 +12,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { api } from "../../utils/apiClient";
+import { API_BASE_URL, IS_MISCONFIGURED_PREVIEW, PREVIEW_CONFIG_ERROR } from "../../config";
 import { useAuth } from "../../context/AuthContext";
 
 export default function SettlementDashboard() {
@@ -72,13 +73,19 @@ export default function SettlementDashboard() {
   }, [restaurantId, range, statusFilter, page]);
 
   const handleDownloadCsv = () => {
-    const apiBaseUrl = import.meta.env.VITE_API_URL || "https://api.tiffzy.com";
+    if (IS_MISCONFIGURED_PREVIEW) {
+      throw new Error(PREVIEW_CONFIG_ERROR);
+    }
+    const apiBaseUrl = API_BASE_URL || "https://api.tiffzy.com";
     const downloadUrl = `${apiBaseUrl}/owner/${restaurantId}/settlements/export/csv?range=${range}`;
     window.open(downloadUrl, "_blank");
   };
 
   const handleDownloadPdf = () => {
-    const apiBaseUrl = import.meta.env.VITE_API_URL || "https://api.tiffzy.com";
+    if (IS_MISCONFIGURED_PREVIEW) {
+      throw new Error(PREVIEW_CONFIG_ERROR);
+    }
+    const apiBaseUrl = API_BASE_URL || "https://api.tiffzy.com";
     const downloadUrl = `${apiBaseUrl}/owner/${restaurantId}/settlements/export/pdf?range=${range}`;
     window.open(downloadUrl, "_blank");
   };

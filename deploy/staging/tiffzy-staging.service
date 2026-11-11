@@ -1,0 +1,19 @@
+[Unit]
+Description=Tiffzy Backend Service (Isolated Staging Environment)
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/cafe-system-staging/backend
+EnvironmentFile=/home/ubuntu/cafe-system-staging/backend/.env
+ExecStart=/usr/bin/node src/server.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tiffzy-staging
+
+[Install]
+WantedBy=multi-user.target
+

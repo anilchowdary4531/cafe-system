@@ -5,7 +5,11 @@ import { validateCoupon, createCoupon, getCoupons } from "../controllers/coupon.
 
 export default async function paymentRoutes(app, deps = {}) {
   const prisma = deps.prisma;
-  const paymentController = buildPaymentController({ prisma, fetchImpl: deps.fetchImpl });
+  const paymentController = buildPaymentController({
+    prisma,
+    realtime: deps.realtime || app.realtime || null,
+    fetchImpl: deps.fetchImpl,
+  });
   const settlementController = buildSettlementController({ prisma });
   const adminSettlementController = buildAdminSettlementController({ prisma });
 

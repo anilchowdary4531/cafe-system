@@ -586,7 +586,6 @@ export const applyVerifiedTwmOutcome = async ({
         where: { id: freshOrder.id },
         data: {
           paymentStatus: "PAID",
-          paidAt: freshOrder.paidAt || new Date(),
           paymentMode: "ONLINE",
         },
         include: { restaurant: { select: { id: true, slug: true, name: true } } },
@@ -756,7 +755,7 @@ const formatVerificationResponse = ({ txResult, message, orderIdInput = null }) 
     transactionId: payment?.transactionId || meta.txn || null,
     amount: round2(Number(order.total || payment?.amount || 0)),
     amountPaise: payment?.amountSubunit || getAuthoritativeOrderPaise(order, payment),
-    paidAt: order.paidAt || null,
+    paidAt: paymentStatus === "PAID" ? (meta.paidAt || order?.paidAt || payment?.updatedAt || null) : null,
     restaurantId: order.restaurantId,
     restaurantSlug: order.restaurant?.slug || null,
     message: message || normalizeTwmStatus(gatewayStatus || "").message,

@@ -6,7 +6,7 @@ import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { MAP_CONFIG } from "../../utils/mapConfig";
 import io from "socket.io-client";
-import { API_BASE_URL } from "../../config";
+import { IS_MISCONFIGURED_PREVIEW, SOCKET_URL } from "../../config";
 import BrandLogo from "../../components/BrandLogo";
 
 const formatMoney = (value) => `₹${Math.round(Number(value || 0))}`;
@@ -69,9 +69,9 @@ export default function TrackOrderPage() {
 
   // Socket.IO Room Subscription for Live GPS & Status updates
   useEffect(() => {
-    if (!orderId) return;
+    if (!orderId || IS_MISCONFIGURED_PREVIEW) return;
 
-    const socket = io(API_BASE_URL, {
+    const socket = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
       withCredentials: true,
     });

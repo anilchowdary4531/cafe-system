@@ -43,10 +43,17 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    val configuredBaseUrl = (
+        findProperty("TIFFZY_BASE_URL")?.toString()
+            ?: System.getenv("TIFFZY_BASE_URL")
+            ?: "https://api.tiffzy.com/"
+        ).trim().let { if (it.endsWith("/")) it else "$it/" }
+
     buildTypes {
         debug {
-            buildConfigField("String", "BASE_URL", "\"https://api.tiffzy.com/\"")
-            manifestPlaceholders["usesCleartextTraffic"] = "false"
+            buildConfigField("String", "BASE_URL", "\"$configuredBaseUrl\"")
+            manifestPlaceholders["usesCleartextTraffic"] =
+                if (configuredBaseUrl.startsWith("http://")) "true" else "false"
         }
         release {
             if (hasKeystoreProperties) {

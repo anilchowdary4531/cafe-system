@@ -37,7 +37,7 @@ const app = Fastify({ logger: true });
 app.decorateRequest("staffActor", null);
 
 const runtime = getRuntimeConfig();
-const { PORT, HOST, JWT_SECRET, FRONTEND_URL, CORS_ORIGINS, DB_HOST } = runtime;
+const { PORT, HOST, JWT_SECRET, FRONTEND_URL, CORS_ORIGINS, CORS_ORIGIN_PATTERNS = [], DB_HOST } = runtime;
 
 app.log.info({ NODE_ENV: runtime.NODE_ENV, FRONTEND_URL, DB_HOST }, "runtime_config");
 app.log.info(getStorageInfo(), "storage_config");
@@ -288,10 +288,18 @@ const isAllowedDevOrigin = (origin) => {
   }
 };
 
+const isOriginAllowed = (origin) => {
+  const normalizedOrigin = origin ? String(origin).trim().replace(/\/+$/, "") : "";
+  if (!normalizedOrigin) return true;
+  if (allowedCorsOrigins.has(normalizedOrigin) || isAllowedDevOrigin(normalizedOrigin)) {
+    return true;
+  }
+  return CORS_ORIGIN_PATTERNS.some((pattern) => pattern.test(normalizedOrigin));
+};
+
 await app.register(cors, {
   origin: (origin, cb) => {
-    const normalizedOrigin = origin ? String(origin).trim().replace(/\/+$/, "") : "";
-    if (!normalizedOrigin || allowedCorsOrigins.has(normalizedOrigin) || isAllowedDevOrigin(normalizedOrigin)) {
+    if (isOriginAllowed(origin)) {
       cb(null, true);
       return;
     }
@@ -396,7 +404,12 @@ const realtime = initRealtime({
   app,
   prisma,
   allowedOrigins: [...allowedCorsOrigins],
+  isOriginAllowed,
 });
+
+if (!app.hasDecorator("realtime")) {
+  app.decorate("realtime", realtime);
+}
 
 const routeDeps = {
   prisma,

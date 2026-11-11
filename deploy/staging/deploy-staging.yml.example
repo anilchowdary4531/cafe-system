@@ -1,0 +1,31 @@
+# Copy to .github/workflows/deploy-staging.yml ONLY after creating separate STAGING_* GitHub Secrets
+# and provisioning staging-api.tiffzy.com + tiffzy-staging systemd unit + staging PostgreSQL DB.
+# Triggered strictly via manual workflow_dispatch (never auto-deploys on main).
+
+name: Deploy Feature Branch to Staging (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Feature branch to deploy to staging"
+        required: true
+        default: "feature/twm-pay-integration"
+
+jobs:
+  deploy-staging:
+    name: Deploy Backend to Staging Service
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.branch != 'main' }}
+    steps:
+      - name: Deploy Staging via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.STAGING_EC2_HOST }}
+          username: ${{ secrets.STAGING_EC2_USER }}
+          key: ${{ secrets.STAGING_EC2_SSH_KEY }}
+          script: |
+            set -e
+            export FEATURE_BRANCH="${{ github.event.inputs.branch }}"
+            bash /home/ubuntu/cafe-system-staging/deploy/staging/setup-staging.sh
+

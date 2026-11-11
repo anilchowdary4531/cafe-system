@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import CheckoutPrompt from "../components/CheckoutPrompt";
 import PaymentStatus, { parsePaymentReturnParams } from "../pages/PaymentStatus";
+import { resolveFrontendEnvConfig } from "../config";
 import { RestaurantContextProvider } from "../context/RestaurantContext";
 import { AuthProvider } from "../context/AuthContext";
 import { api } from "../utils/apiClient";
@@ -251,6 +252,72 @@ describe("TWM Pay Frontend Checkout & Return Verification Suite", () => {
         await waitFor(() => {
             expect(screen.getByText("Payment Failed")).toBeInTheDocument();
             expect(screen.getAllByText(/Invalid payment signature/i).length).toBeGreaterThanOrEqual(1);
+        });
+    });
+
+    it("5. Vercel Preview env config supports VITE_API_BASE_URL/VITE_SOCKET_URL and blocks accidental prod API fallback", () => {
+        // Explicit staging env vars succeed on Vercel Preview domain
+        const validPreview = resolveFrontendEnvConfig({
+            apiUrl: "",
+            apiBaseUrl: "https://staging-api.tiffzy.com/",
+            socketUrl: "https://staging-api.tiffzy.com/",
+            isProd: true,
+            hostname: "cafe-system-git-feature-twm-p-ebc5a0-anilchowdary4531s-projects.vercel.app",
+        });
+        expect(validPreview).toEqual({
+            API_BASE_URL: "https://staging-api.tiffzy.com",
+            SOCKET_URL: "https://staging-api.tiffzy.com",
+            IS_MISCONFIGURED_PREVIEW: false,
+        });
+
+        // Missing staging API URL on Vercel Preview fails closed (does NOT fall back to /api -> api.tiffzy.com)
+        const missingPreview = resolveFrontendEnvConfig({
+            apiUrl: "",
+            apiBaseUrl: "",
+            socketUrl: "",
+            isProd: true,
+            hostname: "cafe-system-3ttgzslpf-anilchowdary4531s-projects.vercel.app",
+        });
+        expect(missingPreview.IS_MISCONFIGURED_PREVIEW).toBe(true);
+        expect(missingPreview.API_BASE_URL).not.toBe("/api");
+        expect(missingPreview.SOCKET_URL).toBe("");
+
+        // Explicitly pointing Preview at https://api.tiffzy.com is also blocked
+        const prodLeakPreview = resolveFrontendEnvConfig({
+            apiUrl: "https://api.tiffzy.com",
+            apiBaseUrl: "",
+            socketUrl: "",
+            isProd: true,
+            hostname: "cafe-system-3ttgzslpf-anilchowdary4531s-projects.vercel.app",
+        });
+        expect(prodLeakPreview.IS_MISCONFIGURED_PREVIEW).toBe(true);
+
+        // Production domain www.tiffzy.com continues to work normally
+        const prodDomain = resolveFrontendEnvConfig({
+            apiUrl: "",
+            apiBaseUrl: "",
+            socketUrl: "",
+            isProd: true,
+            hostname: "www.tiffzy.com",
+        });
+        expect(prodDomain).toEqual({
+            API_BASE_URL: "/api",
+            SOCKET_URL: "/api",
+            IS_MISCONFIGURED_PREVIEW: false,
+        });
+
+        // Explicit VITE_API_BASE_URL on Preview/local overrides default .env.production VITE_API_URL=https://api.tiffzy.com
+        const previewBaseOverridesDefaultProd = resolveFrontendEnvConfig({
+            apiUrl: "https://api.tiffzy.com",
+            apiBaseUrl: "https://staging-api.tiffzy.com",
+            socketUrl: "https://staging-api.tiffzy.com",
+            isProd: true,
+            hostname: "cafe-system-3ttgzslpf-anilchowdary4531s-projects.vercel.app",
+        });
+        expect(previewBaseOverridesDefaultProd).toEqual({
+            API_BASE_URL: "https://staging-api.tiffzy.com",
+            SOCKET_URL: "https://staging-api.tiffzy.com",
+            IS_MISCONFIGURED_PREVIEW: false,
         });
     });
 });

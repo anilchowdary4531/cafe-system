@@ -10,6 +10,7 @@ import {
   fromPaise,
 } from "../services/twmPay.service.js";
 import { validateCreateOrderPayload } from "../middleware/paymentValidation.js";
+import { getRuntimeConfig } from "../config.js";
 
 /**
  * Stateful in-memory Prisma double tailored for Payment / Order / TableSession workflows.
@@ -633,4 +634,35 @@ describe("TWM Pay Payment Gateway Integration Suite", () => {
     assert.equal(twmValidation.isValid, true);
     assert.equal(twmValidation.data.provider, "TWM_PAY");
   });
+
+  it("7. Runtime CORS pattern config compiles Vercel Preview wildcard origins for staging", () => {
+    const prev = {
+      DATABASE_URL: process.env.DATABASE_URL,
+      JWT_SECRET: process.env.JWT_SECRET,
+      FRONTEND_URL: process.env.FRONTEND_URL,
+      CORS_ORIGINS: process.env.CORS_ORIGINS,
+      CORS_ORIGIN_PATTERNS: process.env.CORS_ORIGIN_PATTERNS,
+    };
+    try {
+      process.env.DATABASE_URL = "postgresql://user:pass@localhost:5432/tiffzy_staging";
+      process.env.JWT_SECRET = "staging_secret_value";
+      process.env.FRONTEND_URL = "https://cafe-system-git-feature-twm-p-ebc5a0-anilchowdary4531s-projects.vercel.app";
+      process.env.CORS_ORIGINS = "http://localhost:5173";
+      process.env.CORS_ORIGIN_PATTERNS = "https://cafe-system-*.vercel.app";
+
+      const cfg = getRuntimeConfig();
+      assert.equal(cfg.CORS_ORIGIN_PATTERNS.length, 1);
+      assert.equal(
+        cfg.CORS_ORIGIN_PATTERNS[0].test("https://cafe-system-3ttgzslpf-anilchowdary4531s-projects.vercel.app"),
+        true
+      );
+      assert.equal(cfg.CORS_ORIGIN_PATTERNS[0].test("https://evil-vercel.app"), false);
+    } finally {
+      for (const [k, v] of Object.entries(prev)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    }
+  });
 });
+
