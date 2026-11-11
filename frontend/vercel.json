@@ -1,6 +1,20 @@
 {
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "https://api.tiffzy.com/$1" },
+    {
+      "source": "/api/(.*)",
+      "has": [{ "type": "host", "value": "tiffzy.com" }],
+      "destination": "https://api.tiffzy.com/$1"
+    },
+    {
+      "source": "/api/(.*)",
+      "has": [{ "type": "host", "value": "www.tiffzy.com" }],
+      "destination": "https://api.tiffzy.com/$1"
+    },
+    {
+      "source": "/api/(.*)",
+      "has": [{ "type": "host", "value": "cafe-system-nu.vercel.app" }],
+      "destination": "https://api.tiffzy.com/$1"
+    },
     { "source": "/(.*)", "destination": "/" }
   ]
 }

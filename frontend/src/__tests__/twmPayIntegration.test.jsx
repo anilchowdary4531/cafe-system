@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import CheckoutPrompt from "../components/CheckoutPrompt";
 import PaymentStatus, { parsePaymentReturnParams } from "../pages/PaymentStatus";
 import { resolveFrontendEnvConfig } from "../config";
+import vercelConfig from "../../vercel.json";
 import { RestaurantContextProvider } from "../context/RestaurantContext";
 import { AuthProvider } from "../context/AuthContext";
 import { api } from "../utils/apiClient";
@@ -319,5 +320,26 @@ describe("TWM Pay Frontend Checkout & Return Verification Suite", () => {
             SOCKET_URL: "https://staging-api.tiffzy.com",
             IS_MISCONFIGURED_PREVIEW: false,
         });
+    });
+
+    it("6. vercel.json scopes production /api proxy rewrites to production hosts only and never routes Preview requests to api.tiffzy.com", () => {
+        const prodOnlyHosts = new Set(["tiffzy.com", "www.tiffzy.com", "cafe-system-nu.vercel.app"]);
+        const previewHost = "cafe-system-git-feature-twm-p-ebc5a0-anilchowdary4531s-projects.vercel.app";
+        const prodProxyRewrites = (vercelConfig.rewrites || []).filter((rule) =>
+            String(rule?.destination || "").includes("api.tiffzy.com")
+        );
+
+        expect(prodProxyRewrites.length).toBeGreaterThan(0);
+        for (const rule of prodProxyRewrites) {
+            const hostGuards = (rule.has || []).filter((cond) => cond?.type === "host");
+            expect(hostGuards.length).toBeGreaterThan(0);
+            expect(hostGuards.every((cond) => prodOnlyHosts.has(cond.value))).toBe(true);
+            expect(hostGuards.some((cond) => cond.value === previewHost)).toBe(false);
+        }
+
+        const spaFallback = (vercelConfig.rewrites || []).find(
+            (rule) => rule.source === "/(.*)" && rule.destination === "/"
+        );
+        expect(spaFallback).toBeTruthy();
     });
 });

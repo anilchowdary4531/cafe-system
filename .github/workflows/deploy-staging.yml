@@ -480,9 +480,9 @@ jobs:
           STAGING_EC2_SSH_KEY: ${{ secrets.STAGING_EC2_SSH_KEY }}
           STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
           STAGING_JWT_SECRET: ${{ secrets.STAGING_JWT_SECRET }}
-          TWM_MERCHANT_ID: ${{ secrets.STAGING_TWM_MERCHANT_ID || secrets.TWM_MERCHANT_ID }}
-          TWM_API_SECRET: ${{ secrets.STAGING_TWM_API_SECRET || secrets.TWM_API_SECRET }}
-          TWM_SIGNING_KEY: ${{ secrets.STAGING_TWM_SIGNING_KEY || secrets.TWM_SIGNING_KEY }}
+          STAGING_TWM_MERCHANT_ID: ${{ secrets.STAGING_TWM_MERCHANT_ID }}
+          STAGING_TWM_API_SECRET: ${{ secrets.STAGING_TWM_API_SECRET }}
+          STAGING_TWM_SIGNING_KEY: ${{ secrets.STAGING_TWM_SIGNING_KEY }}
           TWM_ENABLED: ${{ vars.STAGING_TWM_ENABLED || 'true' }}
           TWM_NOTIFY_URL: ${{ vars.STAGING_TWM_NOTIFY_URL || 'https://staging-api.tiffzy.com/api/payments/twm/notify' }}
           TWM_RETURN_URL: ${{ vars.STAGING_TWM_RETURN_URL || 'https://cafe-system-git-feature-twm-p-ebc5a0-anilchowdary4531s-projects.vercel.app/payment-status' }}
@@ -508,9 +508,9 @@ jobs:
           check_secret "STAGING_EC2_SSH_KEY" "${STAGING_EC2_SSH_KEY}"
           check_secret "STAGING_DATABASE_URL" "${STAGING_DATABASE_URL}"
           check_secret "STAGING_JWT_SECRET" "${STAGING_JWT_SECRET}"
-          check_secret "TWM_MERCHANT_ID (or STAGING_TWM_MERCHANT_ID)" "${TWM_MERCHANT_ID}"
-          check_secret "TWM_API_SECRET (or STAGING_TWM_API_SECRET)" "${TWM_API_SECRET}"
-          check_secret "TWM_SIGNING_KEY (or STAGING_TWM_SIGNING_KEY)" "${TWM_SIGNING_KEY}"
+          check_secret "STAGING_TWM_MERCHANT_ID" "${STAGING_TWM_MERCHANT_ID}"
+          check_secret "STAGING_TWM_API_SECRET" "${STAGING_TWM_API_SECRET}"
+          check_secret "STAGING_TWM_SIGNING_KEY" "${STAGING_TWM_SIGNING_KEY}"
 
           PROD_API_IP=$(dig +short api.tiffzy.com A | head -n1 || true)
           STAGING_DNS_IP=$(dig +short "${STAGING_API_HOST}" A | head -n1 || true)
@@ -574,9 +574,9 @@ jobs:
           STAGING_CASHFREE_CLIENT_ID: ${{ secrets.STAGING_CASHFREE_CLIENT_ID || '' }}
           STAGING_CASHFREE_CLIENT_SECRET: ${{ secrets.STAGING_CASHFREE_CLIENT_SECRET || '' }}
           TWM_ENABLED: ${{ vars.STAGING_TWM_ENABLED || 'true' }}
-          TWM_MERCHANT_ID: ${{ secrets.STAGING_TWM_MERCHANT_ID || secrets.TWM_MERCHANT_ID }}
-          TWM_API_SECRET: ${{ secrets.STAGING_TWM_API_SECRET || secrets.TWM_API_SECRET }}
-          TWM_SIGNING_KEY: ${{ secrets.STAGING_TWM_SIGNING_KEY || secrets.TWM_SIGNING_KEY }}
+          TWM_MERCHANT_ID: ${{ secrets.STAGING_TWM_MERCHANT_ID }}
+          TWM_API_SECRET: ${{ secrets.STAGING_TWM_API_SECRET }}
+          TWM_SIGNING_KEY: ${{ secrets.STAGING_TWM_SIGNING_KEY }}
           TWM_URL: ${{ vars.STAGING_TWM_URL || 'https://pay.thewebsitemakers.in' }}
           TWM_NOTIFY_URL: ${{ vars.STAGING_TWM_NOTIFY_URL || 'https://staging-api.tiffzy.com/api/payments/twm/notify' }}
           TWM_RETURN_URL: ${{ vars.STAGING_TWM_RETURN_URL || 'https://cafe-system-git-feature-twm-p-ebc5a0-anilchowdary4531s-projects.vercel.app/payment-status' }}
