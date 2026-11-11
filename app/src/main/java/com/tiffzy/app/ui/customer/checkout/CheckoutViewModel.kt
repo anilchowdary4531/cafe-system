@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tiffzy.app.data.model.*
 import com.tiffzy.app.data.repository.CheckoutRepository
+import com.tiffzy.app.data.repository.PaymentRepository
 import com.tiffzy.app.ui.customer.cart.CartViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,14 +20,16 @@ data class CheckoutUiState(
     val deliveryInstructions: String = "",
     val restaurant: Restaurant? = null,
     val checkoutPreview: CheckoutPreviewResponse? = null,
-    val selectedPaymentMethod: String = "CASHFREE",
+    val selectedPaymentMethod: String = "TWM_PAY",
+    val availableOnlineProviders: List<PaymentProviderItem> = emptyList(),
     val orderSuccess: OrderResponse? = null,
     val error: String? = null
 )
 
 class CheckoutViewModel(
     private val repository: CheckoutRepository,
-    private val cartViewModel: CartViewModel
+    private val cartViewModel: CartViewModel,
+    private val paymentRepository: PaymentRepository = PaymentRepository()
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CheckoutUiState())
@@ -41,13 +44,26 @@ class CheckoutViewModel(
                 val addresses = repository.getAddresses()
                 val wallet = repository.getWalletAccounts()
                 val restaurant = repository.getRestaurant(restaurantSlug)
-                
+                val providersRes = paymentRepository.getPaymentProviders().getOrNull()
+                val configuredProviders = providersRes?.providers?.filter { it.configured }.orEmpty()
+                val currentSelection = _uiState.value.selectedPaymentMethod
+                val updatedDefault = if (
+                    (currentSelection == "TWM_PAY" || currentSelection == "CASHFREE") &&
+                    configuredProviders.isNotEmpty()
+                ) {
+                    providersRes?.defaultProvider ?: configuredProviders.first().id
+                } else {
+                    currentSelection
+                }
+
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     addresses = addresses,
                     selectedAddress = addresses.find { it.isDefault } ?: addresses.firstOrNull(),
                     walletAccounts = wallet,
-                    restaurant = restaurant
+                    restaurant = restaurant,
+                    availableOnlineProviders = configuredProviders,
+                    selectedPaymentMethod = updatedDefault
                 )
                 calculateBill()
             } catch (e: Exception) {

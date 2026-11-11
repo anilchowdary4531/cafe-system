@@ -115,6 +115,7 @@ const normalizeCoordinate = (value) => {
 
 const getCheckoutActionLabel = ({
     paymentMethod,
+    onlineProvider = "TWM_PAY",
     placedOrder,
     customerToken,
     otpStep,
@@ -123,6 +124,7 @@ const getCheckoutActionLabel = ({
     fulfillment,
 } = {}) => {
     const method = normalizePaymentMethod(paymentMethod);
+    const providerLabel = onlineProvider === "CASHFREE" ? "Cashfree" : "TWM Pay";
     const normalizedFulfillment = normalizeFulfillment(fulfillment);
     const orderMode = isOnlineOrder
         ? normalizedFulfillment === "pickup"
@@ -137,11 +139,11 @@ const getCheckoutActionLabel = ({
     }
 
     if (method === "UPI") {
-        if (placedOrder?.id) return "Open Cashfree Gateway";
-        if (customerToken) return `Pay Rs ${toInr(payableAmount)} Online (Cashfree)`;
-        if (!isOnlineOrder) return `Pay Rs ${toInr(payableAmount)} via Cashfree`;
+        if (placedOrder?.id) return `Open ${providerLabel} Checkout`;
+        if (customerToken) return `Pay Rs ${toInr(payableAmount)} Online (${providerLabel})`;
+        if (!isOnlineOrder) return `Pay Rs ${toInr(payableAmount)} via ${providerLabel}`;
         return otpStep === "otp"
-            ? `Verify & Pay Rs ${toInr(payableAmount)} via Cashfree`
+            ? `Verify & Pay Rs ${toInr(payableAmount)} via ${providerLabel}`
             : `Send OTP & Pay Rs ${toInr(payableAmount)} Online`;
     }
 
@@ -160,7 +162,7 @@ const getCheckoutActionLabel = ({
             : "Send OTP to Place Order";
 };
 
-export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
+export default function CheckoutPrompt({ open, onClose, cart, clearCart, redirectToCheckout }) {
     const navigate = useNavigate();
     const { customer, customerToken, loginCustomer } = useAuth();
     const { restaurantContext, setRestaurantContext } = useRestaurantContext();
@@ -217,6 +219,46 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
     const [selectedAddressId, setSelectedAddressId] = useState("");
     const [manualAddress, setManualAddress] = useState("");
     const [paymentMethod, setPaymentMethod] = useState("UPI"); // UPI | WALLET | CASH | PAY_LATER
+    const [onlineProvider, setOnlineProvider] = useState("TWM_PAY"); // TWM_PAY | CASHFREE
+    const [providerAvailability, setProviderAvailability] = useState({
+        twmPayConfigured: true,
+        cashfreeConfigured: true,
+        loaded: false,
+    });
+    const twmAttemptNonceRef = useRef(`${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+
+    useEffect(() => {
+        if (!open) return;
+        let cancelled = false;
+        const maybePromise = api?.get?.("/api/payments/providers");
+        if (maybePromise && typeof maybePromise.then === "function") {
+            maybePromise
+                .then((res) => {
+                    if (cancelled || !res?.data) return;
+                    const data = res.data;
+                    const twmConfigured = Boolean(data.twmPay?.configured);
+                    const cfConfigured = Boolean(data.cashfree?.configured);
+                    setProviderAvailability({
+                        twmPayConfigured: twmConfigured,
+                        cashfreeConfigured: cfConfigured,
+                        loaded: true,
+                    });
+                    if (twmConfigured && !cfConfigured) {
+                        setOnlineProvider("TWM_PAY");
+                    } else if (!twmConfigured && cfConfigured) {
+                        setOnlineProvider("CASHFREE");
+                    } else if (data.defaultProvider === "TWM_PAY" || data.defaultProvider === "CASHFREE") {
+                        setOnlineProvider(data.defaultProvider);
+                    }
+                })
+                .catch(() => {
+                    // Fallback gracefully when providers endpoint is unavailable (e.g. offline/tests)
+                });
+        }
+        return () => {
+            cancelled = true;
+        };
+    }, [open]);
     const [payLaterEligible, setPayLaterEligible] = useState(false);
     const [payLaterAccountId, setPayLaterAccountId] = useState(null);
     const [payLaterBalance, setPayLaterBalance] = useState(0);
@@ -787,13 +829,87 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                 return;
             }
 
-            // Online Digital Payment via Cashfree Payment Gateway Engine
+            // Online Digital Payment (TWM Pay Hosted Checkout or Cashfree SDK)
+            if (onlineProvider === "TWM_PAY") {
+                try {
+                    const returnUrl =
+                        typeof window !== "undefined" && window.location?.origin
+                            ? `${window.location.origin}/payment-status`
+                            : undefined;
+
+                    const twmRes = await api.post(
+                        "/api/payments/create-order",
+                        {
+                            orderId,
+                            amount: orderTotal,
+                            provider: "TWM_PAY",
+                            restaurantId: restaurantContext?.id || undefined,
+                            customerName: String(customerName || customer?.name || "").trim() || undefined,
+                            customerPhone: normalizedPhone,
+                            customerEmail: normalizedEmail,
+                            returnUrl,
+                            idempotencyKey: `web_twm_${orderId}_${twmAttemptNonceRef.current}`,
+                        },
+                        getCustomerAuthConfig()
+                    );
+
+                    const twmData = twmRes?.data || {};
+                    const checkoutUrl = String(twmData.checkoutUrl || twmData.checkout_url || "").trim();
+
+                    if (!checkoutUrl || !/^https?:\/\//i.test(checkoutUrl)) {
+                        throw new Error(twmData.message || "TWM Pay checkout session could not be created.");
+                    }
+
+                    try {
+                        sessionStorage.setItem(
+                            "tiffzy:pending_twm_payment",
+                            JSON.stringify({
+                                orderId: String(orderId),
+                                orderNo,
+                                orderRef: twmData.orderRef || twmData.order_ref || "",
+                                slug,
+                            })
+                        );
+                    } catch {
+                        // ignore storage errors
+                    }
+
+                    const doRedirect =
+                        typeof redirectToCheckout === "function"
+                            ? redirectToCheckout
+                            : (url) => window.location.assign(url);
+                    doRedirect(checkoutUrl);
+                    return;
+                } catch (twmErr) {
+                    const errCode = twmErr?.response?.data?.code;
+                    if (errCode === "PAYMENT_VERIFICATION_PENDING") {
+                        onClose();
+                        navigate(`/payment-status?provider=twm_pay&orderId=${encodeURIComponent(String(orderId))}`);
+                        return;
+                    }
+                    if (errCode === "ORDER_ALREADY_PAID") {
+                        clearCart();
+                        onClose();
+                        navigate(`/orders/thank-you?slug=${encodeURIComponent(slug)}&orderNo=${encodeURIComponent(orderNo)}&orderId=${encodeURIComponent(String(orderId))}&paymentStatus=SUCCESS&paymentMode=ONLINE&provider=TWM_PAY`);
+                        return;
+                    }
+                    setError(
+                        twmErr?.response?.data?.message ||
+                        twmErr?.message ||
+                        "TWM Pay Gateway Unavailable. Please try again or choose another payment method."
+                    );
+                    setSubmitting(false);
+                    return;
+                }
+            }
+
             try {
                 const cashfreeRes = await api.post(
                     "/api/payments/create-order",
                     {
                         orderId,
                         amount: orderTotal,
+                        provider: "CASHFREE",
                         customerPhone: normalizedPhone,
                         customerEmail: normalizedEmail,
                     },
@@ -887,6 +1003,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
 
     const actionButtonLabel = getCheckoutActionLabel({
         paymentMethod: selectedPaymentMethod,
+        onlineProvider,
         placedOrder,
         customerToken,
         otpStep,
@@ -1361,38 +1478,79 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                             </div>
 
                             <div className="grid gap-2">
-                                {/* Option A: Pay Online (Cashfree) */}
-                                <button
-                                    type="button"
-                                    onClick={() => setPaymentMethod("UPI")}
-                                    className={`flex items-start justify-between gap-3 rounded-xl border p-2.5 sm:p-3 text-left transition-all ${
+                                {/* Option A: Pay Online (TWM Pay / Cashfree) */}
+                                <div
+                                    className={`rounded-xl border p-2.5 sm:p-3 text-left transition-all ${
                                         selectedPaymentMethod === "UPI"
                                             ? "border-[var(--app-primary)] bg-[color:color-mix(in_srgb,var(--app-primary)_8%,var(--app-surface))] ring-1 ring-[var(--app-primary)]/40 shadow-sm"
                                             : "border-[var(--app-border)] hover:border-[var(--app-primary)]/40 bg-[var(--app-surface)]"
                                     }`}
                                 >
-                                    <div className="flex items-start gap-2.5">
-                                        <div className={`mt-0.5 flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg border ${
-                                            selectedPaymentMethod === "UPI" ? "border-[var(--app-primary)]/30 bg-[color:color-mix(in_srgb,var(--app-primary)_15%,transparent)] text-[var(--app-primary)]" : "border-[var(--app-border)] bg-[var(--app-surface)] theme-muted"
-                                        }`}>
-                                            <CreditCard size={15} />
-                                        </div>
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-1.5">
-                                                <span className="text-xs font-bold sm:text-sm text-[var(--app-text)]">Pay Online</span>
-                                                <span className="rounded-full bg-[var(--app-primary)]/15 px-1.5 py-0.2 text-[9px] font-bold text-[var(--app-primary)] border border-[var(--app-primary)]/30">
-                                                    Recommended
-                                                </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPaymentMethod("UPI")}
+                                        className="flex w-full items-start justify-between gap-3 text-left"
+                                    >
+                                        <div className="flex items-start gap-2.5">
+                                            <div className={`mt-0.5 flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg border ${
+                                                selectedPaymentMethod === "UPI" ? "border-[var(--app-primary)]/30 bg-[color:color-mix(in_srgb,var(--app-primary)_15%,transparent)] text-[var(--app-primary)]" : "border-[var(--app-border)] bg-[var(--app-surface)] theme-muted"
+                                            }`}>
+                                                <CreditCard size={15} />
                                             </div>
-                                            <p className="theme-muted text-[11px] mt-0.5">UPI, Cards, Net Banking & Wallets</p>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-xs font-bold sm:text-sm text-[var(--app-text)]">Pay Online</span>
+                                                    <span className="rounded-full bg-[var(--app-primary)]/15 px-1.5 py-0.2 text-[9px] font-bold text-[var(--app-primary)] border border-[var(--app-primary)]/30">
+                                                        Recommended
+                                                    </span>
+                                                </div>
+                                                <p className="theme-muted text-[11px] mt-0.5">UPI, QR, Cards, Net Banking & Wallets</p>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border mt-0.5 ${
-                                        selectedPaymentMethod === "UPI" ? "border-[var(--app-primary)] bg-[var(--app-primary)] text-white" : "border-[var(--app-border)]"
-                                    }`}>
-                                        {selectedPaymentMethod === "UPI" && <CheckCircle2 size={12} className="fill-current text-white" />}
-                                    </div>
-                                </button>
+                                        <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border mt-0.5 ${
+                                            selectedPaymentMethod === "UPI" ? "border-[var(--app-primary)] bg-[var(--app-primary)] text-white" : "border-[var(--app-border)]"
+                                        }`}>
+                                            {selectedPaymentMethod === "UPI" && <CheckCircle2 size={12} className="fill-current text-white" />}
+                                        </div>
+                                    </button>
+
+                                    {selectedPaymentMethod === "UPI" && (
+                                        <div className="mt-2.5 flex flex-wrap gap-1.5 pl-9 sm:pl-10">
+                                            {(providerAvailability.twmPayConfigured || !providerAvailability.loaded || !providerAvailability.cashfreeConfigured) && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setPaymentMethod("UPI");
+                                                        setOnlineProvider("TWM_PAY");
+                                                    }}
+                                                    className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition ${
+                                                        onlineProvider === "TWM_PAY"
+                                                            ? "border-[var(--app-primary)] bg-[var(--app-primary)] text-white shadow-sm"
+                                                            : "border-[var(--app-border)] bg-[var(--app-surface)] theme-muted hover:text-[var(--app-text)]"
+                                                    }`}
+                                                >
+                                                    TWM Pay (UPI / QR)
+                                                </button>
+                                            )}
+                                            {(providerAvailability.cashfreeConfigured || !providerAvailability.loaded || !providerAvailability.twmPayConfigured) && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setPaymentMethod("UPI");
+                                                        setOnlineProvider("CASHFREE");
+                                                    }}
+                                                    className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition ${
+                                                        onlineProvider === "CASHFREE"
+                                                            ? "border-[var(--app-primary)] bg-[var(--app-primary)] text-white shadow-sm"
+                                                            : "border-[var(--app-border)] bg-[var(--app-surface)] theme-muted hover:text-[var(--app-text)]"
+                                                    }`}
+                                                >
+                                                    Cashfree Online
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
 
                                 {/* Option B: Tiffzy Wallet */}
                                 <button

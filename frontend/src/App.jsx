@@ -29,6 +29,7 @@ import Login from "./pages/Login";
 import StaffLoginLink from "./pages/StaffLoginLink";
 import Profile from "./pages/Profile";
 import ThankYou from "./pages/ThankYou";
+import PaymentStatus from "./pages/PaymentStatus";
 
 // ============================
 // ADMIN PAGES
@@ -356,6 +357,28 @@ export default function App() {
                             <>
                                 <Navbar />
                                 <ThankYou />
+                                <Footer />
+                            </>
+                        }
+                    />
+
+                    <Route
+                        path="/payment-status"
+                        element={
+                            <>
+                                <Navbar />
+                                <PaymentStatus />
+                                <Footer />
+                            </>
+                        }
+                    />
+
+                    <Route
+                        path="/payment-status/:orderId"
+                        element={
+                            <>
+                                <Navbar />
+                                <PaymentStatus />
                                 <Footer />
                             </>
                         }

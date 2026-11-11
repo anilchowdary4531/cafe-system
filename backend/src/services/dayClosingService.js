@@ -90,7 +90,7 @@ export const calculateDayClosingSummary = async ({ prisma, restaurantId, busines
       paymentBreakdown.upi = round2(paymentBreakdown.upi + pamt);
     } else if (method.includes("CARD")) {
       paymentBreakdown.card = round2(paymentBreakdown.card + pamt);
-    } else if (method.includes("CASHFREE") || method.includes("ONLINE")) {
+    } else if (method.includes("CASHFREE") || method.includes("TWM") || method.includes("ONLINE")) {
       paymentBreakdown.cashfree = round2(paymentBreakdown.cashfree + pamt);
     } else if (method.includes("PAY_LATER")) {
       paymentBreakdown.payLater = round2(paymentBreakdown.payLater + pamt);
