@@ -3,7 +3,7 @@ name: Staging CI & Isolated AWS Deployment (TWM Pay)
 on:
   push:
     branches:
-      - feature/twm-pay-integration
+      - "staging/**"
   workflow_dispatch:
     inputs:
       deploy_backend:
@@ -17,457 +17,113 @@ permissions:
   deployments: read
 
 concurrency:
-  group: staging-pipeline-${{ github.ref_name }}
+  group: staging-deploy-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
-  backend-ci:
-    name: Backend CI (Prisma, Targeted TWM Pay & Full Suite)
-    runs-on: ubuntu-latest
-    if: ${{ github.ref == 'refs/heads/feature/twm-pay-integration' }}
+  ci:
+    name: Run Required CI Pipeline
+    uses: ./.github/workflows/ci.yml
 
-    services:
-      postgres:
-        image: postgres:16
+  verify-vercel-preview:
+    name: Verify Vercel Preview Deployment
+    runs-on: ubuntu-latest
+    needs: [ci]
+    if: ${{ !cancelled() && needs.ci.result == 'success' && github.ref != 'refs/heads/main' }}
+
+    steps:
+      - name: Inspect Vercel Git integration deployment for exact commit SHA
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres_ci_password
-          POSTGRES_DB: tiffzy_ci_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U postgres -d tiffzy_ci_test"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=12
-
-    env:
-      NODE_ENV: test
-      PORT: "3100"
-      HOST: "127.0.0.1"
-      DATABASE_URL: "postgresql://postgres:postgres_ci_password@localhost:5432/tiffzy_ci_test?schema=public"
-      JWT_SECRET: "ci-ephemeral-jwt-secret-not-for-staging-or-prod"
-      FRONTEND_URL: "https://staging-preview.example.com"
-      CORS_ORIGINS: "https://staging-preview.example.com,http://localhost:5173"
-      CORS_ORIGIN_PATTERNS: "https://cafe-system-*.vercel.app"
-
-    steps:
-      - name: Checkout exact feature branch commit
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Verify branch name and commit SHA
+          GH_TOKEN: ${{ github.token }}
+          VERCEL_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          EXPECTED_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          EXACT_SHA="$(git rev-parse HEAD)"
-          echo "Branch ref_name: ${GITHUB_REF_NAME}"
-          echo "Checked out SHA: ${EXACT_SHA}"
-          if [ "${GITHUB_REF_NAME}" = "main" ] || [ "${GITHUB_REF_NAME}" != "feature/twm-pay-integration" ]; then
-            echo "::error::Staging workflow must run strictly on feature/twm-pay-integration (got '${GITHUB_REF_NAME}')."
-            exit 1
-          fi
-          if [ "${EXACT_SHA}" != "${GITHUB_SHA}" ]; then
-            echo "::error::Checked out SHA (${EXACT_SHA}) does not match GITHUB_SHA (${GITHUB_SHA})."
-            exit 1
-          fi
+          DEPLOYMENT_JSON=""
+          for i in $(seq 1 12); do
+            DEPLOYMENT_JSON=$(gh api "repos/${GITHUB_REPOSITORY}/deployments?sha=${EXPECTED_SHA}&environment=Preview&per_page=5" | jq '.[0] // empty')
+            if [ -n "${DEPLOYMENT_JSON}" ]; then
+              break
+            fi
+            echo "Waiting for Vercel Preview deployment record for ${EXPECTED_SHA}... (${i}/12)"
+            sleep 5
+          done
 
-      - name: Set up Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: backend/package-lock.json
-
-      - name: Install backend dependencies
-        working-directory: backend
-        run: npm ci
-
-      - name: Generate Prisma client and push schema to ephemeral CI database
-        working-directory: backend
-        run: |
-          npx prisma generate
-          npx prisma db push --skip-generate
-
-      - name: Smoke-test backend boot configuration
-        working-directory: backend
-        run: VALIDATE_BOOT=1 NODE_ENV=production node src/server.js
-
-      - name: Run targeted TWM Pay & payment backend tests (required)
-        working-directory: backend
-        run: |
-          set -euo pipefail
-          mkdir -p test-reports
-          node --test --test-reporter=spec src/tests/twmPay.integration.test.js 2>&1 | tee test-reports/twm-pay-backend.log
-          node --test --test-reporter=spec \
-            src/tests/cashfree.payment.test.js \
-            src/tests/cashfreePpiPreparation.test.js \
-            src/tests/checkoutAmountCalculation.test.js \
-            src/tests/unifiedBillingSystem.test.js \
-            src/tests/billingP0P1Fixes.test.js 2>&1 | tee test-reports/payment-billing-backend.log
-
-      - name: Run full backend test suite
-        working-directory: backend
-        run: |
-          set +e
-          node --test --test-reporter=spec --test-concurrency=1 src/tests/*.test.js 2>&1 | tee test-reports/backend-full.log
-          BACKEND_FULL_EXIT=${PIPESTATUS[0]}
-          set -e
-          echo "BACKEND_FULL_EXIT=${BACKEND_FULL_EXIT}" >> "$GITHUB_ENV"
-          exit "${BACKEND_FULL_EXIT}"
-
-      - name: Publish backend test summary
-        if: always()
-        working-directory: backend
-        run: |
-          node -e '
-            const fs = require("node:fs");
-            const extract = (file) => {
-              if (!fs.existsSync(file)) return null;
-              const text = fs.readFileSync(file, "utf8");
-              const matchNum = (re) => {
-                const all = [...text.matchAll(re)];
-                return all.length ? all[all.length - 1][1] : "0";
-              };
-              const tests = matchNum(/^[ℹ#]\s+tests\s+(\d+)/gm);
-              const pass = matchNum(/^[ℹ#]\s+pass\s+(\d+)/gm);
-              const fail = matchNum(/^[ℹ#]\s+fail\s+(\d+)/gm);
-              const skipped = matchNum(/^[ℹ#]\s+skipped\s+(\d+)/gm);
-              const failedLines = text
-                .split(/\r?\n/)
-                .filter((l) => /^\s*✖\s+/.test(l))
-                .map((l) => l.trim());
-              return { tests, pass, fail, skipped, failedLines };
-            };
-
-            const lines = [
-              "## Backend CI Results",
-              "",
-              `- **Branch**: \`${process.env.GITHUB_REF_NAME}\``,
-              `- **Commit**: \`${process.env.GITHUB_SHA}\``,
-              "",
-              "| Suite | Total | Passed | Failed | Skipped |",
-              "| --- | --- | --- | --- | --- |",
-            ];
-
-            const twm = extract("test-reports/twm-pay-backend.log");
-            if (twm) {
-              lines.push(`| Targeted TWM Pay (\`twmPay.integration.test.js\`) | ${twm.tests} | ${twm.pass} | ${twm.fail} | ${twm.skipped} |`);
-            }
-            const pay = extract("test-reports/payment-billing-backend.log");
-            if (pay) {
-              lines.push(`| Payment & Billing Regression Suites | ${pay.tests} | ${pay.pass} | ${pay.fail} | ${pay.skipped} |`);
-            }
-            const full = extract("test-reports/backend-full.log");
-            if (full) {
-              lines.push(`| Full Backend Suite (\`src/tests/*.test.js\`) | ${full.tests} | ${full.pass} | ${full.fail} | ${full.skipped} |`);
-              if (Number(full.fail) > 0 && full.failedLines.length > 0) {
-                lines.push("", "### Unrelated Backend Suite Failures (Reported Separately)", "");
-                for (const fl of [...new Set(full.failedLines)].slice(0, 25)) {
-                  lines.push(`- ${fl}`);
-                }
-              }
-            }
-
-            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
-          '
-
-      - name: Upload backend test logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-test-results
-          path: backend/test-reports/
-          if-no-files-found: ignore
-
-  frontend-ci:
-    name: Frontend CI (TWM Pay Targeted, Full Suite & Staging Build)
-    runs-on: ubuntu-latest
-    if: ${{ github.ref == 'refs/heads/feature/twm-pay-integration' }}
-
-    steps:
-      - name: Checkout exact feature branch commit
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Verify branch name and commit SHA
-        run: |
-          set -euo pipefail
-          EXACT_SHA="$(git rev-parse HEAD)"
-          echo "Branch ref_name: ${GITHUB_REF_NAME}"
-          echo "Checked out SHA: ${EXACT_SHA}"
-          if [ "${GITHUB_REF_NAME}" = "main" ] || [ "${GITHUB_REF_NAME}" != "feature/twm-pay-integration" ]; then
-            echo "::error::Staging workflow must run strictly on feature/twm-pay-integration (got '${GITHUB_REF_NAME}')."
-            exit 1
-          fi
-
-      - name: Set up Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Run targeted TWM Pay frontend tests (required)
-        working-directory: frontend
-        run: |
-          set -euo pipefail
-          mkdir -p test-reports
-          npx vitest run src/__tests__/twmPayIntegration.test.jsx --reporter=verbose --reporter=json --outputFile=test-reports/twm-pay-frontend.json 2>&1 | tee test-reports/twm-pay-frontend.log
-
-      - name: Run full frontend test suite (report unrelated failures separately)
-        working-directory: frontend
-        run: |
-          set +e
-          npx vitest run --reporter=verbose --reporter=json --outputFile=test-reports/frontend-full.json 2>&1 | tee test-reports/frontend-full.log
-          FULL_EXIT=${PIPESTATUS[0]}
-          set -e
-          echo "FRONTEND_FULL_EXIT=${FULL_EXIT}" >> "$GITHUB_ENV"
-          # Ensure TWM Pay tests passed inside the full run too; do not fail staging build on pre-existing unrelated frontend test failures.
-          node -e '
-            const fs = require("node:fs");
-            const data = JSON.parse(fs.readFileSync("test-reports/frontend-full.json", "utf8"));
-            const twm = (data.testResults || []).find((r) => String(r.name || "").endsWith("twmPayIntegration.test.jsx"));
-            if (!twm || twm.status !== "passed") {
-              console.error("ERROR: TWM Pay frontend suite did not pass in full Vitest run.");
-              process.exit(1);
-            }
-            const unrelatedFailed = (data.testResults || []).filter((r) => r.status === "failed" && !String(r.name || "").endsWith("twmPayIntegration.test.jsx"));
-            console.log(`Unrelated failing frontend test files: ${unrelatedFailed.length}`);
-            for (const f of unrelatedFailed) {
-              console.log(` - ${f.name}`);
-            }
-          '
-
-      - name: Build frontend with staging preview configuration
-        working-directory: frontend
-        env:
-          VITE_API_URL: https://staging-api.tiffzy.com
-          VITE_API_BASE_URL: https://staging-api.tiffzy.com
-          VITE_SOCKET_URL: https://staging-api.tiffzy.com
-          VITE_CASHFREE_ENV: SANDBOX
-        run: |
-          set -euo pipefail
-          npm run build
-          test -f dist/index.html
-          if ! grep -rq "staging-api.tiffzy.com" dist/assets/*.js; then
-            echo "::error::Expected staging-api.tiffzy.com to be compiled into staging frontend build."
-            exit 1
-          fi
-          echo "Staging frontend build succeeded at frontend/dist/"
-
-      - name: Publish frontend test and build summary
-        if: always()
-        working-directory: frontend
-        run: |
-          node -e '
-            const fs = require("node:fs");
-            const lines = [
-              "## Frontend CI Results",
-              "",
-              `- **Branch**: \`${process.env.GITHUB_REF_NAME}\``,
-              `- **Commit**: \`${process.env.GITHUB_SHA}\``,
-              "",
-              "| Check | Status | Details |",
-              "| --- | --- | --- |",
-            ];
-
-            if (fs.existsSync("test-reports/twm-pay-frontend.json")) {
-              const twm = JSON.parse(fs.readFileSync("test-reports/twm-pay-frontend.json", "utf8"));
-              lines.push(`| Targeted TWM Pay (\`twmPayIntegration.test.jsx\`) | ${twm.success ? "PASSED" : "FAILED"} | ${twm.numPassedTests}/${twm.numTotalTests} tests passed |`);
-            }
-
-            if (fs.existsSync("test-reports/frontend-full.json")) {
-              const full = JSON.parse(fs.readFileSync("test-reports/frontend-full.json", "utf8"));
-              const failedFiles = (full.testResults || []).filter((r) => r.status === "failed");
-              const passedFiles = (full.testResults || []).filter((r) => r.status === "passed");
-              lines.push(`| Full Frontend Suite (\`npm run test:run\`) | ${failedFiles.length === 0 ? "PASSED" : "UNRELATED FAILURES"} | Files: ${passedFiles.length}/${(full.testResults || []).length} passed; Tests: ${full.numPassedTests}/${full.numTotalTests} passed (${full.numFailedTests} failed) |`);
-
-              const buildOk = fs.existsSync("dist/index.html");
-              lines.push(`| Staging Frontend Build (\`vite build\`) | ${buildOk ? "PASSED" : "FAILED"} | \`VITE_API_URL=https://staging-api.tiffzy.com\`, \`VITE_CASHFREE_ENV=SANDBOX\` |`);
-
-              if (failedFiles.length > 0) {
-                lines.push("", "### Unrelated Pre-existing Frontend Test Failures (Reported Separately)", "");
-                for (const file of failedFiles) {
-                  const rel = String(file.name || "").replace(/^.*\/frontend\//, "");
-                  const failCount = (file.assertionResults || []).filter((a) => a.status === "failed").length;
-                  lines.push(`- \`${rel}\` (${failCount} failed test(s))`);
-                }
-              }
-            }
-
-            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
-          '
-
-      - name: Upload frontend test reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-test-results
-          path: frontend/test-reports/
-          if-no-files-found: ignore
-
-  android-ci:
-    name: Android CI (Unit Tests & Staging APK)
-    runs-on: ubuntu-latest
-    if: ${{ github.ref == 'refs/heads/feature/twm-pay-integration' }}
-
-    steps:
-      - name: Checkout exact feature branch commit
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Verify branch name and commit SHA
-        run: |
-          set -euo pipefail
-          if [ "${GITHUB_REF_NAME}" = "main" ] || [ "${GITHUB_REF_NAME}" != "feature/twm-pay-integration" ]; then
-            echo "::error::Staging workflow must run strictly on feature/twm-pay-integration."
-            exit 1
-          fi
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: "21"
-          distribution: "temurin"
-
-      - name: Install required Android SDK platform and accept licenses
-        run: |
-          set -euo pipefail
-          mkdir -p android-test-reports
-          echo "Java version:" | tee android-test-reports/env.log
-          java -version 2>&1 | tee -a android-test-reports/env.log
-
-          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
-          export ANDROID_HOME="$SDK_ROOT"
-          export ANDROID_SDK_ROOT="$SDK_ROOT"
-          echo "ANDROID_HOME=${ANDROID_HOME}" | tee -a android-test-reports/env.log
-
-          SDKMANAGER=$(command -v sdkmanager || find "$SDK_ROOT" -name sdkmanager -type f 2>/dev/null | head -n1 || true)
-          if [ -z "$SDKMANAGER" ]; then
-            echo "::error::sdkmanager not found on runner."
-            exit 1
-          fi
-          echo "Using sdkmanager: ${SDKMANAGER}" | tee -a android-test-reports/env.log
-
-          # Accept SDK licenses directly without android-actions/setup-android calling deprecated 'tools' package
-          (set +o pipefail; yes | "$SDKMANAGER" --licenses >/dev/null 2>&1) || true
-
-          COMPILE_SDK=$(grep -E 'compileSdk\s*=' app/build.gradle.kts | head -n1 | sed -E 's/[^0-9]//g')
-          echo "Project compileSdk=${COMPILE_SDK}" | tee -a android-test-reports/env.log
-
-          # Write sdkmanager output to a file first so pipefail never fails on SIGPIPE during early match exit
-          "$SDKMANAGER" --list > /tmp/android-sdk-list.txt 2>/dev/null || true
-          SDK_PLATFORM_PKG=$(awk -v ver="${COMPILE_SDK}" '$1 ~ ("^platforms;android-" ver "(\\.0)?$") {print $1; exit}' /tmp/android-sdk-list.txt || true)
-          if [ -z "$SDK_PLATFORM_PKG" ]; then
-            echo "::error::Runner Android SDK repository does not provide platforms;android-${COMPILE_SDK}(.0)."
-            grep "platforms;android-" /tmp/android-sdk-list.txt | tail -n 20 || true
-            exit 1
-          fi
-
-          echo "Installing SDK packages: ${SDK_PLATFORM_PKG} platform-tools" | tee -a android-test-reports/env.log
-          (set +o pipefail; yes | "$SDKMANAGER" "${SDK_PLATFORM_PKG}" "platform-tools")
-          chmod +x ./gradlew || true
-
-      - name: Run Android unit tests (including TwmPayHelperTest)
-        run: |
-          set -euo pipefail
-          ./gradlew testDebugUnitTest --no-daemon --console=plain 2>&1 | tee android-test-reports/gradle-test.log
-
-      - name: Build staging debug APK and verify TIFFZY_BASE_URL override
-        run: |
-          set -euo pipefail
-          STAGING_URL="https://staging-api.tiffzy.com/"
-          ./gradlew assembleDebug -PTIFFZY_BASE_URL=https://staging-api.tiffzy.com --no-daemon --console=plain 2>&1 | tee android-test-reports/gradle-apk.log
-          BUILD_CFG="app/build/generated/source/buildConfig/debug/com/tiffzy/app/BuildConfig.java"
-          APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
-          test -f "$BUILD_CFG"
-          test -f "$APK_PATH"
-          if ! grep -Fq "BASE_URL = \"${STAGING_URL}\"" "$BUILD_CFG"; then
-            echo "::error::Staging BuildConfig.BASE_URL mismatch in ${BUILD_CFG}:"
-            grep -n "BASE_URL" "$BUILD_CFG" || true
-            exit 1
-          fi
-          APK_SIZE=$(stat -c%s "$APK_PATH" 2>/dev/null || wc -c < "$APK_PATH")
           {
-            echo "STAGING_BUILD_CONFIG_BASE_URL=${STAGING_URL}"
-            echo "STAGING_APK_PATH=${APK_PATH}"
-            echo "STAGING_APK_BYTES=${APK_SIZE}"
-          } | tee android-test-reports/apk-meta.env
+            echo "## Vercel Preview Verification"
+            echo ""
+            echo "- **Expected Commit SHA**: \`${EXPECTED_SHA}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Publish Android test & APK build summary
-        if: always()
-        run: |
-          python3 - << 'PYEOF'
-          import glob, os, xml.etree.ElementTree as ET
+          if [ -z "${DEPLOYMENT_JSON}" ]; then
+            echo "No Vercel Preview deployment record found yet for ${EXPECTED_SHA}."
+            echo "- **Deployment Status**: Pending / not yet created by Vercel Git integration" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
 
-          summary = ["## Android CI Results", ""]
-          summary.append(f"- **Branch**: `{os.environ.get('GITHUB_REF_NAME', '')}`")
-          summary.append(f"- **Commit**: `{os.environ.get('GITHUB_SHA', '')}`")
+          DEPLOY_ID=$(echo "${DEPLOYMENT_JSON}" | jq -r '.id')
+          DEPLOY_SHA=$(echo "${DEPLOYMENT_JSON}" | jq -r '.sha')
 
-          xml_files = sorted(glob.glob("app/build/test-results/testDebugUnitTest/TEST-*.xml"))
-          if not xml_files:
-              summary.append("- **Unit Tests**: NO XML TEST REPORTS GENERATED")
-          else:
-              summary.extend(["", "| Test Suite | Tests | Failures | Errors | Skipped |", "| --- | --- | --- | --- | --- |"])
-              total_t = total_f = total_e = total_s = 0
-              for xf in xml_files:
-                  root = ET.parse(xf).getroot()
-                  name = root.attrib.get("name", os.path.basename(xf))
-                  t = int(root.attrib.get("tests", 0))
-                  f = int(root.attrib.get("failures", 0))
-                  e = int(root.attrib.get("errors", 0))
-                  s = int(root.attrib.get("skipped", 0))
-                  total_t += t; total_f += f; total_e += e; total_s += s
-                  summary.append(f"| `{name}` | {t} | {f} | {e} | {s} |")
-              summary.append(f"| **Total** | **{total_t}** | **{total_f}** | **{total_e}** | **{total_s}** |")
+          STATUS_JSON="{}"
+          for i in $(seq 1 18); do
+            LATEST_STATUS=$(gh api "repos/${GITHUB_REPOSITORY}/deployments/${DEPLOY_ID}/statuses" | jq -c '.[0] // empty')
+            if [ -n "${LATEST_STATUS}" ]; then
+              STATUS_JSON="${LATEST_STATUS}"
+            fi
+            STATE=$(echo "${STATUS_JSON}" | jq -r '.state // "pending"')
+            if [ "${STATE}" = "success" ] || [ "${STATE}" = "failure" ] || [ "${STATE}" = "error" ]; then
+              break
+            fi
+            echo "Waiting for Vercel Preview deployment ${DEPLOY_ID} state=${STATE}... (${i}/18)"
+            sleep 5
+          done
 
-          meta_path = "android-test-reports/apk-meta.env"
-          if os.path.exists(meta_path):
-              meta = dict(line.strip().split("=", 1) for line in open(meta_path, encoding="utf-8") if "=" in line)
-              summary.append("")
-              summary.append(f"- **Staging Debug APK**: `{meta.get('STAGING_APK_PATH', '')}` ({meta.get('STAGING_APK_BYTES', '')} bytes)")
-              summary.append(f"- **Verified BuildConfig.BASE_URL**: `{meta.get('STAGING_BUILD_CONFIG_BASE_URL', '')}`")
+          STATE=$(echo "${STATUS_JSON}" | jq -r '.state // "unknown"')
+          TARGET_URL=$(echo "${STATUS_JSON}" | jq -r '.environment_url // .target_url // ""')
+          echo "Vercel deployment ID: ${DEPLOY_ID}, state: ${STATE}, sha: ${DEPLOY_SHA}, url: ${TARGET_URL}"
 
-          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as fh:
-              fh.write("\n".join(summary) + "\n")
-          PYEOF
+          {
+            echo "- **Deployment ID**: \`${DEPLOY_ID}\`"
+            echo "- **Deployed Commit SHA**: \`${DEPLOY_SHA}\`"
+            echo "- **Deployment State**: \`${STATE}\`"
+            echo "- **Preview URL**: ${TARGET_URL}"
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload Android test reports and staging debug APK
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-test-and-apk-results
-          path: |
-            android-test-reports/
-            app/build/test-results/testDebugUnitTest/
-            app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: ignore
+          if [ -n "${TARGET_URL}" ]; then
+            if [ -n "${VERCEL_BYPASS}" ]; then
+              HTML=$(curl -fsSL -H "x-vercel-protection-bypass: ${VERCEL_BYPASS}" "${TARGET_URL}")
+              BUNDLE_PATH=$(echo "${HTML}" | grep -oE '/assets/index-[^" ]+\.js' | head -n1 || true)
+              if [ -n "${BUNDLE_PATH}" ]; then
+                BUNDLE_JS=$(curl -fsSL -H "x-vercel-protection-bypass: ${VERCEL_BYPASS}" "${TARGET_URL}${BUNDLE_PATH}")
+                if echo "${BUNDLE_JS}" | grep -q "staging-api.tiffzy.com"; then
+                  echo "Verified live Preview bundle routes to staging-api.tiffzy.com"
+                  echo "- **Live Bundle API Check**: Verified \`staging-api.tiffzy.com\` (authorized bypass)" >> "$GITHUB_STEP_SUMMARY"
+                else
+                  echo "::warning::Live Preview bundle does not contain staging-api.tiffzy.com (check Vercel Preview env vars)."
+                  echo "- **Live Bundle API Check**: \`staging-api.tiffzy.com\` NOT found in live bundle (check Vercel Preview env vars)" >> "$GITHUB_STEP_SUMMARY"
+                fi
+              fi
+            else
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${TARGET_URL}" || true)
+              echo "Unauthenticated probe to ${TARGET_URL} returned HTTP ${HTTP_CODE}"
+              echo "- **Access Check**: HTTP \`${HTTP_CODE}\` (Vercel Deployment Protection / SSO active)" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
 
   deploy-staging:
     name: Deploy Backend to Isolated AWS Staging
     runs-on: ubuntu-latest
-    needs: [backend-ci, frontend-ci, android-ci, verify-vercel-preview]
+    needs: [ci]
     if: >-
       ${{
         !cancelled() &&
-        needs.backend-ci.result == 'success' &&
-        needs.frontend-ci.result == 'success' &&
-        needs.android-ci.result == 'success' &&
-        needs.verify-vercel-preview.result == 'success' &&
-        github.ref == 'refs/heads/feature/twm-pay-integration' &&
-        (github.event_name == 'push' || (github.event.inputs.deploy_backend != false && github.event.inputs.deploy_backend != 'false'))
+        needs.ci.result == 'success' &&
+        (github.event_name != 'workflow_dispatch' || (github.event.inputs.deploy_backend != false && github.event.inputs.deploy_backend != 'false'))
       }}
     environment: staging
 
     steps:
-      - name: Checkout exact feature branch commit
+      - name: Checkout target commit
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
@@ -485,7 +141,7 @@ jobs:
           STAGING_TWM_SIGNING_KEY: ${{ secrets.STAGING_TWM_SIGNING_KEY }}
           TWM_ENABLED: ${{ vars.STAGING_TWM_ENABLED || 'true' }}
           TWM_NOTIFY_URL: ${{ vars.STAGING_TWM_NOTIFY_URL || 'https://staging-api.tiffzy.com/api/payments/twm/notify' }}
-          TWM_RETURN_URL: ${{ vars.STAGING_TWM_RETURN_URL || 'https://cafe-system-git-feature-twm-p-ebc5a0-anilchowdary4531s-projects.vercel.app/payment-status' }}
+          TWM_RETURN_URL: ${{ vars.STAGING_TWM_RETURN_URL || '' }}
           STAGING_API_HOST: staging-api.tiffzy.com
         run: |
           set -euo pipefail
@@ -560,15 +216,15 @@ jobs:
             exit 1
           fi
 
-      - name: Deploy feature branch commit to isolated AWS staging via SSH
+      - name: Deploy target commit to isolated AWS staging via SSH
         uses: appleboy/ssh-action@v1.2.0
         env:
           TARGET_SHA: ${{ github.sha }}
-          FEATURE_BRANCH: ${{ github.ref_name }}
+          TARGET_BRANCH: ${{ github.ref_name }}
           STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
           STAGING_JWT_SECRET: ${{ secrets.STAGING_JWT_SECRET }}
-          STAGING_FRONTEND_URL: ${{ vars.STAGING_FRONTEND_URL || 'https://cafe-system-git-feature-twm-p-ebc5a0-anilchowdary4531s-projects.vercel.app' }}
-          STAGING_CORS_ORIGINS: ${{ vars.STAGING_CORS_ORIGINS || 'https://cafe-system-git-feature-twm-p-ebc5a0-anilchowdary4531s-projects.vercel.app,http://localhost:5173' }}
+          STAGING_FRONTEND_URL: ${{ vars.STAGING_FRONTEND_URL || 'https://staging-preview.tiffzy.com' }}
+          STAGING_CORS_ORIGINS: ${{ vars.STAGING_CORS_ORIGINS || 'https://staging-preview.tiffzy.com,http://localhost:5173' }}
           STAGING_CORS_ORIGIN_PATTERNS: ${{ vars.STAGING_CORS_ORIGIN_PATTERNS || 'https://cafe-system-*.vercel.app' }}
           STAGING_BACKEND_URL: "https://staging-api.tiffzy.com"
           STAGING_CASHFREE_CLIENT_ID: ${{ secrets.STAGING_CASHFREE_CLIENT_ID || '' }}
@@ -579,12 +235,12 @@ jobs:
           TWM_SIGNING_KEY: ${{ secrets.STAGING_TWM_SIGNING_KEY }}
           TWM_URL: ${{ vars.STAGING_TWM_URL || 'https://pay.thewebsitemakers.in' }}
           TWM_NOTIFY_URL: ${{ vars.STAGING_TWM_NOTIFY_URL || 'https://staging-api.tiffzy.com/api/payments/twm/notify' }}
-          TWM_RETURN_URL: ${{ vars.STAGING_TWM_RETURN_URL || 'https://cafe-system-git-feature-twm-p-ebc5a0-anilchowdary4531s-projects.vercel.app/payment-status' }}
+          TWM_RETURN_URL: ${{ vars.STAGING_TWM_RETURN_URL || '' }}
         with:
           host: ${{ secrets.STAGING_EC2_HOST }}
           username: ${{ secrets.STAGING_EC2_USER }}
           key: ${{ secrets.STAGING_EC2_SSH_KEY }}
-          envs: TARGET_SHA,FEATURE_BRANCH,STAGING_DATABASE_URL,STAGING_JWT_SECRET,STAGING_FRONTEND_URL,STAGING_CORS_ORIGINS,STAGING_CORS_ORIGIN_PATTERNS,STAGING_BACKEND_URL,STAGING_CASHFREE_CLIENT_ID,STAGING_CASHFREE_CLIENT_SECRET,TWM_ENABLED,TWM_MERCHANT_ID,TWM_API_SECRET,TWM_SIGNING_KEY,TWM_URL,TWM_NOTIFY_URL,TWM_RETURN_URL
+          envs: TARGET_SHA,TARGET_BRANCH,STAGING_DATABASE_URL,STAGING_JWT_SECRET,STAGING_FRONTEND_URL,STAGING_CORS_ORIGINS,STAGING_CORS_ORIGIN_PATTERNS,STAGING_BACKEND_URL,STAGING_CASHFREE_CLIENT_ID,STAGING_CASHFREE_CLIENT_SECRET,TWM_ENABLED,TWM_MERCHANT_ID,TWM_API_SECRET,TWM_SIGNING_KEY,TWM_URL,TWM_NOTIFY_URL,TWM_RETURN_URL
           script: |
             set -euo pipefail
 
@@ -595,11 +251,6 @@ jobs:
 
             if [ "$STAGING_DIR" = "/home/ubuntu/cafe-system" ] || [ "$STAGING_SERVICE" = "tiffzy" ]; then
               echo "ERROR: Refusing to touch production directory or production systemd unit."
-              exit 1
-            fi
-
-            if [ "$FEATURE_BRANCH" = "main" ]; then
-              echo "ERROR: Refusing to deploy main to staging."
               exit 1
             fi
 
@@ -614,12 +265,12 @@ jobs:
             fi
 
             if [ ! -d "$STAGING_DIR/.git" ]; then
-              git clone --branch "$FEATURE_BRANCH" "$REPO_URL" "$STAGING_DIR"
+              git clone --branch "$TARGET_BRANCH" "$REPO_URL" "$STAGING_DIR"
             fi
 
             cd "$STAGING_DIR"
-            git fetch origin "$FEATURE_BRANCH"
-            git checkout -B "$FEATURE_BRANCH" "origin/$FEATURE_BRANCH"
+            git fetch origin "$TARGET_BRANCH"
+            git checkout -B "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
             git checkout --detach "$TARGET_SHA"
 
             DEPLOYED_HEAD=$(git rev-parse HEAD)
@@ -718,90 +369,3 @@ jobs:
               throw new Error("Expected TWM Pay to report configured=true on staging");
             }
           ' "${HEALTH_JSON}" "${PROVIDERS_JSON}"
-
-  verify-vercel-preview:
-    name: Verify Vercel Preview Deployment
-    runs-on: ubuntu-latest
-    needs: [frontend-ci]
-    if: ${{ !cancelled() && needs.frontend-ci.result == 'success' && github.ref == 'refs/heads/feature/twm-pay-integration' }}
-
-    steps:
-      - name: Inspect Vercel Git integration deployment for exact commit SHA
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERCEL_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-          EXPECTED_SHA: ${{ github.sha }}
-          PREVIEW_BRANCH_ALIAS: https://cafe-system-git-feature-twm-p-ebc5a0-anilchowdary4531s-projects.vercel.app
-        run: |
-          set -euo pipefail
-          DEPLOYMENT_JSON=""
-          for i in $(seq 1 12); do
-            DEPLOYMENT_JSON=$(gh api "repos/${GITHUB_REPOSITORY}/deployments?sha=${EXPECTED_SHA}&environment=Preview&per_page=5" | jq '.[0] // empty')
-            if [ -n "${DEPLOYMENT_JSON}" ]; then
-              break
-            fi
-            echo "Waiting for Vercel Preview deployment record for ${EXPECTED_SHA}... (${i}/12)"
-            sleep 5
-          done
-
-          {
-            echo "## Vercel Preview Verification"
-            echo ""
-            echo "- **Expected Commit SHA**: \`${EXPECTED_SHA}\`"
-            echo "- **Branch Alias URL**: ${PREVIEW_BRANCH_ALIAS}"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          if [ -z "${DEPLOYMENT_JSON}" ]; then
-            echo "No Vercel Preview deployment record found yet for ${EXPECTED_SHA}."
-            echo "- **Deployment Status**: Pending / not yet created by Vercel Git integration" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          DEPLOY_ID=$(echo "${DEPLOYMENT_JSON}" | jq -r '.id')
-          DEPLOY_SHA=$(echo "${DEPLOYMENT_JSON}" | jq -r '.sha')
-
-          STATUS_JSON="{}"
-          for i in $(seq 1 18); do
-            LATEST_STATUS=$(gh api "repos/${GITHUB_REPOSITORY}/deployments/${DEPLOY_ID}/statuses" | jq -c '.[0] // empty')
-            if [ -n "${LATEST_STATUS}" ]; then
-              STATUS_JSON="${LATEST_STATUS}"
-            fi
-            STATE=$(echo "${STATUS_JSON}" | jq -r '.state // "pending"')
-            if [ "${STATE}" = "success" ] || [ "${STATE}" = "failure" ] || [ "${STATE}" = "error" ]; then
-              break
-            fi
-            echo "Waiting for Vercel Preview deployment ${DEPLOY_ID} state=${STATE}... (${i}/18)"
-            sleep 5
-          done
-
-          STATE=$(echo "${STATUS_JSON}" | jq -r '.state // "unknown"')
-          TARGET_URL=$(echo "${STATUS_JSON}" | jq -r '.environment_url // .target_url // ""')
-          echo "Vercel deployment ID: ${DEPLOY_ID}, state: ${STATE}, sha: ${DEPLOY_SHA}, url: ${TARGET_URL}"
-
-          {
-            echo "- **Deployment ID**: \`${DEPLOY_ID}\`"
-            echo "- **Deployed Commit SHA**: \`${DEPLOY_SHA}\`"
-            echo "- **Deployment State**: \`${STATE}\`"
-            echo "- **Preview URL**: ${TARGET_URL}"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          if [ -n "${TARGET_URL}" ]; then
-            if [ -n "${VERCEL_BYPASS}" ]; then
-              HTML=$(curl -fsSL -H "x-vercel-protection-bypass: ${VERCEL_BYPASS}" "${TARGET_URL}")
-              BUNDLE_PATH=$(echo "${HTML}" | grep -oE '/assets/index-[^" ]+\.js' | head -n1 || true)
-              if [ -n "${BUNDLE_PATH}" ]; then
-                BUNDLE_JS=$(curl -fsSL -H "x-vercel-protection-bypass: ${VERCEL_BYPASS}" "${TARGET_URL}${BUNDLE_PATH}")
-                if echo "${BUNDLE_JS}" | grep -q "staging-api.tiffzy.com"; then
-                  echo "Verified live Preview bundle routes to staging-api.tiffzy.com"
-                  echo "- **Live Bundle API Check**: Verified \`staging-api.tiffzy.com\` (authorized bypass)" >> "$GITHUB_STEP_SUMMARY"
-                else
-                  echo "::warning::Live Preview bundle does not contain staging-api.tiffzy.com (check Vercel Preview env vars)."
-                  echo "- **Live Bundle API Check**: \`staging-api.tiffzy.com\` NOT found in live bundle (check Vercel Preview env vars)" >> "$GITHUB_STEP_SUMMARY"
-                fi
-              fi
-            else
-              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${TARGET_URL}" || true)
-              echo "Unauthenticated probe to ${TARGET_URL} returned HTTP ${HTTP_CODE}"
-              echo "- **Access Check**: HTTP \`${HTTP_CODE}\` (Vercel Deployment Protection / SSO active; configure \`VERCEL_AUTOMATION_BYPASS_SECRET\` for automated bundle inspection)" >> "$GITHUB_STEP_SUMMARY"
-            fi
-          fi

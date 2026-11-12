@@ -1,0 +1,539 @@
+name: CI Pipeline (Backend, Frontend & Android)
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+  pull_request:
+    branches:
+      - main
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  backend-ci:
+    name: Backend CI (Prisma, Targeted Payment & Full Suite)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_ci_password
+          POSTGRES_DB: tiffzy_ci_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d tiffzy_ci_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=12
+
+    env:
+      NODE_ENV: test
+      PORT: "3100"
+      HOST: "127.0.0.1"
+      DATABASE_URL: "postgresql://postgres:postgres_ci_password@localhost:5432/tiffzy_ci_test?schema=public"
+      JWT_SECRET: "ci-ephemeral-jwt-secret-not-for-staging-or-prod"
+      FRONTEND_URL: "https://staging-preview.example.com"
+      CORS_ORIGINS: "https://staging-preview.example.com,http://localhost:5173"
+      CORS_ORIGIN_PATTERNS: "https://cafe-system-*.vercel.app"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Log ref and checked out commit
+        run: |
+          set -euo pipefail
+          echo "Event: ${GITHUB_EVENT_NAME}"
+          echo "Ref: ${GITHUB_REF} (${GITHUB_REF_NAME})"
+          echo "Checked out HEAD: $(git rev-parse HEAD)"
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Validate Prisma schema, generate client, and push CI database schema
+        working-directory: backend
+        run: |
+          npx prisma validate
+          npx prisma generate
+          npx prisma db push --skip-generate
+
+      - name: Smoke-test backend boot configuration
+        working-directory: backend
+        run: VALIDATE_BOOT=1 NODE_ENV=production node src/server.js
+
+      - name: Run targeted TWM Pay, Cashfree, Wallet & Billing suites (required)
+        working-directory: backend
+        run: |
+          set -euo pipefail
+          mkdir -p test-reports
+          node --test --test-reporter=spec src/tests/twmPay.integration.test.js 2>&1 | tee test-reports/twm-pay-backend.log
+          node --test --test-reporter=spec --test-concurrency=1 \
+            src/tests/cashfree.payment.test.js \
+            src/tests/cashfreePpiPreparation.test.js \
+            src/tests/walletAnalytics.test.js \
+            src/tests/checkoutAmountCalculation.test.js \
+            src/tests/unifiedBillingSystem.test.js \
+            src/tests/billingP0P1Fixes.test.js 2>&1 | tee test-reports/payment-wallet-billing-backend.log
+
+      - name: Run full backend test suite (required)
+        working-directory: backend
+        run: |
+          set +e
+          node --test --test-reporter=spec --test-concurrency=1 src/tests/*.test.js 2>&1 | tee test-reports/backend-full.log
+          BACKEND_FULL_EXIT=${PIPESTATUS[0]}
+          set -e
+          echo "BACKEND_FULL_EXIT=${BACKEND_FULL_EXIT}" >> "$GITHUB_ENV"
+          node -e '
+            const fs = require("node:fs");
+            const text = fs.readFileSync("test-reports/backend-full.log", "utf8");
+            const matchNum = (re) => {
+              const all = [...text.matchAll(re)];
+              return all.length ? Number(all[all.length - 1][1]) : 0;
+            };
+            const tests = matchNum(/^[ℹ#]\s+tests\s+(\d+)/gm);
+            const pass = matchNum(/^[ℹ#]\s+pass\s+(\d+)/gm);
+            const fail = matchNum(/^[ℹ#]\s+fail\s+(\d+)/gm);
+            const skipped = matchNum(/^[ℹ#]\s+skipped\s+(\d+)/gm);
+            if (tests <= 0 || pass <= 0) {
+              console.error("ERROR: Backend test suite produced zero test results.");
+              process.exit(1);
+            }
+            if (skipped > 0 || fail > 0) {
+              console.error(`ERROR: Backend full suite had fail=${fail}, skipped=${skipped}.`);
+              process.exit(1);
+            }
+          '
+          exit "${BACKEND_FULL_EXIT}"
+
+      - name: Publish backend test summary
+        if: always()
+        working-directory: backend
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const extract = (file) => {
+              if (!fs.existsSync(file)) return null;
+              const text = fs.readFileSync(file, "utf8");
+              const matchNum = (re) => {
+                const all = [...text.matchAll(re)];
+                return all.length ? all[all.length - 1][1] : "0";
+              };
+              const tests = matchNum(/^[ℹ#]\s+tests\s+(\d+)/gm);
+              const pass = matchNum(/^[ℹ#]\s+pass\s+(\d+)/gm);
+              const fail = matchNum(/^[ℹ#]\s+fail\s+(\d+)/gm);
+              const skipped = matchNum(/^[ℹ#]\s+skipped\s+(\d+)/gm);
+              const failedLines = text
+                .split(/\r?\n/)
+                .filter((l) => /^\s*✖\s+/.test(l))
+                .map((l) => l.trim());
+              return { tests, pass, fail, skipped, failedLines };
+            };
+
+            const lines = [
+              "## Backend CI Results",
+              "",
+              `- **Branch / Ref**: \`${process.env.GITHUB_REF_NAME}\``,
+              `- **Commit**: \`${process.env.GITHUB_SHA}\``,
+              "",
+              "| Suite | Total | Passed | Failed | Skipped |",
+              "| --- | --- | --- | --- | --- |",
+            ];
+
+            const twm = extract("test-reports/twm-pay-backend.log");
+            if (twm) {
+              lines.push(`| Targeted TWM Pay (\`twmPay.integration.test.js\`) | ${twm.tests} | ${twm.pass} | ${twm.fail} | ${twm.skipped} |`);
+            }
+            const pay = extract("test-reports/payment-wallet-billing-backend.log");
+            if (pay) {
+              lines.push(`| Cashfree, Wallet & Billing Suites | ${pay.tests} | ${pay.pass} | ${pay.fail} | ${pay.skipped} |`);
+            }
+            const full = extract("test-reports/backend-full.log");
+            if (full) {
+              lines.push(`| Full Backend Suite (\`src/tests/*.test.js\`) | ${full.tests} | ${full.pass} | ${full.fail} | ${full.skipped} |`);
+              if (Number(full.fail) > 0 && full.failedLines.length > 0) {
+                lines.push("", "### Backend Failures", "");
+                for (const fl of [...new Set(full.failedLines)].slice(0, 25)) {
+                  lines.push(`- ${fl}`);
+                }
+              }
+            }
+
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+          '
+
+      - name: Upload backend test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: backend/test-reports/
+          if-no-files-found: ignore
+
+  frontend-ci:
+    name: Frontend CI (Targeted Suite, Full Suite & Builds)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run targeted TWM Pay, Wallet & Checkout frontend tests (required)
+        working-directory: frontend
+        run: |
+          set -euo pipefail
+          mkdir -p test-reports
+          npx vitest run \
+            src/__tests__/twmPayIntegration.test.jsx \
+            src/__tests__/walletRedesign.test.jsx \
+            src/__tests__/unifiedCheckout.test.jsx \
+            src/__tests__/thankYouNavigation.test.jsx \
+            src/__tests__/continueToPaymentBugFix.test.jsx \
+            src/__tests__/checkoutAmountCalculation.test.jsx \
+            --reporter=verbose --reporter=json --outputFile=test-reports/targeted-frontend.json 2>&1 | tee test-reports/targeted-frontend.log
+
+      - name: Run full frontend test suite (enforce no new regressions, report unrelated failures separately)
+        working-directory: frontend
+        run: |
+          set +e
+          npx vitest run --reporter=verbose --reporter=json --outputFile=test-reports/frontend-full.json 2>&1 | tee test-reports/frontend-full.log
+          FULL_EXIT=${PIPESTATUS[0]}
+          set -e
+          echo "FRONTEND_FULL_EXIT=${FULL_EXIT}" >> "$GITHUB_ENV"
+          node -e '
+            const fs = require("node:fs");
+            const data = JSON.parse(fs.readFileSync("test-reports/frontend-full.json", "utf8"));
+            const results = data.testResults || [];
+            if (!results.length) {
+              console.error("ERROR: Full frontend test suite produced no results.");
+              process.exit(1);
+            }
+
+            const requiredFiles = [
+              "twmPayIntegration.test.jsx",
+              "walletRedesign.test.jsx",
+              "unifiedCheckout.test.jsx",
+              "thankYouNavigation.test.jsx",
+              "continueToPaymentBugFix.test.jsx",
+              "checkoutAmountCalculation.test.jsx",
+            ];
+            for (const reqFile of requiredFiles) {
+              const hit = results.find((r) => String(r.name || "").endsWith(reqFile));
+              if (!hit || hit.status !== "passed") {
+                console.error(`ERROR: Mandatory frontend suite ${reqFile} did not pass in full Vitest run.`);
+                process.exit(1);
+              }
+            }
+
+            const knownUnrelatedFailures = new Set([
+              "src/__tests__/cashSettlementTableSync.test.jsx",
+              "src/__tests__/chefStationCompactLayout.test.jsx",
+              "src/__tests__/cleanerStationHistoryAndNotifications.test.jsx",
+              "src/__tests__/serverProfileNotifications.test.jsx",
+              "src/__tests__/stewardStationWorkspace.test.jsx",
+              "src/__tests__/swiperStationLayoutAndProfile.test.jsx",
+              "src/__tests__/tiffzyMapIntegration.test.jsx",
+            ]);
+
+            const failedFiles = results.filter((r) => r.status === "failed");
+            const unexpectedFailures = [];
+            for (const f of failedFiles) {
+              const rel = String(f.name || "").replace(/^.*\/frontend\//, "");
+              if (!knownUnrelatedFailures.has(rel)) {
+                unexpectedFailures.push(rel);
+              }
+            }
+
+            if (unexpectedFailures.length > 0) {
+              console.error("ERROR: New frontend test regressions detected:", unexpectedFailures);
+              process.exit(1);
+            }
+
+            console.log(`Tracked unrelated pre-existing failing files: ${failedFiles.length}`);
+          '
+
+      - name: Build frontend with staging configuration & verify secret isolation
+        working-directory: frontend
+        env:
+          VITE_API_URL: https://staging-api.tiffzy.com
+          VITE_API_BASE_URL: https://staging-api.tiffzy.com
+          VITE_SOCKET_URL: https://staging-api.tiffzy.com
+          VITE_CASHFREE_ENV: SANDBOX
+        run: |
+          set -euo pipefail
+          npm run build
+          test -f dist/index.html
+          if ! grep -rq "staging-api.tiffzy.com" dist/assets/*.js; then
+            echo "::error::Expected staging-api.tiffzy.com in staging frontend bundle."
+            exit 1
+          fi
+          if grep -rqE "TWM_API_SECRET|TWM_SIGNING_KEY|X-TWM-Secret" dist/assets/*.js; then
+            echo "::error::Sensitive TWM secret reference found in staging frontend bundle!"
+            exit 1
+          fi
+          mkdir -p build-artifacts/staging-dist
+          cp -R dist/* build-artifacts/staging-dist/
+
+      - name: Build frontend with production configuration & verify secret isolation
+        working-directory: frontend
+        env:
+          VITE_API_URL: https://api.tiffzy.com
+          VITE_API_BASE_URL: https://api.tiffzy.com
+          VITE_SOCKET_URL: https://api.tiffzy.com
+          VITE_CASHFREE_ENV: PRODUCTION
+        run: |
+          set -euo pipefail
+          npm run build
+          test -f dist/index.html
+          if grep -rqE "TWM_API_SECRET|TWM_SIGNING_KEY|X-TWM-Secret" dist/assets/*.js; then
+            echo "::error::Sensitive TWM secret reference found in production frontend bundle!"
+            exit 1
+          fi
+          mkdir -p build-artifacts/production-dist
+          cp -R dist/* build-artifacts/production-dist/
+
+      - name: Publish frontend test and build summary
+        if: always()
+        working-directory: frontend
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const lines = [
+              "## Frontend CI Results",
+              "",
+              `- **Branch / Ref**: \`${process.env.GITHUB_REF_NAME}\``,
+              `- **Commit**: \`${process.env.GITHUB_SHA}\``,
+              "",
+              "| Check | Status | Details |",
+              "| --- | --- | --- |",
+            ];
+
+            if (fs.existsSync("test-reports/targeted-frontend.json")) {
+              const t = JSON.parse(fs.readFileSync("test-reports/targeted-frontend.json", "utf8"));
+              lines.push(`| Targeted Payment, Wallet & Checkout | ${t.success ? "PASSED" : "FAILED"} | ${t.numPassedTests}/${t.numTotalTests} tests passed across ${(t.testResults || []).length} files |`);
+            }
+
+            if (fs.existsSync("test-reports/frontend-full.json")) {
+              const full = JSON.parse(fs.readFileSync("test-reports/frontend-full.json", "utf8"));
+              const failedFiles = (full.testResults || []).filter((r) => r.status === "failed");
+              const passedFiles = (full.testResults || []).filter((r) => r.status === "passed");
+              lines.push(`| Full Frontend Suite (\`npm run test:run\`) | ${failedFiles.length === 0 ? "PASSED" : "UNRELATED PRE-EXISTING FAILURES"} | Files: ${passedFiles.length}/${(full.testResults || []).length} passed; Tests: ${full.numPassedTests}/${full.numTotalTests} passed (${full.numFailedTests} failed) |`);
+
+              const stagingOk = fs.existsSync("build-artifacts/staging-dist/index.html");
+              const prodOk = fs.existsSync("build-artifacts/production-dist/index.html");
+              lines.push(`| Staging Frontend Build (\`vite build\`) | ${stagingOk ? "PASSED" : "FAILED"} | \`VITE_API_URL=https://staging-api.tiffzy.com\` |`);
+              lines.push(`| Production Frontend Build (\`vite build\`) | ${prodOk ? "PASSED" : "FAILED"} | \`VITE_API_URL=https://api.tiffzy.com\` |`);
+
+              if (failedFiles.length > 0) {
+                lines.push("", "### Pre-Existing Unrelated Frontend Test Failures (Reported Separately)", "");
+                for (const file of failedFiles) {
+                  const rel = String(file.name || "").replace(/^.*\/frontend\//, "");
+                  const failCount = (file.assertionResults || []).filter((a) => a.status === "failed").length;
+                  lines.push(`- \`${rel}\` (${failCount} failed test(s))`);
+                }
+              }
+            }
+
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+          '
+
+      - name: Upload frontend test reports and build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-ci-artifacts
+          path: |
+            frontend/test-reports/
+            frontend/build-artifacts/
+          if-no-files-found: ignore
+
+  android-ci:
+    name: Android CI (Unit Tests & Staging APK)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+
+      - name: Install required Android SDK platform and accept licenses
+        run: |
+          set -euo pipefail
+          mkdir -p android-test-reports
+          java -version 2>&1 | tee android-test-reports/env.log
+
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          export ANDROID_HOME="$SDK_ROOT"
+          export ANDROID_SDK_ROOT="$SDK_ROOT"
+
+          SDKMANAGER=$(command -v sdkmanager || find "$SDK_ROOT" -name sdkmanager -type f 2>/dev/null | head -n1 || true)
+          if [ -z "$SDKMANAGER" ]; then
+            echo "::error::sdkmanager not found on runner."
+            exit 1
+          fi
+
+          (set +o pipefail; yes | "$SDKMANAGER" --licenses >/dev/null 2>&1) || true
+
+          COMPILE_SDK=$(grep -E 'compileSdk\s*=' app/build.gradle.kts | head -n1 | sed -E 's/[^0-9]//g')
+          "$SDKMANAGER" --list > /tmp/android-sdk-list.txt 2>/dev/null || true
+          SDK_PLATFORM_PKG=$(awk -v ver="${COMPILE_SDK}" '$1 ~ ("^platforms;android-" ver "(\\.0)?$") {print $1; exit}' /tmp/android-sdk-list.txt || true)
+          if [ -z "$SDK_PLATFORM_PKG" ]; then
+            echo "::error::Runner Android SDK repository does not provide platforms;android-${COMPILE_SDK}(.0)."
+            exit 1
+          fi
+
+          echo "Installing SDK packages: ${SDK_PLATFORM_PKG} platform-tools" | tee -a android-test-reports/env.log
+          (set +o pipefail; yes | "$SDKMANAGER" "${SDK_PLATFORM_PKG}" "platform-tools")
+          chmod +x ./gradlew || true
+
+      - name: Run Android unit tests (required, zero skipped allowed)
+        run: |
+          set -euo pipefail
+          ./gradlew testDebugUnitTest --no-daemon --console=plain 2>&1 | tee android-test-reports/gradle-test.log
+          python3 - << 'PYEOF'
+          import glob, sys, xml.etree.ElementTree as ET
+          xml_files = sorted(glob.glob("app/build/test-results/testDebugUnitTest/TEST-*.xml"))
+          if not xml_files:
+              print("ERROR: No Android unit test XML reports generated.", file=sys.stderr)
+              sys.exit(1)
+          total_t = total_f = total_e = total_s = 0
+          for xf in xml_files:
+              root = ET.parse(xf).getroot()
+              total_t += int(root.attrib.get("tests", 0))
+              total_f += int(root.attrib.get("failures", 0))
+              total_e += int(root.attrib.get("errors", 0))
+              total_s += int(root.attrib.get("skipped", 0))
+          print(f"Android unit test totals: tests={total_t}, failures={total_f}, errors={total_e}, skipped={total_s}")
+          if total_t <= 0 or total_f > 0 or total_e > 0 or total_s > 0:
+              sys.exit(1)
+          PYEOF
+
+      - name: Build staging debug APK and verify TIFFZY_BASE_URL & secret isolation
+        run: |
+          set -euo pipefail
+          STAGING_URL="https://staging-api.tiffzy.com/"
+          ./gradlew assembleDebug -PTIFFZY_BASE_URL=https://staging-api.tiffzy.com --no-daemon --console=plain 2>&1 | tee android-test-reports/gradle-apk.log
+          BUILD_CFG="app/build/generated/source/buildConfig/debug/com/tiffzy/app/BuildConfig.java"
+          APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$BUILD_CFG"
+          test -f "$APK_PATH"
+          if ! grep -Fq "BASE_URL = \"${STAGING_URL}\"" "$BUILD_CFG"; then
+            echo "::error::Staging BuildConfig.BASE_URL mismatch in ${BUILD_CFG}"
+            exit 1
+          fi
+          if grep -rqE "TWM_API_SECRET|TWM_SIGNING_KEY|X-TWM-Secret" app/src/ "$BUILD_CFG"; then
+            echo "::error::Sensitive TWM secret reference found in Android source or BuildConfig!"
+            exit 1
+          fi
+          APK_SIZE=$(stat -c%s "$APK_PATH" 2>/dev/null || wc -c < "$APK_PATH")
+          {
+            echo "STAGING_BUILD_CONFIG_BASE_URL=${STAGING_URL}"
+            echo "STAGING_APK_PATH=${APK_PATH}"
+            echo "STAGING_APK_BYTES=${APK_SIZE}"
+          } | tee android-test-reports/apk-meta.env
+
+      - name: Publish Android test & APK build summary
+        if: always()
+        run: |
+          python3 - << 'PYEOF'
+          import glob, os, xml.etree.ElementTree as ET
+
+          summary = ["## Android CI Results", ""]
+          summary.append(f"- **Branch / Ref**: `{os.environ.get('GITHUB_REF_NAME', '')}`")
+          summary.append(f"- **Commit**: `{os.environ.get('GITHUB_SHA', '')}`")
+
+          xml_files = sorted(glob.glob("app/build/test-results/testDebugUnitTest/TEST-*.xml"))
+          if not xml_files:
+              summary.append("- **Unit Tests**: NO XML TEST REPORTS GENERATED")
+          else:
+              summary.extend(["", "| Test Suite | Tests | Failures | Errors | Skipped |", "| --- | --- | --- | --- | --- |"])
+              total_t = total_f = total_e = total_s = 0
+              for xf in xml_files:
+                  root = ET.parse(xf).getroot()
+                  name = root.attrib.get("name", os.path.basename(xf))
+                  t = int(root.attrib.get("tests", 0))
+                  f = int(root.attrib.get("failures", 0))
+                  e = int(root.attrib.get("errors", 0))
+                  s = int(root.attrib.get("skipped", 0))
+                  total_t += t; total_f += f; total_e += e; total_s += s
+                  summary.append(f"| `{name}` | {t} | {f} | {e} | {s} |")
+              summary.append(f"| **Total** | **{total_t}** | **{total_f}** | **{total_e}** | **{total_s}** |")
+
+          meta_path = "android-test-reports/apk-meta.env"
+          if os.path.exists(meta_path):
+              meta = dict(line.strip().split("=", 1) for line in open(meta_path, encoding="utf-8") if "=" in line)
+              summary.append("")
+              summary.append(f"- **Staging Debug APK**: `{meta.get('STAGING_APK_PATH', '')}` ({meta.get('STAGING_APK_BYTES', '')} bytes)")
+              summary.append(f"- **Verified BuildConfig.BASE_URL**: `{meta.get('STAGING_BUILD_CONFIG_BASE_URL', '')}`")
+
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as fh:
+              fh.write("\n".join(summary) + "\n")
+          PYEOF
+
+      - name: Upload Android test reports and staging debug APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-and-apk-results
+          path: |
+            android-test-reports/
+            app/build/test-results/testDebugUnitTest/
+            app/build/outputs/apk/debug/app-debug.apk
+
+  ci-gate:
+    name: CI Verification Gate
+    runs-on: ubuntu-latest
+    needs: [backend-ci, frontend-ci, android-ci]
+    if: always()
+    steps:
+      - name: Verify all mandatory CI jobs succeeded
+        run: |
+          set -euo pipefail
+          echo "backend-ci=${{ needs.backend-ci.result }}"
+          echo "frontend-ci=${{ needs.frontend-ci.result }}"
+          echo "android-ci=${{ needs.android-ci.result }}"
+          if [ "${{ needs.backend-ci.result }}" != "success" ] || [ "${{ needs.frontend-ci.result }}" != "success" ] || [ "${{ needs.android-ci.result }}" != "success" ]; then
+            echo "::error::One or more mandatory CI jobs failed."
+            exit 1
+          fi

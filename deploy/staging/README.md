@@ -1,6 +1,6 @@
 # Tiffzy Isolated Staging Deployment Guide
 
-This directory contains ready-to-apply templates for running `feature/twm-pay-integration` in a completely isolated staging environment without touching `main`, the production database, or the production `tiffzy` service.
+This directory contains ready-to-apply templates for running Tiffzy (`main` or a staging branch) in a completely isolated staging environment without touching `/home/ubuntu/cafe-system`, the production database, or the production `tiffzy` service.
 
 ## Architecture Isolation
 - **Staging API hostname**: `https://staging-api.tiffzy.com` (separate DNS A record / TLS vhost)
@@ -14,7 +14,7 @@ This directory contains ready-to-apply templates for running `feature/twm-pay-in
 2. Create an isolated PostgreSQL database (`tiffzy_staging`) and dedicated user.
 3. Install `deploy/staging/nginx-staging-api.tiffzy.com.conf` to `/etc/nginx/sites-available/staging-api.tiffzy.com`, enable it, and run `sudo certbot --nginx -d staging-api.tiffzy.com`.
 4. Install `deploy/staging/tiffzy-staging.service` to `/etc/systemd/system/tiffzy-staging.service` and enable it (`sudo systemctl enable tiffzy-staging`).
-5. Clone `feature/twm-pay-integration` to `/home/ubuntu/cafe-system-staging` and create `/home/ubuntu/cafe-system-staging/backend/.env` from `deploy/staging/backend.env.staging.example`.
+5. Clone the target branch (e.g., `main`) to `/home/ubuntu/cafe-system-staging` and create `/home/ubuntu/cafe-system-staging/backend/.env` from `deploy/staging/backend.env.staging.example`.
 6. Run `bash /home/ubuntu/cafe-system-staging/deploy/staging/setup-staging.sh`.
 7. In **Vercel Project Settings -> Environment Variables (Preview scope only)**, configure the variables from `deploy/staging/frontend.env.preview.example` and redeploy the Preview branch.
 8. Add your Vercel Preview hostname to TWM Pay Admin -> **Allowed websites** (no separate TWM Pay sandbox exists; live merchant keys verify against the allowlisted domain).

@@ -1,19 +1,68 @@
-name: Deploy Backend to AWS EC2
+name: Deploy Production Backend to AWS EC2 (Manual Approval)
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
+    inputs:
+      confirm_production:
+        description: "Type DEPLOY_PRODUCTION to confirm deploying origin/main to production EC2"
+        type: string
+        required: true
+      verify_ci:
+        description: "Require passing CI Pipeline run on target commit before deploying"
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: read
+  actions: read
 
 jobs:
   deploy:
-    name: Deploy Backend Service
+    name: Deploy Backend Service (Production)
     runs-on: ubuntu-latest
+    environment: Production
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' &&
+        github.ref == 'refs/heads/main' &&
+        github.event.inputs.confirm_production == 'DEPLOY_PRODUCTION'
+      }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Preflight Safety Check — Production Secrets & CI Gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          TARGET_SHA: ${{ github.sha }}
+          VERIFY_CI: ${{ github.event.inputs.verify_ci }}
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then
+            echo "::error::Production deployment is restricted strictly to branch main."
+            exit 1
+          fi
+          if [ -z "${EC2_HOST}" ] || [ -z "${EC2_USER}" ] || [ -z "${EC2_SSH_KEY}" ]; then
+            echo "::error::Missing required production secrets (EC2_HOST, EC2_USER, EC2_SSH_KEY)."
+            exit 1
+          fi
+          if [ "${EC2_HOST}" = "staging-api.tiffzy.com" ]; then
+            echo "::error::Refusing production deployment to staging host."
+            exit 1
+          fi
+          if [ "${VERIFY_CI}" = "true" ]; then
+            CI_CONCLUSION=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${TARGET_SHA}&status=completed&per_page=5" --jq '.workflow_runs[0].conclusion // ""')
+            if [ "${CI_CONCLUSION}" != "success" ]; then
+              echo "::error::CI Pipeline has not succeeded for commit ${TARGET_SHA} (got '${CI_CONCLUSION:-none}'). Refusing production deployment."
+              exit 1
+            fi
+            echo "Verified CI Pipeline passed for commit ${TARGET_SHA}."
+          fi
 
       - name: Deploy via SSH to AWS EC2
         uses: appleboy/ssh-action@v1.2.0

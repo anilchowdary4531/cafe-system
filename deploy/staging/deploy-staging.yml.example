@@ -8,15 +8,14 @@ on:
   workflow_dispatch:
     inputs:
       branch:
-        description: "Feature branch to deploy to staging"
+        description: "Branch to deploy to staging"
         required: true
-        default: "feature/twm-pay-integration"
+        default: "main"
 
 jobs:
   deploy-staging:
     name: Deploy Backend to Staging Service
     runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.branch != 'main' }}
     steps:
       - name: Deploy Staging via SSH
         uses: appleboy/ssh-action@v1.2.0
@@ -26,6 +25,6 @@ jobs:
           key: ${{ secrets.STAGING_EC2_SSH_KEY }}
           script: |
             set -e
-            export FEATURE_BRANCH="${{ github.event.inputs.branch }}"
+            export TARGET_BRANCH="${{ github.event.inputs.branch }}"
             bash /home/ubuntu/cafe-system-staging/deploy/staging/setup-staging.sh
 

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Deploy ONLY the TWM Pay feature branch to an isolated staging directory and systemd unit.
-# Never modifies /home/ubuntu/cafe-system, main branch, or production tiffzy.service.
+# Deploy target branch (default: main) to an isolated staging directory and systemd unit.
+# Never modifies /home/ubuntu/cafe-system or production tiffzy.service.
 
 STAGING_DIR="${STAGING_DIR:-/home/ubuntu/cafe-system-staging}"
 REPO_URL="${REPO_URL:-https://github.com/anilchowdary4531/cafe-system.git}"
-FEATURE_BRANCH="${FEATURE_BRANCH:-feature/twm-pay-integration}"
+TARGET_BRANCH="${TARGET_BRANCH:-${FEATURE_BRANCH:-main}}"
 STAGING_SERVICE="${STAGING_SERVICE:-tiffzy-staging}"
 STAGING_PORT="${STAGING_PORT:-3100}"
 
@@ -16,16 +16,16 @@ if [ "$STAGING_DIR" = "/home/ubuntu/cafe-system" ] || [ "$STAGING_SERVICE" = "ti
 fi
 
 if [ ! -d "$STAGING_DIR/.git" ]; then
-  git clone --branch "$FEATURE_BRANCH" "$REPO_URL" "$STAGING_DIR"
+  git clone --branch "$TARGET_BRANCH" "$REPO_URL" "$STAGING_DIR"
 fi
 
 cd "$STAGING_DIR"
-git fetch origin "$FEATURE_BRANCH"
-git checkout "$FEATURE_BRANCH"
-git reset --hard "origin/$FEATURE_BRANCH"
+git fetch origin "$TARGET_BRANCH"
+git checkout "$TARGET_BRANCH"
+git reset --hard "origin/$TARGET_BRANCH"
 
 TARGET_SHA=$(git rev-parse HEAD)
-echo "Staging HEAD: $TARGET_SHA (branch: $FEATURE_BRANCH)"
+echo "Staging HEAD: $TARGET_SHA (branch: $TARGET_BRANCH)"
 
 cd "$STAGING_DIR/backend"
 if [ ! -f .env ]; then
