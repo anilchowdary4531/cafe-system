@@ -664,5 +664,192 @@ describe("TWM Pay Payment Gateway Integration Suite", () => {
       }
     }
   });
+
+  it("8. Handles CREATED, REJECTED, EXPIRED, Same-Key Retry After Failure/Amount Change, and Prevents Stale Downgrades", async () => {
+    const prisma = createInMemoryPaymentPrisma();
+    const gatewayCalls = [];
+    const mockFetch = async (_url, opts) => {
+      const parsed = JSON.parse(opts.body);
+      gatewayCalls.push(parsed);
+      return new Response(
+        JSON.stringify({
+          order_ref: parsed.order_ref,
+          amount_paise: parsed.amount_paise,
+          checkout_url: `https://pay.thewebsitemakers.in/checkout/${parsed.order_ref}`,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    };
+
+    const app = Fastify({ logger: false });
+    await app.register(paymentRoutes, { prisma, fetchImpl: mockFetch });
+
+    // Create initial checkout with explicit client idempotencyKey on order 101 (₹249.50 = 24950 paise)
+    const create1 = await app.inject({
+      method: "POST",
+      url: "/api/payments/create-order",
+      payload: {
+        orderId: "101",
+        provider: "TWM_PAY",
+        idempotencyKey: "client-retry-key",
+      },
+    });
+    assert.equal(create1.statusCode, 200);
+    const ref1 = create1.json().orderRef;
+
+    // CREATED status webhook keeps order PENDING and never marks PAID
+    const createdSig = computeTwmSignature({
+      order_ref: ref1,
+      status: "created",
+      amount_paise: "24950",
+      txn: "",
+    });
+    const createdRes = await app.inject({
+      method: "POST",
+      url: "/api/payments/twm/notify",
+      payload: { order_ref: ref1, status: "created", amount_paise: "24950", txn: "", signature: createdSig },
+    });
+    assert.equal(createdRes.statusCode, 200);
+    assert.equal(createdRes.json().verified, false);
+    assert.equal(createdRes.json().paymentStatus, "PENDING");
+    assert.equal(createdRes.json().gatewayStatus, "CREATED");
+    assert.equal(prisma._orders.get(101).paymentStatus, "UNPAID");
+
+    // REJECTED return marks order & payment FAILED, populates reason + slug, and never marks PAID
+    const rejectedSig = computeTwmSignature({
+      order_ref: ref1,
+      status: "rejected",
+      amount_paise: "24950",
+      txn: "TX_REJ_1",
+    });
+    const rejectedRes = await app.inject({
+      method: "POST",
+      url: "/api/payments/twm/return",
+      payload: {
+        order_ref: ref1,
+        status: "rejected",
+        amount_paise: "24950",
+        txn: "TX_REJ_1",
+        signature: rejectedSig,
+      },
+    });
+    assert.equal(rejectedRes.statusCode, 200);
+    const rejBody = rejectedRes.json();
+    assert.equal(rejBody.verified, false);
+    assert.equal(rejBody.paymentStatus, "FAILED");
+    assert.equal(rejBody.gatewayStatus, "REJECTED");
+    assert.equal(rejBody.slug, "cafe-alpha");
+    assert.ok(rejBody.reason && rejBody.reason.toLowerCase().includes("rejected"));
+    assert.equal(prisma._orders.get(101).paymentStatus, "FAILED");
+
+    // Out-of-order delayed 'created' webhook CANNOT downgrade REJECTED back to CREATED
+    const staleCreatedOnFailed = await app.inject({
+      method: "POST",
+      url: "/api/payments/twm/notify",
+      payload: { order_ref: ref1, status: "created", amount_paise: "24950", txn: "", signature: createdSig },
+    });
+    assert.equal(staleCreatedOnFailed.statusCode, 200);
+    assert.equal(staleCreatedOnFailed.json().paymentStatus, "FAILED");
+    assert.equal(staleCreatedOnFailed.json().gatewayStatus, "REJECTED");
+
+    // Retrying with the SAME idempotencyKey after REJECTED must NOT throw unique constraint 500
+    const retrySameKey = await app.inject({
+      method: "POST",
+      url: "/api/payments/create-order",
+      payload: {
+        orderId: "101",
+        provider: "TWM_PAY",
+        idempotencyKey: "client-retry-key",
+      },
+    });
+    assert.equal(retrySameKey.statusCode, 200);
+    const ref2 = retrySameKey.json().orderRef;
+    assert.notEqual(ref2, ref1);
+    assert.equal(prisma._orders.get(101).paymentStatus, "PENDING");
+
+    // UTR_SUBMITTED cannot be downgraded back to CREATED by an out-of-order webhook
+    const utrSig2 = computeTwmSignature({
+      order_ref: ref2,
+      status: "utr_submitted",
+      amount_paise: "24950",
+      txn: "UTR222",
+    });
+    await app.inject({
+      method: "POST",
+      url: "/api/payments/twm/notify",
+      payload: { order_ref: ref2, status: "utr_submitted", amount_paise: "24950", txn: "UTR222", signature: utrSig2 },
+    });
+    const createdSig2 = computeTwmSignature({
+      order_ref: ref2,
+      status: "created",
+      amount_paise: "24950",
+      txn: "",
+    });
+    const staleCreatedOnUtr = await app.inject({
+      method: "POST",
+      url: "/api/payments/twm/notify",
+      payload: { order_ref: ref2, status: "created", amount_paise: "24950", txn: "", signature: createdSig2 },
+    });
+    assert.equal(staleCreatedOnUtr.statusCode, 200);
+    assert.equal(staleCreatedOnUtr.json().gatewayStatus, "UTR_SUBMITTED");
+    assert.equal(staleCreatedOnUtr.json().paymentStatus, "PENDING");
+
+    // Amount mutation between retries invalidates same-idempotencyKey replay on order 102 (₹500 -> ₹600)
+    const ord102Create1 = await app.inject({
+      method: "POST",
+      url: "/api/payments/create-order",
+      payload: { orderId: "102", provider: "TWM_PAY", idempotencyKey: "ord102-key" },
+    });
+    assert.equal(ord102Create1.statusCode, 200);
+    assert.equal(ord102Create1.json().amountPaise, 50000);
+
+    const updatedOrder102 = { ...prisma._orders.get(102), total: 600, subtotal: 600 };
+    prisma._orders.set(102, updatedOrder102);
+
+    const ord102Create2 = await app.inject({
+      method: "POST",
+      url: "/api/payments/create-order",
+      payload: { orderId: "102", provider: "TWM_PAY", idempotencyKey: "ord102-key" },
+    });
+    assert.equal(ord102Create2.statusCode, 200);
+    assert.equal(ord102Create2.json().amountPaise, 60000);
+    assert.notEqual(ord102Create2.json().orderRef, ord102Create1.json().orderRef);
+
+    await app.close();
+  });
+
+  it("9. Regression: Cashfree orders preserve existing status verification without misrouting to TWM Pay", async () => {
+    const prisma = createInMemoryPaymentPrisma();
+    await prisma.payment.create({
+      data: {
+        orderId: 102,
+        restaurantId: 2,
+        provider: "CASHFREE",
+        providerOrderId: "CF_ORD_102",
+        amount: 500,
+        amountSubunit: 50000,
+        currency: "INR",
+        status: "PENDING",
+        method: "ONLINE",
+      },
+    });
+
+    const app = Fastify({ logger: false });
+    await app.register(paymentRoutes, { prisma });
+
+    // Cashfree paid order 103 continues to return verified SUCCESS without invoking TWM Pay
+    const paidRes = await app.inject({ method: "GET", url: "/api/payments/cashfree/status/103" });
+    assert.equal(paidRes.statusCode, 200);
+    assert.equal(paidRes.json().verified, true);
+    assert.equal(paidRes.json().paymentStatus, "PAID");
+
+    // Pending Cashfree order 102 stays on Cashfree path and never throws TWM PAYMENT_SESSION_NOT_FOUND
+    const pendingRes = await app.inject({ method: "GET", url: "/api/payments/status/102" });
+    assert.equal(pendingRes.statusCode, 200);
+    assert.equal(pendingRes.json().verified, false);
+    assert.notEqual(pendingRes.json().code, "PAYMENT_SESSION_NOT_FOUND");
+
+    await app.close();
+  });
 });
 

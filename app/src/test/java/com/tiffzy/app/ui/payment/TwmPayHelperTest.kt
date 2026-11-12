@@ -88,4 +88,32 @@ class TwmPayHelperTest {
         assertEquals("42", snakeResponse.resolvedOrderId())
         assertTrue(PaymentResultStatus.values().contains(PaymentResultStatus.HOSTED_CHECKOUT_READY))
     }
+
+    @Test
+    fun `mapTwmOutcomeStatus enforces non-paid pending and terminal transitions accurately`() {
+        assertEquals(
+            PaymentResultStatus.SUCCESS,
+            TwmCheckoutUrlHelper.mapTwmOutcomeStatus(verified = true, paymentStatus = "PAID", gatewayStatus = "PAID")
+        )
+        assertEquals(
+            PaymentResultStatus.PENDING,
+            TwmCheckoutUrlHelper.mapTwmOutcomeStatus(verified = false, paymentStatus = "PENDING", gatewayStatus = "UTR_SUBMITTED")
+        )
+        assertEquals(
+            PaymentResultStatus.PENDING,
+            TwmCheckoutUrlHelper.mapTwmOutcomeStatus(verified = false, paymentStatus = "PENDING", gatewayStatus = "CREATED", allowPollIfPending = true)
+        )
+        assertEquals(
+            PaymentResultStatus.CANCELLED,
+            TwmCheckoutUrlHelper.mapTwmOutcomeStatus(verified = false, paymentStatus = "PENDING", gatewayStatus = "CREATED", allowPollIfPending = false)
+        )
+        assertEquals(
+            PaymentResultStatus.FAILED,
+            TwmCheckoutUrlHelper.mapTwmOutcomeStatus(verified = false, paymentStatus = "FAILED", gatewayStatus = "REJECTED")
+        )
+        assertEquals(
+            PaymentResultStatus.FAILED,
+            TwmCheckoutUrlHelper.mapTwmOutcomeStatus(verified = false, paymentStatus = "PENDING", gatewayStatus = "EXPIRED")
+        )
+    }
 }

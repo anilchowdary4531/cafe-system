@@ -342,4 +342,149 @@ describe("TWM Pay Frontend Checkout & Return Verification Suite", () => {
         );
         expect(spaFallback).toBeTruthy();
     });
+
+    it("7. Cashfree Online remains selectable alongside TWM Pay and submits provider CASHFREE", async () => {
+        const mockCart = [{ id: 101, name: "Masala Chai", price: 50, quantity: 2 }];
+
+        api.get.mockImplementation((url) => {
+            if (url.includes("/api/payments/providers")) {
+                return Promise.resolve({
+                    data: {
+                        defaultProvider: "TWM_PAY",
+                        twmPay: { configured: true },
+                        cashfree: { configured: true },
+                    },
+                });
+            }
+            return Promise.resolve({ data: {} });
+        });
+
+        api.post.mockImplementation((url) => {
+            if (url.includes("/checkout/preview")) {
+                return Promise.resolve({ data: { ok: true, billing: { subtotal: 100, tax: 0, total: 100 } } });
+            }
+            if (url.includes("/order")) {
+                return Promise.resolve({ data: { order: { id: 52, orderNo: "ORD-52", total: 100, status: "PLACED" } } });
+            }
+            if (url.includes("/api/payments/create-order")) {
+                return Promise.reject(new Error("Mock stop after create-order inspection"));
+            }
+            return Promise.resolve({ data: {} });
+        });
+
+        render(
+            <MemoryRouter initialEntries={["/r/mango-forest"]}>
+                <AuthProvider>
+                    <RestaurantContextProvider initialValue={{ id: 10, slug: "mango-forest", name: "Mango Forest" }}>
+                        <CheckoutPrompt open={true} onClose={() => {}} cart={mockCart} clearCart={() => {}} />
+                    </RestaurantContextProvider>
+                </AuthProvider>
+            </MemoryRouter>
+        );
+
+        const cfButton = await screen.findByRole("button", { name: /Cashfree Online/i });
+        fireEvent.click(cfButton);
+
+        const payBtn = screen.getByRole("button", { name: /Pay Rs 100\.00 Online \(Cashfree\)/i });
+        fireEvent.click(payBtn);
+
+        await waitFor(() => {
+            expect(api.post).toHaveBeenCalledWith(
+                "/api/payments/create-order",
+                expect.objectContaining({
+                    orderId: 52,
+                    amount: 100,
+                    provider: "CASHFREE",
+                }),
+                expect.anything()
+            );
+        });
+    });
+
+    it("8. PaymentStatus renders EXPIRED, REJECTED, CREATED pending, and preserves restaurant retry link on error", async () => {
+        localStorage.setItem("cart", JSON.stringify([{ id: 1, quantity: 1 }]));
+        sessionStorage.setItem(
+            "tiffzy:pending_twm_payment",
+            JSON.stringify({ orderId: "55", orderNo: "ORD-55", orderRef: "TWM_10_55_1", slug: "mango-forest" })
+        );
+
+        // Case A: EXPIRED return -> displays Payment Expired, preserves cart & retry link
+        api.post.mockResolvedValueOnce({
+            data: {
+                verified: false,
+                success: false,
+                status: "FAILED",
+                paymentStatus: "FAILED",
+                gatewayStatus: "EXPIRED",
+                provider: "TWM_PAY",
+                paymentMethod: "ONLINE",
+                orderId: "55",
+                orderNo: "ORD-55",
+                orderRef: "TWM_10_55_1",
+                amount: 180,
+                slug: "mango-forest",
+                reason: "Payment session expired",
+            },
+        });
+
+        const { unmount: unmountExpired } = render(
+            <MemoryRouter
+                initialEntries={[
+                    "/payment-status?order_ref=TWM_10_55_1&status=expired&amount_paise=18000&txn=&signature=expsig",
+                ]}
+            >
+                <RestaurantContextProvider>
+                    <Routes>
+                        <Route path="/payment-status" element={<PaymentStatus />} />
+                    </Routes>
+                </RestaurantContextProvider>
+            </MemoryRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText("Payment Expired")).toBeInTheDocument();
+            expect(screen.getByText(/^EXPIRED$/)).toBeInTheDocument();
+            const retryLink = screen.getByRole("link", { name: /try payment again/i });
+            expect(retryLink.getAttribute("href")).toContain("/r/mango-forest/menu");
+        });
+        expect(localStorage.getItem("cart")).not.toBeNull();
+        unmountExpired();
+
+        // Case B: CREATED status stays PENDING and never shows Payment Successful
+        api.post.mockResolvedValueOnce({
+            data: {
+                verified: false,
+                success: false,
+                status: "PENDING",
+                paymentStatus: "PENDING",
+                gatewayStatus: "CREATED",
+                provider: "TWM_PAY",
+                paymentMethod: "ONLINE",
+                orderId: "55",
+                orderNo: "ORD-55",
+                orderRef: "TWM_10_55_1",
+                amount: 180,
+                slug: "mango-forest",
+            },
+        });
+
+        render(
+            <MemoryRouter
+                initialEntries={[
+                    "/payment-status?order_ref=TWM_10_55_1&status=created&amount_paise=18000&txn=&signature=crt",
+                ]}
+            >
+                <RestaurantContextProvider>
+                    <Routes>
+                        <Route path="/payment-status" element={<PaymentStatus />} />
+                    </Routes>
+                </RestaurantContextProvider>
+            </MemoryRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText("Payment Pending")).toBeInTheDocument();
+            expect(screen.queryByText("Payment Successful")).not.toBeInTheDocument();
+        });
+    });
 });

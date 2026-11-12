@@ -97,6 +97,27 @@ class PaymentActivity : AppCompatActivity(), CFCheckoutResponseCallback {
             TiffzyAppTheme {
                 val uiState by viewModel.uiState.collectAsState()
 
+                val navigateToOrderSuccess: () -> Unit = {
+                    com.tiffzy.app.data.repository.CartRepository.getInstance().clearCart()
+                    val successIntent = Intent(this@PaymentActivity, com.tiffzy.app.MainActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        putExtra("payment_success", true)
+                        putExtra("order_id", uiState.orderId ?: currentOrderId)
+                    }
+                    startActivity(successIntent)
+                    finish()
+                }
+
+                LaunchedEffect(uiState.status) {
+                    if (uiState.status == PaymentResultStatus.SUCCESS) {
+                        com.tiffzy.app.data.repository.CartRepository.getInstance().clearCart()
+                    }
+                }
+
+                BackHandler(enabled = uiState.status == PaymentResultStatus.SUCCESS) {
+                    navigateToOrderSuccess()
+                }
+
                 // Launch Cashfree Checkout once session is generated
                 LaunchedEffect(uiState.paymentSessionId, uiState.status) {
                     val sessionId = uiState.paymentSessionId
@@ -117,7 +138,9 @@ class PaymentActivity : AppCompatActivity(), CFCheckoutResponseCallback {
                 PaymentScreen(
                     uiState = uiState,
                     onBackClick = {
-                        if (uiState.provider == "TWM_PAY" &&
+                        if (uiState.status == PaymentResultStatus.SUCCESS) {
+                            navigateToOrderSuccess()
+                        } else if (uiState.provider == "TWM_PAY" &&
                             uiState.status == PaymentResultStatus.HOSTED_CHECKOUT_READY
                         ) {
                             viewModel.reconcileTwmStatus(pollIfPending = false)
@@ -163,19 +186,14 @@ class PaymentActivity : AppCompatActivity(), CFCheckoutResponseCallback {
                     },
                     onDoneClick = {
                         if (uiState.status == PaymentResultStatus.SUCCESS) {
-                            val intent = Intent(this@PaymentActivity, com.tiffzy.app.MainActivity::class.java).apply {
-                                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                                putExtra("payment_success", true)
-                                putExtra("order_id", uiState.orderId ?: currentOrderId)
-                            }
-                            startActivity(intent)
+                            navigateToOrderSuccess()
                         } else if (uiState.provider == "TWM_PAY") {
                             viewModel.reconcileTwmStatus()
                             return@PaymentScreen
                         } else {
                             viewModel.verifyPaymentWithBackend(uiState.orderId ?: currentOrderId)
+                            finish()
                         }
-                        finish()
                     }
                 )
             }
@@ -212,7 +230,7 @@ class PaymentActivity : AppCompatActivity(), CFCheckoutResponseCallback {
         }
 
         try {
-            val environment = if (isProduction || envMode.equals("PRODUCTION", ignoreCase = true)) {
+            val environment = if (isProduction) {
                 CFSession.Environment.PRODUCTION
             } else {
                 CFSession.Environment.SANDBOX
@@ -446,7 +464,9 @@ fun PaymentScreen(
                         onGoBackClick = onBackClick,
                         onSupportClick = {
                             Toast.makeText(context, "Support requested.", Toast.LENGTH_LONG).show()
-                        }
+                        },
+                        isExpired = uiState.gatewayStatus == "EXPIRED",
+                        providerName = if (isTwm) "TWM Pay" else "Cashfree"
                     )
                 }
                 PaymentResultStatus.PENDING -> {
@@ -510,6 +530,18 @@ fun TwmHostedCheckoutWebView(
             return@Box
         }
 
+        val dispatchReturnInterception: (String) -> Unit = { targetUrl ->
+            if (!handledReturn) {
+                handledReturn = true
+                val params = TwmCheckoutUrlHelper.extractTwmReturnParams(targetUrl)
+                if (params != null) {
+                    onReturnIntercepted(params)
+                } else {
+                    onReturnFallbackCheck()
+                }
+            }
+        }
+
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
@@ -534,15 +566,7 @@ fun TwmHostedCheckoutWebView(
                             }
 
                             if (TwmCheckoutUrlHelper.isTwmReturnUrl(targetUrl, returnUrlPrefix)) {
-                                if (!handledReturn) {
-                                    handledReturn = true
-                                    val params = TwmCheckoutUrlHelper.extractTwmReturnParams(targetUrl)
-                                    if (params != null) {
-                                        onReturnIntercepted(params)
-                                    } else {
-                                        onReturnFallbackCheck()
-                                    }
-                                }
+                                dispatchReturnInterception(targetUrl)
                                 return true
                             }
 
@@ -551,6 +575,12 @@ fun TwmHostedCheckoutWebView(
 
                         override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                             super.onPageStarted(view, url, favicon)
+                            val targetUrl = url.orEmpty()
+                            if (targetUrl.isNotBlank() && TwmCheckoutUrlHelper.isTwmReturnUrl(targetUrl, returnUrlPrefix)) {
+                                view?.stopLoading()
+                                dispatchReturnInterception(targetUrl)
+                                return
+                            }
                             pageLoading = true
                         }
 

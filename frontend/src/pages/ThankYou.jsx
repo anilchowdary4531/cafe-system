@@ -68,11 +68,12 @@ export default function ThankYou({ orderFromStatus = null, onRefreshStatus = nul
 
     const isSuccess = statusRaw === "SUCCESS" || statusRaw === "PAID";
     const isFailed = !isSuccess && statusRaw === "FAILED";
+    const isExpired = isFailed && gatewayStatusRaw === "EXPIRED";
     const isCancelled = !isSuccess && !isFailed && statusRaw === "CANCELLED";
     const isPending = !isSuccess && !isFailed && !isCancelled && (statusRaw === "PENDING" || isUtrSubmitted);
     const isUnknown = !isSuccess && !isFailed && !isCancelled && !isPending;
 
-    const failureReason = merged?.reason || merged?.failureReason || (isCancelled ? "User cancelled payment" : isFailed ? "Payment could not be completed" : null);
+    const failureReason = merged?.reason || merged?.failureReason || (isCancelled ? "User cancelled payment" : isExpired ? "Payment session expired" : isFailed ? "Payment could not be completed" : null);
 
     const isPickupOrder = fulfillment === "pickup";
     const isDeliveryOrder = fulfillment === "delivery";
@@ -119,7 +120,7 @@ export default function ThankYou({ orderFromStatus = null, onRefreshStatus = nul
                     {/* Headline */}
                     <h1 className="mt-6 text-3xl font-bold tracking-tight sm:text-4xl">
                         {isSuccess && "Payment Successful"}
-                        {isFailed && "Payment Failed"}
+                        {isFailed && (isExpired ? "Payment Expired" : "Payment Failed")}
                         {isCancelled && "Payment Cancelled"}
                         {isPending && (isUtrSubmitted ? "UPI Verification in Progress" : "Payment Pending")}
                         {isUnknown && "Payment Status Could Not Be Verified"}
@@ -128,7 +129,12 @@ export default function ThankYou({ orderFromStatus = null, onRefreshStatus = nul
                     {/* Subtitle Description */}
                     <p className="theme-muted mt-3 text-base max-w-xl mx-auto leading-relaxed">
                         {isSuccess && "Thanks for ordering. You can continue ordering anytime."}
-                        {isFailed && (merged?.reason || "Your payment could not be completed. If any amount was deducted, it will be refunded within 3-5 business days.")}
+                        {isFailed && (
+                            merged?.reason ||
+                            (isExpired
+                                ? "This payment session expired before confirmation. No charges were completed — please try again."
+                                : "Your payment could not be completed. If any amount was deducted, it will be refunded within 3-5 business days.")
+                        )}
                         {isCancelled && "You cancelled the payment checkout session. You can try again whenever you are ready."}
                         {isPending && (
                             isUtrSubmitted
@@ -185,7 +191,7 @@ export default function ThankYou({ orderFromStatus = null, onRefreshStatus = nul
                                 <span className={`inline-block h-2 w-2 rounded-full ${
                                     isSuccess ? "bg-emerald-400 animate-pulse" : isFailed ? "bg-rose-400" : isCancelled ? "bg-orange-400" : "bg-amber-400 animate-ping"
                                 }`} />
-                                {isSuccess ? "SUCCESS (PAID)" : isFailed ? "FAILED" : isCancelled ? "CANCELLED" : isUtrSubmitted ? "VERIFYING UPI" : isPending ? "PENDING" : "UNKNOWN"}
+                                {isSuccess ? "SUCCESS (PAID)" : isExpired ? "EXPIRED" : isFailed ? "FAILED" : isCancelled ? "CANCELLED" : isUtrSubmitted ? "VERIFYING UPI" : isPending ? "PENDING" : "UNKNOWN"}
                             </p>
                         </div>
                     </div>

@@ -77,8 +77,11 @@ fun CheckoutScreen(
                     isOrderPlaced = uiState.orderSuccess != null,
                     onPlaceOrder = {
                         val currentOrder = uiState.orderSuccess
-                        if (currentOrder != null && uiState.selectedPaymentMethod == "CASHFREE") {
-                            // If order already exists, just re-trigger the payment gateway
+                        if (
+                            currentOrder != null &&
+                            (uiState.selectedPaymentMethod == "CASHFREE" || uiState.selectedPaymentMethod == "TWM_PAY")
+                        ) {
+                            // If order already exists, just re-trigger the selected online payment gateway
                             onOrderSuccess(currentOrder.order)
                         } else {
                             // Otherwise, place a new order
@@ -172,10 +175,11 @@ fun CheckoutScreen(
 
                 Spacer(modifier = Modifier.height(Dimens.SpacingLarge))
 
-                // 5. Payment Method Selector (Cashfree PG)
+                // 5. Payment Method Selector (TWM Pay / Cashfree / Wallet / Cash)
                 SectionHeader("Select Payment Method", Icons.Default.Payment)
                 PaymentMethodSelectorCard(
                     selectedMethod = uiState.selectedPaymentMethod,
+                    availableOnlineProviders = uiState.availableOnlineProviders,
                     onSelectMethod = { viewModel.selectPaymentMethod(it) }
                 )
 
@@ -314,7 +318,16 @@ fun AddressSelector(
 }
 
 @Composable
-fun PaymentMethodSelectorCard(selectedMethod: String, onSelectMethod: (String) -> Unit) {
+fun PaymentMethodSelectorCard(
+    selectedMethod: String,
+    availableOnlineProviders: List<PaymentProviderItem> = emptyList(),
+    onSelectMethod: (String) -> Unit
+) {
+    val showTwmPay = availableOnlineProviders.isEmpty() ||
+        availableOnlineProviders.any { it.id.equals("TWM_PAY", ignoreCase = true) && it.configured }
+    val showCashfree = availableOnlineProviders.isEmpty() ||
+        availableOnlineProviders.any { it.id.equals("CASHFREE", ignoreCase = true) && it.configured }
+
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         
         // Tiffzy Wallet (Cashfree PPI) Option
@@ -389,7 +402,7 @@ fun PaymentMethodSelectorCard(selectedMethod: String, onSelectMethod: (String) -
         }
 
         // TWM Pay Option (UPI / QR / Hosted Online)
-        Card(
+        if (showTwmPay) Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { onSelectMethod("TWM_PAY") },
@@ -460,7 +473,7 @@ fun PaymentMethodSelectorCard(selectedMethod: String, onSelectMethod: (String) -
         }
 
         // Cashfree Option (Pay Online)
-        Card(
+        if (showCashfree) Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { onSelectMethod("CASHFREE") },

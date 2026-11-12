@@ -893,6 +893,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart, redirec
                         navigate(`/orders/thank-you?slug=${encodeURIComponent(slug)}&orderNo=${encodeURIComponent(orderNo)}&orderId=${encodeURIComponent(String(orderId))}&paymentStatus=SUCCESS&paymentMode=ONLINE&provider=TWM_PAY`);
                         return;
                     }
+                    twmAttemptNonceRef.current = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
                     setError(
                         twmErr?.response?.data?.message ||
                         twmErr?.message ||

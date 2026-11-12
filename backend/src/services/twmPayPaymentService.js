@@ -300,6 +300,8 @@ export const createTwmPayCheckoutSession = async ({
   }
 
   const workPromise = (async () => {
+    let existingKeyOccupied = false;
+
     // 1. Explicit idempotency key lookup
     if (cleanIdempotencyKey) {
       const existingByKey = await prisma.payment.findUnique({
@@ -312,13 +314,16 @@ export const createTwmPayCheckoutSession = async ({
           err.code = "IDEMPOTENCY_CONFLICT";
           throw err;
         }
+        existingKeyOccupied = true;
         const meta = existingByKey.providerMetadata || {};
         if (
+          !forceNewSession &&
           existingByKey.status === "PENDING" &&
           existingByKey.provider === "TWM_PAY" &&
           meta.checkoutUrl &&
           meta.gatewayStatus !== "REJECTED" &&
-          meta.gatewayStatus !== "EXPIRED"
+          meta.gatewayStatus !== "EXPIRED" &&
+          Number(existingByKey.amountSubunit) === expectedPaise
         ) {
           return {
             success: true,
@@ -425,7 +430,9 @@ export const createTwmPayCheckoutSession = async ({
     );
 
     const paymentIdempotencyKey =
-      cleanIdempotencyKey || `TWM_CREATE_${order.restaurantId}_${order.id}_A${attempt}`;
+      cleanIdempotencyKey && !existingKeyOccupied
+        ? cleanIdempotencyKey
+        : `TWM_CREATE_${order.restaurantId}_${order.id}_A${attempt}`;
 
     await prisma.payment.create({
       data: {
@@ -667,7 +674,29 @@ export const applyVerifiedTwmOutcome = async ({
       };
     }
 
-    // CREATED or other non-final state
+    // CREATED or other non-final state: never downgrade FAILED or UTR_SUBMITTED back to CREATED
+    if (freshPayment.status === "FAILED") {
+      return {
+        alreadyPaid: false,
+        newlyPaid: false,
+        order: freshOrder,
+        payment: freshPayment,
+        paymentStatus: "FAILED",
+        gatewayStatus: prevMeta.gatewayStatus || "FAILED",
+      };
+    }
+
+    if (prevMeta.gatewayStatus === "UTR_SUBMITTED" && normalized.gatewayStatus === "CREATED") {
+      return {
+        alreadyPaid: false,
+        newlyPaid: false,
+        order: freshOrder,
+        payment: freshPayment,
+        paymentStatus: "PENDING",
+        gatewayStatus: "UTR_SUBMITTED",
+      };
+    }
+
     const updatedPayment = await tx.payment.update({
       where: { id: freshPayment.id },
       data: {
@@ -738,6 +767,8 @@ const formatVerificationResponse = ({ txResult, message, orderIdInput = null }) 
     FAILED: "FAILED",
   };
 
+  const resolvedMessage = message || normalizeTwmStatus(gatewayStatus || "").message;
+
   return {
     verified: paymentStatus === "PAID",
     success: paymentStatus === "PAID",
@@ -757,8 +788,10 @@ const formatVerificationResponse = ({ txResult, message, orderIdInput = null }) 
     amountPaise: payment?.amountSubunit || getAuthoritativeOrderPaise(order, payment),
     paidAt: paymentStatus === "PAID" ? (meta.paidAt || order?.paidAt || payment?.updatedAt || null) : null,
     restaurantId: order.restaurantId,
+    slug: order.restaurant?.slug || null,
     restaurantSlug: order.restaurant?.slug || null,
-    message: message || normalizeTwmStatus(gatewayStatus || "").message,
+    message: resolvedMessage,
+    ...(paymentStatus === "FAILED" ? { reason: resolvedMessage } : {}),
   };
 };
 
@@ -812,7 +845,10 @@ export const processTwmPayReturn = async ({
 
     return formatVerificationResponse({
       txResult,
-      message: normalized.message,
+      message:
+        txResult.gatewayStatus === normalized.gatewayStatus && !txResult.alreadyPaid
+          ? normalized.message
+          : undefined,
     });
   }
 
@@ -870,7 +906,10 @@ export const processTwmPayNotify = async ({
   recordTwmNotificationMetric("verified");
   return formatVerificationResponse({
     txResult,
-    message: normalized.message,
+    message:
+      txResult.gatewayStatus === normalized.gatewayStatus && !txResult.alreadyPaid
+        ? normalized.message
+        : undefined,
   });
 };
 
@@ -931,7 +970,10 @@ export const reconcileTwmPayOrderStatus = async ({
 
   return formatVerificationResponse({
     txResult,
-    message: remote.normalized.message,
+    message:
+      txResult.gatewayStatus === remote.normalized.gatewayStatus && !txResult.alreadyPaid
+        ? remote.normalized.message
+        : undefined,
     orderIdInput: orderId,
   });
 };

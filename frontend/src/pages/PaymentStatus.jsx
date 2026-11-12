@@ -113,8 +113,11 @@ export default function PaymentStatus() {
                 provider: "TWM_PAY",
                 status: errData?.status || "UNKNOWN",
                 paymentStatus: errData?.paymentStatus || "UNKNOWN",
+                gatewayStatus: errData?.gatewayStatus || prev?.gatewayStatus,
                 reason: errData?.message || "Payment verification failed or status could not be confirmed",
                 orderId: rawOrderId || rawOrderRef,
+                orderNo: errData?.orderNo || prev?.orderNo || storedTwmPending?.orderNo,
+                slug: errData?.slug || errData?.restaurantSlug || prev?.slug || storedTwmPending?.slug,
             }));
         } finally {
             if (mountedRef.current) setLoading(false);
@@ -170,9 +173,12 @@ export default function PaymentStatus() {
                     provider: "TWM_PAY",
                     status: errData?.status || "FAILED",
                     paymentStatus: errData?.paymentStatus || "FAILED",
+                    gatewayStatus: errData?.gatewayStatus,
                     reason: errData?.message || "Payment signature or amount verification failed",
                     orderId: rawOrderId || rawOrderRef,
                     orderRef: rawOrderRef,
+                    orderNo: errData?.orderNo || storedTwmPending?.orderNo,
+                    slug: errData?.slug || errData?.restaurantSlug || storedTwmPending?.slug,
                 });
                 setLoading(false);
                 return;

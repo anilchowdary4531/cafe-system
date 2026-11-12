@@ -33,12 +33,16 @@ fun PaymentFailureScreen(
     onRetryClick: () -> Unit,
     onChooseOtherPaymentClick: () -> Unit,
     onGoBackClick: () -> Unit,
-    onSupportClick: () -> Unit = {}
+    onSupportClick: () -> Unit = {},
+    isExpired: Boolean = false,
+    providerName: String = "Cashfree"
 ) {
     val displayReason = if (!errorMessage.isNullOrBlank()) {
         errorMessage
+    } else if (isExpired) {
+        "Your $providerName payment session expired before confirmation. Please retry payment."
     } else {
-        "Your transaction could not be processed by the bank or Cashfree gateway. No money was deducted."
+        "Your transaction could not be processed by the bank or $providerName gateway. No money was deducted."
     }
 
     Column(
@@ -78,7 +82,7 @@ fun PaymentFailureScreen(
         Spacer(modifier = Modifier.height(Dimens.SpacingLarge))
 
         Text(
-            text = "Payment Failed",
+            text = if (isExpired) "Payment Expired" else "Payment Failed",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Black,
             textAlign = TextAlign.Center,

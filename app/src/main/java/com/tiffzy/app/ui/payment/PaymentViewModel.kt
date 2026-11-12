@@ -113,6 +113,22 @@ object TwmCheckoutUrlHelper {
             false
         }
     }
+
+    fun mapTwmOutcomeStatus(
+        verified: Boolean,
+        paymentStatus: String?,
+        gatewayStatus: String?,
+        allowPollIfPending: Boolean = true
+    ): PaymentResultStatus {
+        val normPayment = paymentStatus?.trim()?.uppercase().orEmpty()
+        val normGateway = gatewayStatus?.trim()?.uppercase().orEmpty()
+        return when {
+            verified || normPayment == "PAID" || normPayment == "SUCCESS" -> PaymentResultStatus.SUCCESS
+            normPayment == "FAILED" || normGateway == "REJECTED" || normGateway == "EXPIRED" -> PaymentResultStatus.FAILED
+            normGateway == "CREATED" && !allowPollIfPending -> PaymentResultStatus.CANCELLED
+            else -> PaymentResultStatus.PENDING
+        }
+    }
 }
 
 data class PaymentUiState(
@@ -216,16 +232,17 @@ class PaymentViewModel(
                 } else {
                     val sessionId = response.paymentSessionId
                     if (!sessionId.isNullOrBlank()) {
+                        val resolvedIsProd = response.isProduction || response.cfEnv.equals("PRODUCTION", ignoreCase = true)
                         _uiState.update {
                             it.copy(
                                 status = PaymentResultStatus.SESSION_CREATED,
                                 provider = "CASHFREE",
                                 paymentSessionId = sessionId,
                                 orderId = finalOrderId,
-                                isProduction = response.isProduction
+                                isProduction = resolvedIsProd
                             )
                         }
-                        Log.d("CASHFREE_DEBUG", "Session created: orderId=$finalOrderId, isProd=${response.isProduction}, cfEnv=${response.cfEnv}")
+                        Log.d("CASHFREE_DEBUG", "Session created: orderId=$finalOrderId, isProd=$resolvedIsProd, cfEnv=${response.cfEnv}")
                     } else {
                         val msg = response.message ?: "Failed to generate payment session"
                         _uiState.update {
@@ -237,6 +254,15 @@ class PaymentViewModel(
                     }
                 }
             }.onFailure { exception ->
+                val errorCode = extractHttpErrorField(exception, "code")?.uppercase()
+                if (errorCode == "PAYMENT_VERIFICATION_PENDING" || errorCode == "ORDER_ALREADY_PAID") {
+                    if (normalizedProvider == "TWM_PAY") {
+                        reconcileTwmStatus(orderId)
+                    } else {
+                        verifyPaymentWithBackend(orderId)
+                    }
+                    return@launch
+                }
                 val errorMsg = extractHttpErrorMessage(exception, "Network error creating payment session")
                 _uiState.update {
                     it.copy(
@@ -315,12 +341,12 @@ class PaymentViewModel(
         val paymentStatus = (response.paymentStatus ?: response.status).uppercase()
         val gatewayStatus = response.gatewayStatus?.uppercase()
 
-        val mappedStatus = when {
-            response.verified || paymentStatus == "PAID" || paymentStatus == "SUCCESS" -> PaymentResultStatus.SUCCESS
-            paymentStatus == "FAILED" || gatewayStatus == "REJECTED" || gatewayStatus == "EXPIRED" -> PaymentResultStatus.FAILED
-            gatewayStatus == "CREATED" && allowPollIfPending.not() -> PaymentResultStatus.CANCELLED
-            else -> PaymentResultStatus.PENDING
-        }
+        val mappedStatus = TwmCheckoutUrlHelper.mapTwmOutcomeStatus(
+            verified = response.verified,
+            paymentStatus = paymentStatus,
+            gatewayStatus = gatewayStatus,
+            allowPollIfPending = allowPollIfPending
+        )
 
         val resolvedMsg = when {
             mappedStatus == PaymentResultStatus.SUCCESS -> response.message ?: "Payment verified successfully"
@@ -442,19 +468,23 @@ class PaymentViewModel(
         _uiState.value = PaymentUiState()
     }
 
-    private fun extractHttpErrorMessage(exception: Throwable, fallback: String): String {
+    private fun extractHttpErrorField(exception: Throwable, field: String): String? {
         if (exception is retrofit2.HttpException) {
             try {
                 val body = exception.response()?.errorBody()?.string()
                 if (!body.isNullOrBlank()) {
                     val parsed = com.google.gson.Gson().fromJson(body, Map::class.java)
-                    val msg = parsed?.get("message") as? String
-                    if (!msg.isNullOrBlank()) return msg
+                    val value = parsed?.get(field) as? String
+                    if (!value.isNullOrBlank()) return value
                 }
             } catch (_: Exception) {
-                // fallback below
+                // ignore parse error
             }
         }
-        return exception.message ?: fallback
+        return null
+    }
+
+    private fun extractHttpErrorMessage(exception: Throwable, fallback: String): String {
+        return extractHttpErrorField(exception, "message") ?: exception.message ?: fallback
     }
 }
