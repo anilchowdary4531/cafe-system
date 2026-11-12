@@ -495,11 +495,16 @@ describe("Staff Passwordless Login Link UI & Flow", () => {
             );
         });
 
+        // Wait for edit mode to close and staff directory reload to settle
+        await waitFor(() => {
+            expect(screen.getByText("John Waiter Updated")).toBeInTheDocument();
+        });
+        const genBtn2 = await screen.findByTestId("generate-login-link-101");
+
         // Stale link must still not be displayed
         expect(screen.queryByText("http://localhost:5173/login?mode=staff&token=firstToken111")).not.toBeInTheDocument();
 
         // Generate new link after edit
-        const genBtn2 = screen.getByTestId("generate-login-link-101");
         fireEvent.click(genBtn2);
 
         await waitFor(() => {
