@@ -128,7 +128,7 @@ export const getSalesReport = async ({
     if (m.includes("CASH")) paymentBreakdown.cash = round2(paymentBreakdown.cash + amt);
     else if (m.includes("UPI")) paymentBreakdown.upi = round2(paymentBreakdown.upi + amt);
     else if (m.includes("CARD")) paymentBreakdown.card = round2(paymentBreakdown.card + amt);
-    else if (m.includes("CASHFREE") || m.includes("ONLINE")) paymentBreakdown.cashfree = round2(paymentBreakdown.cashfree + amt);
+    else if (m.includes("CASHFREE") || m.includes("TWM") || m.includes("ONLINE")) paymentBreakdown.cashfree = round2(paymentBreakdown.cashfree + amt);
     else if (m.includes("PAY_LATER")) paymentBreakdown.payLater = round2(paymentBreakdown.payLater + amt);
     else paymentBreakdown.other = round2(paymentBreakdown.other + amt);
   }
@@ -638,7 +638,7 @@ export const getPaymentReport = async ({ prisma, restaurantId, startDate, endDat
     if (m.includes("CASH")) methodSummary.cash = round2(methodSummary.cash + amt);
     else if (m.includes("UPI")) methodSummary.upi = round2(methodSummary.upi + amt);
     else if (m.includes("CARD")) methodSummary.card = round2(methodSummary.card + amt);
-    else if (m.includes("CASHFREE") || m.includes("ONLINE")) methodSummary.cashfree = round2(methodSummary.cashfree + amt);
+    else if (m.includes("CASHFREE") || m.includes("TWM") || m.includes("ONLINE")) methodSummary.cashfree = round2(methodSummary.cashfree + amt);
     else if (m.includes("PAY_LATER")) methodSummary.payLater = round2(methodSummary.payLater + amt);
     else methodSummary.other = round2(methodSummary.other + amt);
   }

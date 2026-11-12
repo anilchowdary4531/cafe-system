@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
 import { io } from "socket.io-client";
 import { api } from "../utils/apiClient";
-import { API_BASE_URL } from "../config";
+import { IS_MISCONFIGURED_PREVIEW, SOCKET_URL } from "../config";
 import { useAuth } from "./AuthContext";
 import { playNotificationSound } from "../utils/soundPlayer";
 
@@ -109,7 +109,7 @@ export function CustomerNotificationProvider({ children }) {
   // Real-time Socket.IO synchronization
   useEffect(() => {
     const activeToken = customerToken || localStorage.getItem("customerToken");
-    if (!activeToken) {
+    if (!activeToken || IS_MISCONFIGURED_PREVIEW) {
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
@@ -130,7 +130,7 @@ export function CustomerNotificationProvider({ children }) {
 
     tokenRef.current = activeToken;
 
-    const socket = io(API_BASE_URL || "", {
+    const socket = io(SOCKET_URL || "", {
       auth: { token: activeToken },
       transports: ["websocket", "polling"],
       withCredentials: true,

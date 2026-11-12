@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { IS_MISCONFIGURED_PREVIEW, PREVIEW_CONFIG_ERROR } from "./config";
 
 // ============================
 // PUBLIC PAGES
@@ -29,6 +30,7 @@ import Login from "./pages/Login";
 import StaffLoginLink from "./pages/StaffLoginLink";
 import Profile from "./pages/Profile";
 import ThankYou from "./pages/ThankYou";
+import PaymentStatus from "./pages/PaymentStatus";
 
 // ============================
 // ADMIN PAGES
@@ -149,6 +151,14 @@ export default function App() {
                 <TableStateProvider>
                     <CustomerNotificationProvider>
                         <div className="theme-adaptive min-h-screen">
+                        {IS_MISCONFIGURED_PREVIEW && (
+                            <div
+                                role="alert"
+                                className="bg-amber-50 border-b border-amber-300 px-4 py-2 text-xs font-semibold text-amber-900 text-center"
+                            >
+                                {PREVIEW_CONFIG_ERROR} Production backend fallback is blocked on Preview.
+                            </div>
+                        )}
                         <Routes>
 
                     {/* ================================= */}
@@ -356,6 +366,28 @@ export default function App() {
                             <>
                                 <Navbar />
                                 <ThankYou />
+                                <Footer />
+                            </>
+                        }
+                    />
+
+                    <Route
+                        path="/payment-status"
+                        element={
+                            <>
+                                <Navbar />
+                                <PaymentStatus />
+                                <Footer />
+                            </>
+                        }
+                    />
+
+                    <Route
+                        path="/payment-status/:orderId"
+                        element={
+                            <>
+                                <Navbar />
+                                <PaymentStatus />
                                 <Footer />
                             </>
                         }

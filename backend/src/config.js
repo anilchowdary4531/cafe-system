@@ -54,6 +54,17 @@ const parseCsv = (value) =>
         .map((s) => trimSlash(s))
         .filter(Boolean);
 
+const compileOriginPattern = (rawPattern) => {
+  const value = trimSlash(rawPattern);
+  if (!value) return null;
+  if (value.startsWith("^")) {
+    return new RegExp(value, "i");
+  }
+  // Convert wildcard origin patterns such as `https://cafe-system-*.vercel.app` into anchored RegExp.
+  const escaped = value.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]+");
+  return new RegExp(`^${escaped}$`, "i");
+};
+
 export const getRuntimeConfig = () => {
   const nodeEnv = String(process.env.NODE_ENV || "development").trim() || "development";
 
@@ -94,6 +105,10 @@ export const getRuntimeConfig = () => {
     }
   }
 
+  const corsOriginPatterns = parseCsv(process.env.CORS_ORIGIN_PATTERNS)
+    .map(compileOriginPattern)
+    .filter(Boolean);
+
   return {
     NODE_ENV: nodeEnv,
     PORT: port,
@@ -103,5 +118,6 @@ export const getRuntimeConfig = () => {
     JWT_SECRET: jwtSecret,
     FRONTEND_URL: frontendUrl,
     CORS_ORIGINS: allowedCorsOrigins,
+    CORS_ORIGIN_PATTERNS: corsOriginPatterns,
   };
 };

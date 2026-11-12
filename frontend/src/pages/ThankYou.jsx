@@ -42,8 +42,19 @@ export default function ThankYou({ orderFromStatus = null, onRefreshStatus = nul
     const fulfillment = String(merged?.fulfillment || searchParams.get("fulfillment") || "").trim().toLowerCase();
 
     const paymentModeRaw = String(merged?.paymentMethod || merged?.paymentMode || searchParams.get("paymentMode") || "ONLINE").trim().toUpperCase();
-    const isOnlinePayment = paymentModeRaw.includes("ONLINE") || paymentModeRaw.includes("UPI") || paymentModeRaw.includes("CASHFREE") || paymentModeRaw.includes("CARD");
-    const paymentModeLabel = isOnlinePayment ? "Online (Cashfree)" : paymentModeRaw === "PAY_LATER" ? "Khata Pay Later" : "Cash on Pickup";
+    const providerRaw = String(merged?.provider || searchParams.get("provider") || "").trim().toUpperCase();
+    const isTwmPayment = providerRaw === "TWM_PAY" || providerRaw === "TWM" || paymentModeRaw.includes("TWM");
+    const isOnlinePayment = isTwmPayment || paymentModeRaw.includes("ONLINE") || paymentModeRaw.includes("UPI") || paymentModeRaw.includes("CASHFREE") || paymentModeRaw.includes("CARD");
+    const paymentModeLabel = isTwmPayment
+        ? "Online (TWM Pay)"
+        : isOnlinePayment
+        ? "Online (Cashfree)"
+        : paymentModeRaw === "PAY_LATER"
+        ? "Khata Pay Later"
+        : "Cash on Pickup";
+
+    const gatewayStatusRaw = String(merged?.gatewayStatus || searchParams.get("gatewayStatus") || "").trim().toUpperCase();
+    const isUtrSubmitted = gatewayStatusRaw === "UTR_SUBMITTED";
 
     const statusRaw = String(
         merged?.status ||
@@ -56,12 +67,13 @@ export default function ThankYou({ orderFromStatus = null, onRefreshStatus = nul
         .toUpperCase();
 
     const isSuccess = statusRaw === "SUCCESS" || statusRaw === "PAID";
-    const isFailed = statusRaw === "FAILED";
-    const isCancelled = statusRaw === "CANCELLED";
-    const isPending = statusRaw === "PENDING";
+    const isFailed = !isSuccess && statusRaw === "FAILED";
+    const isExpired = isFailed && gatewayStatusRaw === "EXPIRED";
+    const isCancelled = !isSuccess && !isFailed && statusRaw === "CANCELLED";
+    const isPending = !isSuccess && !isFailed && !isCancelled && (statusRaw === "PENDING" || isUtrSubmitted);
     const isUnknown = !isSuccess && !isFailed && !isCancelled && !isPending;
 
-    const failureReason = merged?.reason || merged?.failureReason || (isCancelled ? "User cancelled payment" : isFailed ? "Payment could not be completed" : null);
+    const failureReason = merged?.reason || merged?.failureReason || (isCancelled ? "User cancelled payment" : isExpired ? "Payment session expired" : isFailed ? "Payment could not be completed" : null);
 
     const isPickupOrder = fulfillment === "pickup";
     const isDeliveryOrder = fulfillment === "delivery";
@@ -108,20 +120,36 @@ export default function ThankYou({ orderFromStatus = null, onRefreshStatus = nul
                     {/* Headline */}
                     <h1 className="mt-6 text-3xl font-bold tracking-tight sm:text-4xl">
                         {isSuccess && "Payment Successful"}
-                        {isFailed && "Payment Failed"}
+                        {isFailed && (isExpired ? "Payment Expired" : "Payment Failed")}
                         {isCancelled && "Payment Cancelled"}
-                        {isPending && "Payment Pending"}
+                        {isPending && (isUtrSubmitted ? "UPI Verification in Progress" : "Payment Pending")}
                         {isUnknown && "Payment Status Could Not Be Verified"}
                     </h1>
 
                     {/* Subtitle Description */}
                     <p className="theme-muted mt-3 text-base max-w-xl mx-auto leading-relaxed">
                         {isSuccess && "Thanks for ordering. You can continue ordering anytime."}
-                        {isFailed && "Your payment could not be completed. If any amount was deducted, it will be refunded within 3-5 business days."}
+                        {isFailed && (
+                            merged?.reason ||
+                            (isExpired
+                                ? "This payment session expired before confirmation. No charges were completed — please try again."
+                                : "Your payment could not be completed. If any amount was deducted, it will be refunded within 3-5 business days.")
+                        )}
                         {isCancelled && "You cancelled the payment checkout session. You can try again whenever you are ready."}
-                        {isPending && "Your payment is still being processed by Cashfree. Please wait for gateway confirmation."}
+                        {isPending && (
+                            isUtrSubmitted
+                                ? "We received your UPI reference and are waiting for confirmation from TWM Pay. Do not pay again — tap Refresh Status in a few seconds."
+                                : `Your payment is still being processed by ${isTwmPayment ? "TWM Pay" : "Cashfree"}. Please wait for gateway confirmation.`
+                        )}
                         {isUnknown && "We could not confirm the payment status right now. Please do not make another payment until you check your order status."}
                     </p>
+
+                    {(merged?.transactionId || merged?.orderRef) && (
+                        <div className="mt-4 mx-auto max-w-md rounded-2xl border border-white/10 bg-black/10 p-3 text-xs theme-muted">
+                            {merged?.orderRef && <div>Reference: <strong className="text-[var(--app-text)]">{merged.orderRef}</strong></div>}
+                            {merged?.transactionId && <div>Transaction / UTR: <strong className="text-[var(--app-text)]">{merged.transactionId}</strong></div>}
+                        </div>
+                    )}
 
                     {/* Safe Failure Reason Badge */}
                     {failureReason && !isSuccess && (
@@ -163,7 +191,7 @@ export default function ThankYou({ orderFromStatus = null, onRefreshStatus = nul
                                 <span className={`inline-block h-2 w-2 rounded-full ${
                                     isSuccess ? "bg-emerald-400 animate-pulse" : isFailed ? "bg-rose-400" : isCancelled ? "bg-orange-400" : "bg-amber-400 animate-ping"
                                 }`} />
-                                {isSuccess ? "SUCCESS (PAID)" : isFailed ? "FAILED" : isCancelled ? "CANCELLED" : isPending ? "PENDING" : "UNKNOWN"}
+                                {isSuccess ? "SUCCESS (PAID)" : isExpired ? "EXPIRED" : isFailed ? "FAILED" : isCancelled ? "CANCELLED" : isUtrSubmitted ? "VERIFYING UPI" : isPending ? "PENDING" : "UNKNOWN"}
                             </p>
                         </div>
                     </div>

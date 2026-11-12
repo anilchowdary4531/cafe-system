@@ -61,7 +61,7 @@ import { showToast } from "../../utils/toast";
 import BrandLogo from "../../components/BrandLogo";
 import { SUPPLY_CATEGORIES } from "../../utils/supplyCategories";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
-import { API_BASE_URL } from "../../config";
+import { API_BASE_URL, IS_MISCONFIGURED_PREVIEW, SOCKET_URL } from "../../config";
 
 const getSupplyProductImageUrl = (item) => {
     if (!item) return "";
@@ -507,9 +507,9 @@ export default function SupplierDashboard() {
     useEffect(() => {
         const supplierId = profileData?.id || profileData?.supplier?.id;
         const token = localStorage.getItem("token");
-        if (!token) return;
+        if (!token || IS_MISCONFIGURED_PREVIEW) return;
 
-        const socketUrl = API_BASE_URL || window.location.origin;
+        const socketUrl = SOCKET_URL || API_BASE_URL || window.location.origin;
         const socket = io(socketUrl, {
             transports: ["websocket", "polling"],
             auth: { token },

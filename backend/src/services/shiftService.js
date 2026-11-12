@@ -380,7 +380,7 @@ export const closeShift = async ({
         paymentSummary.upi = round2(paymentSummary.upi + pamt);
       } else if (method.includes("CARD")) {
         paymentSummary.card = round2(paymentSummary.card + pamt);
-      } else if (method.includes("CASHFREE") || method.includes("ONLINE")) {
+      } else if (method.includes("CASHFREE") || method.includes("TWM") || method.includes("ONLINE")) {
         paymentSummary.cashfree = round2(paymentSummary.cashfree + pamt);
       } else if (method.includes("PAY_LATER")) {
         paymentSummary.payLater = round2(paymentSummary.payLater + pamt);

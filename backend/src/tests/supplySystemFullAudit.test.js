@@ -20,21 +20,17 @@ test("Tiffzy Supply Chain Application — Full End-to-End System Audit", async (
     let productId = null;
     let orderId = null;
 
-    let testRestaurantId = 1;
+    let testRestaurantId = null;
 
     t.before(async () => {
-        const rest = await prisma.restaurant.findFirst();
-        if (rest) {
-            testRestaurantId = rest.id;
-        } else {
-            const newRest = await prisma.restaurant.create({
-                data: {
-                    name: "Audit Test Restaurant",
-                    slug: `audit-test-rest-${Date.now()}`,
-                },
-            });
-            testRestaurantId = newRest.id;
-        }
+        const suffix = `${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+        const newRest = await prisma.restaurant.create({
+            data: {
+                name: "Audit Test Restaurant",
+                slug: `audit-test-rest-${suffix}`,
+            },
+        });
+        testRestaurantId = newRest.id;
     });
 
     t.after(async () => {
@@ -54,6 +50,9 @@ test("Tiffzy Supply Chain Application — Full End-to-End System Audit", async (
             await prisma.supplierProfile.deleteMany({ where: { supplierId } }).catch(() => {});
             await prisma.supplierAddress.deleteMany({ where: { supplierId } }).catch(() => {});
             await prisma.supplier.delete({ where: { id: supplierId } }).catch(() => {});
+        }
+        if (testRestaurantId) {
+            await prisma.restaurant.delete({ where: { id: testRestaurantId } }).catch(() => {});
         }
         await prisma.authOtp.deleteMany({ where: { phone: testPhone } }).catch(() => {});
     });

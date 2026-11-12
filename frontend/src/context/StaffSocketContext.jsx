@@ -1,12 +1,12 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { io } from "socket.io-client";
-import { API } from "../config";
+import { IS_MISCONFIGURED_PREVIEW, SOCKET_URL } from "../config";
 import { useAuth } from "./AuthContext";
 
 const StaffSocketContext = createContext(null);
 
 const buildSocket = (token) => {
-    return io(`${API}/staff`, {
+    return io(`${SOCKET_URL}/staff`, {
         auth: { token },
         transports: ["websocket"], // avoid long-polling fallbacks
         reconnection: true,
@@ -35,7 +35,7 @@ export function StaffSocketProvider({ children }) {
                   ).trim()
                 : "");
 
-        if (!user || !token) {
+        if (!user || !token || IS_MISCONFIGURED_PREVIEW) {
             if (socketRef.current) {
                 socketRef.current.disconnect();
                 socketRef.current = null;

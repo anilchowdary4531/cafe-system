@@ -150,6 +150,9 @@ interface ApiService {
     @POST("customer/order")
     suspend fun placeDineInOrder(@Body body: Map<String, Any>): SimpleResponse
 
+    @GET("api/payments/providers")
+    suspend fun getPaymentProviders(): PaymentProvidersResponse
+
     @POST("api/payments/create-order")
     suspend fun createCashfreeOrder(@Body request: CashfreeCreateOrderRequest): CashfreeCreateOrderResponse
 
@@ -161,6 +164,12 @@ interface ApiService {
 
     @GET("api/payments/status/{orderId}")
     suspend fun getPaymentStatus(@Path("orderId") orderId: String): CashfreeVerifyOrderResponse
+
+    @POST("api/payments/twm/return")
+    suspend fun verifyTwmReturn(@Body request: TwmReturnVerifyRequest): CashfreeVerifyOrderResponse
+
+    @GET("api/payments/twm/status/{orderId}")
+    suspend fun getTwmPaymentStatus(@Path("orderId") orderId: String): CashfreeVerifyOrderResponse
 
     @GET("api/restaurant/settlements")
     suspend fun getRestaurantSettlements(

@@ -5,14 +5,51 @@ import { validateCoupon, createCoupon, getCoupons } from "../controllers/coupon.
 
 export default async function paymentRoutes(app, deps = {}) {
   const prisma = deps.prisma;
-  const paymentController = buildPaymentController({ prisma });
+  const paymentController = buildPaymentController({
+    prisma,
+    realtime: deps.realtime || app.realtime || null,
+    fetchImpl: deps.fetchImpl,
+  });
   const settlementController = buildSettlementController({ prisma });
   const adminSettlementController = buildAdminSettlementController({ prisma });
+
+  // Endpoint: GET /api/payments/providers
+  app.get("/api/payments/providers", paymentController.getProviders);
+  app.get("/payments/providers", paymentController.getProviders);
 
   // Endpoint: POST /api/payments/create-order & aliases
   app.post("/api/payments/create-order", paymentController.createOrder);
   app.post("/payments/create-order", paymentController.createOrder);
   app.post("/r/:slug/payments/create-order", paymentController.createOrder);
+
+  // TWM Pay Dedicated Endpoints
+  app.post("/api/payments/twm/create-order", paymentController.createTwmOrder);
+  app.post("/payments/twm/create-order", paymentController.createTwmOrder);
+  app.post("/r/:slug/payments/twm/create-order", paymentController.createTwmOrder);
+  app.get("/api/payments/twm/return", paymentController.handleTwmReturn);
+  app.post("/api/payments/twm/return", paymentController.handleTwmReturn);
+  app.get("/payments/twm/return", paymentController.handleTwmReturn);
+  app.post("/payments/twm/return", paymentController.handleTwmReturn);
+  app.get("/api/payments/twm/status/:orderId", paymentController.getTwmStatus);
+  app.get("/api/payments/twm/status", paymentController.getTwmStatus);
+  app.get("/payments/twm/status/:orderId", paymentController.getTwmStatus);
+  app.get("/payments/twm/status", paymentController.getTwmStatus);
+
+  app.register(async function twmNotifyWebhookScope(scopedApp) {
+    scopedApp.addContentTypeParser(
+      "application/x-www-form-urlencoded",
+      { parseAs: "string" },
+      (req, body, done) => {
+        try {
+          done(null, Object.fromEntries(new URLSearchParams(body)));
+        } catch (err) {
+          done(err);
+        }
+      }
+    );
+    scopedApp.post("/api/payments/twm/notify", paymentController.handleTwmNotify);
+    scopedApp.post("/payments/twm/notify", paymentController.handleTwmNotify);
+  });
 
   // Verification Endpoints: GET /api/payments/cashfree/status/:orderId, GET /api/payments/status/:orderId, POST /api/payments/verify
   app.get("/api/payments/cashfree/status/:orderId", paymentController.verifyOrder);

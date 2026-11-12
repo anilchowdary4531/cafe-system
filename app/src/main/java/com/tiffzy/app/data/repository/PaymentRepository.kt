@@ -4,12 +4,20 @@ import com.tiffzy.app.data.model.CashfreeCreateOrderRequest
 import com.tiffzy.app.data.model.CashfreeCreateOrderResponse
 import com.tiffzy.app.data.model.CashfreeVerifyOrderRequest
 import com.tiffzy.app.data.model.CashfreeVerifyOrderResponse
+import com.tiffzy.app.data.model.PaymentProvidersResponse
 import com.tiffzy.app.data.model.PaymentStatusRequest
 import com.tiffzy.app.data.model.PaymentStatusResponse
+import com.tiffzy.app.data.model.TwmReturnVerifyRequest
 import com.tiffzy.app.data.remote.ApiService
 import com.tiffzy.app.data.remote.RetrofitClient
 
 class PaymentRepository(private val apiService: ApiService = RetrofitClient.apiService) {
+
+    suspend fun getPaymentProviders(): Result<PaymentProvidersResponse> {
+        return runCatching {
+            apiService.getPaymentProviders()
+        }
+    }
 
     suspend fun createCashfreeOrder(request: CashfreeCreateOrderRequest): Result<CashfreeCreateOrderResponse> {
         return runCatching {
@@ -32,6 +40,18 @@ class PaymentRepository(private val apiService: ApiService = RetrofitClient.apiS
     suspend fun getPaymentStatus(orderId: String): Result<CashfreeVerifyOrderResponse> {
         return runCatching {
             apiService.getPaymentStatus(orderId)
+        }
+    }
+
+    suspend fun verifyTwmReturn(request: TwmReturnVerifyRequest): Result<CashfreeVerifyOrderResponse> {
+        return runCatching {
+            apiService.verifyTwmReturn(request)
+        }
+    }
+
+    suspend fun getTwmPaymentStatus(orderId: String): Result<CashfreeVerifyOrderResponse> {
+        return runCatching {
+            apiService.getTwmPaymentStatus(orderId)
         }
     }
 

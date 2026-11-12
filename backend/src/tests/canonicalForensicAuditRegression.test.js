@@ -382,13 +382,22 @@ test("TIFFZY FORENSIC AUDIT CANONICAL REGRESSION SUITE", async (t) => {
 
     // Verify persistent NOTIFICATION for Server 1
     const notifs = await prisma.notification.findMany({
-      where: { restaurantId: rid, recipientId: server1.id, orderId: orderA.id },
+      where: {
+        restaurantId: rid,
+        recipientType: RECIPIENT_TYPES.USER,
+        recipientId: server1.id,
+        orderId: orderA.id,
+      },
     });
     assert.ok(notifs.length >= 1, "Server 1 must receive persistent ORDER_PLACED notification");
 
     // Server 2 received NO notifications
     const server2Notifs = await prisma.notification.findMany({
-      where: { restaurantId: rid, recipientId: server2.id },
+      where: {
+        restaurantId: rid,
+        recipientType: RECIPIENT_TYPES.USER,
+        recipientId: server2.id,
+      },
     });
     assert.equal(server2Notifs.length, 0, "Server 2 must receive zero notifications");
   });

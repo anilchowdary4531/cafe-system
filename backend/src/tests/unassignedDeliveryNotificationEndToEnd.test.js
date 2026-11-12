@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import Fastify from "fastify";
 import fastifyJwt from "@fastify/jwt";
-import { io as ClientIO } from "../../../frontend/node_modules/socket.io-client/build/esm/index.js";
+import { io as ClientIO } from "socket.io-client";
 import prisma from "../prisma.js";
 import routes from "../routes/index.js";
 import { initRealtime } from "../realtime/socketServer.js";

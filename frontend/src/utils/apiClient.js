@@ -1,5 +1,5 @@
 import axios from "axios";
-import { API } from "../config";
+import { API, IS_MISCONFIGURED_PREVIEW, PREVIEW_CONFIG_ERROR } from "../config";
 import { deleteCacheEntry, getCacheEntry, isFresh, isStaleAllowed, makeCacheEntry, pruneCache, setCacheEntry } from "./localCache";
 import { applyAuthHeaders, handleAuth401 } from "./authInterceptor";
 
@@ -19,7 +19,12 @@ export const api = typeof axios.create === "function"
 const inFlight = new Map();
 
 if (api?.interceptors?.request?.use) {
-    api.interceptors.request.use(applyAuthHeaders);
+    api.interceptors.request.use((reqConfig) => {
+        if (IS_MISCONFIGURED_PREVIEW) {
+            return Promise.reject(new Error(PREVIEW_CONFIG_ERROR));
+        }
+        return applyAuthHeaders(reqConfig);
+    });
 }
 if (api?.interceptors?.response?.use) {
     api.interceptors.response.use((res) => res, handleAuth401);

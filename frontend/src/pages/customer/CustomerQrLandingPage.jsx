@@ -28,7 +28,7 @@ import {
   RotateCcw,
   Heart,
 } from "lucide-react";
-import { API, API_BASE_URL } from "../../config";
+import { API, API_BASE_URL, IS_MISCONFIGURED_PREVIEW, SOCKET_URL } from "../../config";
 import { showToast } from "../../utils/toast";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
 import { getCustomerFavorites, toggleFavoriteMenuItem } from "../../utils/customerFavorites";
@@ -198,9 +198,9 @@ export default function CustomerQrLandingPage() {
 
   // 2. Real-Time Socket.IO Room Subscription
   useEffect(() => {
-    if (!restaurant?.id || !table?.tableNo) return;
+    if (!restaurant?.id || !table?.tableNo || IS_MISCONFIGURED_PREVIEW) return;
 
-    const socket = io(API_BASE_URL, {
+    const socket = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
       withCredentials: true,
     });

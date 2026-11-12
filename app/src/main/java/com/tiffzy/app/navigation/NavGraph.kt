@@ -507,8 +507,8 @@ fun NavGraph(
                 onBack = { navController.popBackStack() },
                 onOrderSuccess = { order ->
                     val uiState = checkoutViewModel.uiState.value
-                    if (uiState.selectedPaymentMethod == "CASHFREE") {
-                        // Start Cashfree Payment Activity
+                    if (uiState.selectedPaymentMethod == "CASHFREE" || uiState.selectedPaymentMethod == "TWM_PAY") {
+                        // Start Online Payment Activity (TWM Pay or Cashfree)
                         PaymentActivity.start(
                             context = context,
                             orderId = order.id.toString(),
@@ -517,8 +517,9 @@ fun NavGraph(
                             customerPhone = authViewModel.phone,
                             customerName = authViewModel.name,
                             customerEmail = authViewModel.email,
-                            restaurantId = null, // Backend will resolve this from orderId if needed
-                            env = "PRODUCTION" // Match with backend environment
+                            restaurantId = uiState.restaurant?.id?.toString(),
+                            env = "PRODUCTION",
+                            paymentProvider = uiState.selectedPaymentMethod
                         )
                         // Note: We don't navigate to success screen immediately for online payments.
                         // PaymentActivity handles its own success UI, and when finished,

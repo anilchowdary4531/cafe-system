@@ -942,6 +942,8 @@ model Payment {
   @@index([shiftId])
   @@index([cashfreeOrderId])
   @@index([paymentSessionId])
+  @@index([providerOrderId])
+  @@index([provider, providerOrderId])
   @@map("payments")
 }
 
