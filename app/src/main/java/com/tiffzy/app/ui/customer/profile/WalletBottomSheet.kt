@@ -3,9 +3,14 @@ package com.tiffzy.app.ui.customer.profile
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Schedule
 import com.tiffzy.app.MainActivity
 import com.tiffzy.app.data.model.TopupErrorType
+import com.tiffzy.app.ui.payment.TwmHostedCheckoutWebView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -361,7 +366,14 @@ fun AddMoneyDialog(
     val context = LocalContext.current
     val topupStep by viewModel.topupStep.collectAsState()
     val amountText by viewModel.topupAmountText.collectAsState()
+    val selectedProvider by viewModel.selectedProvider.collectAsState()
+    val availableOnlineProviders by viewModel.availableOnlineProviders.collectAsState()
+    val providersLoaded by viewModel.providersLoaded.collectAsState()
     val isProcessing = viewModel.isProcessing()
+
+    val showTwmPay = availableOnlineProviders.any { it.id.equals("TWM_PAY", ignoreCase = true) && it.configured }
+    val showCashfree = !providersLoaded ||
+        availableOnlineProviders.any { it.id.equals("CASHFREE", ignoreCase = true) && it.configured }
 
     val quickAmounts = listOf(100, 250, 500, 1000, 2000)
 
@@ -371,9 +383,10 @@ fun AddMoneyDialog(
 
     val numericAmount = amountText.toDoubleOrNull()
 
-    // Clear any previous error whenever Add Money dialog is opened/composed
+    // Clear any previous error and fetch providers whenever Add Money dialog is opened/composed
     LaunchedEffect(Unit) {
         viewModel.resetTopupState()
+        viewModel.loadPaymentProviders()
     }
 
     // Listen for top-up success to trigger dismiss and refresh
@@ -523,6 +536,38 @@ fun AddMoneyDialog(
                     enabled = !isProcessing
                 )
 
+                // Gateway selector (when TWM Pay is available)
+                if (showTwmPay) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Pay Via",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = selectedProvider == "TWM_PAY",
+                            onClick = { viewModel.selectProvider("TWM_PAY") },
+                            label = { Text("TWM Pay (UPI/QR)", fontSize = 12.sp) },
+                            enabled = !isProcessing
+                        )
+                        if (showCashfree) {
+                            FilterChip(
+                                selected = selectedProvider == "CASHFREE",
+                                onClick = { viewModel.selectProvider("CASHFREE") },
+                                label = { Text("Cashfree Online", fontSize = 12.sp) },
+                                enabled = !isProcessing
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
+
                 // Error Message Display
                 if (topupStep is TopupStep.Error) {
                     val error = topupStep as TopupStep.Error
@@ -557,11 +602,55 @@ fun AddMoneyDialog(
                     }
                 }
 
+                // Pending TWM Status Card (UTR_SUBMITTED / CREATED)
+                if (topupStep is TopupStep.Pending) {
+                    val pending = topupStep as TopupStep.Pending
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Schedule,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = pending.message,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    viewModel.checkTwmTopupStatus(
+                                        pending.topupTxnId,
+                                        pending.orderRef,
+                                        pending.amount
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Check Payment Status")
+                            }
+                        }
+                    }
+                }
+
                 // Loading State Feedback
                 if (isProcessing) {
                     val loadingMessage = when (topupStep) {
                         is TopupStep.CreatingSession -> "Creating payment session..."
-                        is TopupStep.OpeningPayment -> "Opening Cashfree payment..."
+                        is TopupStep.OpeningPayment -> if (selectedProvider == "TWM_PAY") "Opening TWM Pay..." else "Opening Cashfree payment..."
                         is TopupStep.VerifyingPayment -> "Verifying payment with backend..."
                         else -> "Processing payment..."
                     }
@@ -664,10 +753,103 @@ fun AddMoneyDialog(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "Secure payment via Cashfree",
+                        text = if (selectedProvider == "TWM_PAY") "Secure payment via TWM Pay" else "Secure payment via Cashfree",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+        }
+    }
+
+    // Hosted TWM Pay WebView Dialog for Wallet Top-Up
+    if (topupStep is TopupStep.TwmCheckout) {
+        val twm = topupStep as TopupStep.TwmCheckout
+        Dialog(
+            onDismissRequest = {
+                viewModel.checkTwmTopupStatus(twm.topupTxnId, twm.orderRef, twm.amount)
+            },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background
+            ) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "TWM Pay Wallet Top-Up",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Add ₹${"%.0f".format(twm.amount)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        IconButton(onClick = {
+                            viewModel.checkTwmTopupStatus(twm.topupTxnId, twm.orderRef, twm.amount)
+                        }) {
+                            Icon(Icons.Default.Close, contentDescription = "Close")
+                        }
+                    }
+                    HorizontalDivider()
+                    TwmHostedCheckoutWebView(
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        checkoutUrl = twm.checkoutUrl,
+                        returnUrlPrefix = twm.returnUrlPrefix,
+                        onExternalUpiLaunch = { targetUrl ->
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl))
+                                context.startActivity(Intent.createChooser(intent, "Complete UPI Payment"))
+                            } catch (_: Exception) {
+                                Toast.makeText(
+                                    context,
+                                    "No UPI app found. Complete payment using QR or UPI in checkout.",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        },
+                        onReturnIntercepted = { params ->
+                            viewModel.verifyTwmTopupReturn(twm.topupTxnId, twm.orderRef, twm.amount, params)
+                        },
+                        onReturnFallbackCheck = {
+                            viewModel.checkTwmTopupStatus(twm.topupTxnId, twm.orderRef, twm.amount)
+                        },
+                        onBackPressed = {
+                            viewModel.checkTwmTopupStatus(twm.topupTxnId, twm.orderRef, twm.amount)
+                        }
+                    )
+                    HorizontalDivider()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { viewModel.handlePaymentFailure("CANCELLED", "Cancelled by user") },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Cancel")
+                        }
+                        Button(
+                            onClick = {
+                                viewModel.checkTwmTopupStatus(twm.topupTxnId, twm.orderRef, twm.amount)
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Check Status")
+                        }
+                    }
                 }
             }
         }

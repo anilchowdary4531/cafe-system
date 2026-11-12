@@ -23,6 +23,18 @@ class WalletRepository(
         return apiService.verifyWalletTopup(request)
     }
 
+    suspend fun getPaymentProviders(): PaymentProvidersResponse {
+        return apiService.getPaymentProviders()
+    }
+
+    suspend fun verifyTwmWalletTopupReturn(request: WalletTwmReturnVerifyRequest): WalletTwmStatusResponse {
+        return apiService.verifyTwmWalletTopupReturn(request)
+    }
+
+    suspend fun getTwmWalletTopupStatus(topupTxnId: String, orderRef: String? = null): WalletTwmStatusResponse {
+        return apiService.getTwmWalletTopupStatus(topupTxnId, orderRef)
+    }
+
     suspend fun payOrderWithWallet(request: WalletPayOrderRequest): WalletPayOrderResponse {
         return apiService.payOrderWithWallet(request)
     }

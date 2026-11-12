@@ -16,8 +16,17 @@ export default function WalletBalanceHero({
     loadingWallet,
     onAddMoney,
     topupLoading,
+    selectedProvider = "CASHFREE",
+    onProviderChange = null,
+    providerAvailability = null,
 }) {
     const [selectedAmount, setSelectedAmount] = useState(500);
+
+    const showTwmOption = Boolean(providerAvailability?.twmPayConfigured);
+    const showCashfreeOption =
+        providerAvailability == null ||
+        !providerAvailability.loaded ||
+        Boolean(providerAvailability.cashfreeConfigured);
 
     const handleQuickSelect = (amt) => {
         setSelectedAmount(amt);
@@ -30,7 +39,11 @@ export default function WalletBalanceHero({
 
     const handleSubmit = (e) => {
         e?.preventDefault();
-        onAddMoney(selectedAmount);
+        if (typeof onProviderChange === "function") {
+            onAddMoney(selectedAmount, selectedProvider);
+        } else {
+            onAddMoney(selectedAmount);
+        }
     };
 
     const isAmountValid = Number(selectedAmount) >= 10;
@@ -104,6 +117,39 @@ export default function WalletBalanceHero({
                             );
                         })}
                     </div>
+
+                    {/* Gateway Selector (shown when TWM Pay or multiple gateways configured) */}
+                    {(showTwmOption && typeof onProviderChange === "function") && (
+                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                            <span className="text-[11px] font-medium theme-muted mr-1">Pay via:</span>
+                            <button
+                                type="button"
+                                disabled={topupLoading}
+                                onClick={() => onProviderChange("TWM_PAY")}
+                                className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold transition-all cursor-pointer ${
+                                    selectedProvider === "TWM_PAY"
+                                        ? "border-[var(--app-primary)] bg-[var(--app-primary)] text-white shadow-sm"
+                                        : "border-[color:var(--app-border)]/60 theme-muted hover:text-[color:var(--app-text)]"
+                                }`}
+                            >
+                                TWM Pay (UPI / QR)
+                            </button>
+                            {showCashfreeOption && (
+                                <button
+                                    type="button"
+                                    disabled={topupLoading}
+                                    onClick={() => onProviderChange("CASHFREE")}
+                                    className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold transition-all cursor-pointer ${
+                                        selectedProvider === "CASHFREE"
+                                            ? "border-[var(--app-primary)] bg-[var(--app-primary)] text-white shadow-sm"
+                                            : "border-[color:var(--app-border)]/60 theme-muted hover:text-[color:var(--app-text)]"
+                                    }`}
+                                >
+                                    Cashfree Online
+                                </button>
+                            )}
+                        </div>
+                    )}
 
                     {/* Custom Amount Form & Inline Add Button */}
                     <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">

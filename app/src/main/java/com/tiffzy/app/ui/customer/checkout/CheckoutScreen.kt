@@ -180,6 +180,7 @@ fun CheckoutScreen(
                 PaymentMethodSelectorCard(
                     selectedMethod = uiState.selectedPaymentMethod,
                     availableOnlineProviders = uiState.availableOnlineProviders,
+                    providersLoaded = uiState.providersLoaded,
                     onSelectMethod = { viewModel.selectPaymentMethod(it) }
                 )
 
@@ -321,11 +322,12 @@ fun AddressSelector(
 fun PaymentMethodSelectorCard(
     selectedMethod: String,
     availableOnlineProviders: List<PaymentProviderItem> = emptyList(),
+    providersLoaded: Boolean = false,
     onSelectMethod: (String) -> Unit
 ) {
-    val showTwmPay = availableOnlineProviders.isEmpty() ||
+    val showTwmPay = !providersLoaded ||
         availableOnlineProviders.any { it.id.equals("TWM_PAY", ignoreCase = true) && it.configured }
-    val showCashfree = availableOnlineProviders.isEmpty() ||
+    val showCashfree = !providersLoaded ||
         availableOnlineProviders.any { it.id.equals("CASHFREE", ignoreCase = true) && it.configured }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

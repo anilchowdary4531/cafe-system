@@ -22,6 +22,7 @@ data class CheckoutUiState(
     val checkoutPreview: CheckoutPreviewResponse? = null,
     val selectedPaymentMethod: String = "TWM_PAY",
     val availableOnlineProviders: List<PaymentProviderItem> = emptyList(),
+    val providersLoaded: Boolean = false,
     val orderSuccess: OrderResponse? = null,
     val error: String? = null
 )
@@ -63,6 +64,7 @@ class CheckoutViewModel(
                     walletAccounts = wallet,
                     restaurant = restaurant,
                     availableOnlineProviders = configuredProviders,
+                    providersLoaded = providersRes != null,
                     selectedPaymentMethod = updatedDefault
                 )
                 calculateBill()

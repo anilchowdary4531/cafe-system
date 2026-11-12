@@ -12,6 +12,17 @@ import {
 import { createWalletLoadPgOrder } from "./cashfreePgCreditService.js";
 import defaultPrisma from "../prisma.js";
 import { completeSessionAndReleaseTable } from "./tableSessionService.js";
+import { assertTwmPayConfigured, getTwmPayConfig } from "../config/twmPay.config.js";
+import {
+  createTwmPaymentOrder,
+  fetchTwmOrderStatus,
+  normalizeTwmStatus,
+  recordTwmNotificationMetric,
+  recordTwmStatusMetric,
+  toPaise,
+  verifyTwmSignature,
+} from "./twmPay.service.js";
+import { resolveTwmNotifyUrl } from "./twmPayPaymentService.js";
 
 const round2 = (num) => Math.round((Number(num || 0) + Number.EPSILON) * 100) / 100;
 const getDb = (passedPrisma) => passedPrisma || defaultPrisma;
@@ -342,15 +353,144 @@ export const getWalletAnalytics = async (
   };
 };
 
+const resolveWalletTwmReturnUrl = ({ req, requestedReturnUrl }) => {
+  const cfg = getTwmPayConfig();
+  if (cfg.returnUrlOverride) {
+    return cfg.returnUrlOverride;
+  }
+
+  let defaultBase = "";
+  const originHeader = String(req?.headers?.origin || "").trim();
+  if (/^https?:\/\//i.test(originHeader)) {
+    try {
+      defaultBase = new URL(originHeader).origin;
+    } catch {
+      defaultBase = "";
+    }
+  }
+  if (!defaultBase) {
+    const envFrontend = String(process.env.FRONTEND_URL || "").trim();
+    if (/^https?:\/\//i.test(envFrontend)) {
+      try {
+        defaultBase = new URL(envFrontend).origin;
+      } catch {
+        defaultBase = "";
+      }
+    }
+  }
+  if (!defaultBase) {
+    defaultBase = "http://localhost:5173";
+  }
+
+  const defaultUrl = `${defaultBase}/profile/wallet`;
+  const candidate = String(requestedReturnUrl || "").trim();
+  if (!candidate) return defaultUrl;
+
+  try {
+    const parsed = new URL(candidate);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return defaultUrl;
+    }
+    const allowedOrigins = new Set([defaultBase]);
+    const envFrontend = String(process.env.FRONTEND_URL || "").trim();
+    if (/^https?:\/\//i.test(envFrontend)) {
+      allowedOrigins.add(new URL(envFrontend).origin);
+    }
+    if (
+      parsed.hostname === "localhost" ||
+      parsed.hostname === "127.0.0.1" ||
+      allowedOrigins.has(parsed.origin)
+    ) {
+      const cleaned = candidate.split("?")[0].replace(/\{order_id\}/gi, "").replace(/\/+$/, "");
+      return cleaned || defaultUrl;
+    }
+  } catch {
+    return defaultUrl;
+  }
+  return defaultUrl;
+};
+
 /**
- * Initiate Wallet Top-Up Session
+ * Atomic non-duplicating balance credit & ledger append for verified wallet top-ups.
+ */
+const creditWalletTopupAtomically = async (
+  prisma,
+  { topupRecord, gatewayOrderId, gatewayPaymentId, idempotencyKey, description }
+) => {
+  const cleanIdempotencyKey = idempotencyKey || `CREDIT_${topupRecord.topupTxnId}`;
+
+  return await prisma.$transaction(async (tx) => {
+    const wallet = await tx.wallet.findUnique({ where: { id: topupRecord.walletId } });
+    if (!wallet || wallet.status !== "ACTIVE") {
+      throw new Error("Wallet is inactive or blocked");
+    }
+
+    if (typeof tx.walletTopup?.updateMany === "function") {
+      const claim = await tx.walletTopup.updateMany({
+        where: {
+          id: topupRecord.id,
+          status: { not: "SUCCESS" },
+        },
+        data: {
+          status: "SUCCESS",
+          gatewayOrderId: gatewayOrderId || topupRecord.gatewayOrderId,
+          gatewayPaymentId: gatewayPaymentId || topupRecord.gatewayPaymentId || null,
+        },
+      });
+      if (claim.count === 0) {
+        return { wallet, alreadyCredited: true };
+      }
+    } else {
+      await tx.walletTopup.update({
+        where: { id: topupRecord.id },
+        data: {
+          status: "SUCCESS",
+          gatewayOrderId: gatewayOrderId || topupRecord.gatewayOrderId,
+          gatewayPaymentId: gatewayPaymentId || topupRecord.gatewayPaymentId || null,
+        },
+      });
+    }
+
+    const balanceBefore = round2(wallet.balance);
+    const balanceAfter = round2(balanceBefore + topupRecord.amount);
+
+    const updated = await tx.wallet.update({
+      where: { id: wallet.id },
+      data: { balance: balanceAfter },
+    });
+
+    await tx.walletLedger.create({
+      data: {
+        walletId: wallet.id,
+        customerAccountId: wallet.customerAccountId,
+        type: "WALLET_TOPUP",
+        direction: "CREDIT",
+        amount: topupRecord.amount,
+        balanceBefore,
+        balanceAfter,
+        referenceType: "TOPUP",
+        referenceId: topupRecord.topupTxnId,
+        description: description || `Wallet top-up ₹${topupRecord.amount}`,
+        idempotencyKey: cleanIdempotencyKey,
+        status: "SUCCESS",
+      },
+    });
+
+    return { wallet: updated, alreadyCredited: false };
+  });
+};
+
+/**
+ * Initiate Wallet Top-Up Session (TWM Pay or Cashfree)
  */
 export const initiateTopup = async (
   passedPrisma,
-  { customerAccountId, amount, returnUrl }
+  { customerAccountId, amount, returnUrl, provider, idempotencyKey, req = null, fetchImpl }
 ) => {
   const prisma = getDb(passedPrisma);
   const numAmount = round2(amount);
+  const normalizedProvider = String(provider || "").trim().toUpperCase();
+  const useTwmPay = normalizedProvider === "TWM_PAY" || normalizedProvider === "TWM";
 
   if (Number.isNaN(numAmount) || numAmount < WALLET_CONFIG.MIN_TOPUP) {
     throw new Error(`Minimum top-up amount is ₹${WALLET_CONFIG.MIN_TOPUP}`);
@@ -377,9 +517,81 @@ export const initiateTopup = async (
     throw new Error("Customer account not found");
   }
 
+  const cleanIdemKey = idempotencyKey ? String(idempotencyKey).trim() : null;
+  if (cleanIdemKey) {
+    const existingByIdem = await prisma.walletTopup.findUnique({
+      where: { idempotencyKey: cleanIdemKey },
+    });
+    if (existingByIdem && existingByIdem.status === "SUCCESS") {
+      throw new Error("This top-up request was already completed");
+    }
+  }
+
   const topupTxnId = `TOPUP_${wallet.id}_${Date.now()}`;
 
-  // Create pending top-up record in DB
+  if (useTwmPay) {
+    assertTwmPayConfigured();
+    const amountPaise = toPaise(numAmount);
+    const resolvedReturnUrl = resolveWalletTwmReturnUrl({ req, requestedReturnUrl: returnUrl });
+    const resolvedNotifyUrl = resolveTwmNotifyUrl({ req });
+
+    const topupRecord = await prisma.walletTopup.create({
+      data: {
+        walletId: wallet.id,
+        customerAccountId: wallet.customerAccountId,
+        topupTxnId,
+        amount: numAmount,
+        currency: WALLET_CONFIG.CURRENCY,
+        status: "PENDING",
+        gateway: "TWM_PAY",
+        gatewayOrderId: topupTxnId,
+        idempotencyKey: cleanIdemKey,
+      },
+    });
+
+    try {
+      const twmOrder = await createTwmPaymentOrder(
+        {
+          orderRef: topupTxnId,
+          amountPaise,
+          customerName: customer.name || "Tiffzy Customer",
+          customerPhone: customer.phone || "",
+          returnUrl: resolvedReturnUrl,
+          notifyUrl: resolvedNotifyUrl,
+        },
+        { fetchImpl }
+      );
+
+      const gatewayOrderId = twmOrder.orderRef || topupTxnId;
+      if (gatewayOrderId !== topupRecord.gatewayOrderId) {
+        await prisma.walletTopup.update({
+          where: { id: topupRecord.id },
+          data: { gatewayOrderId },
+        });
+      }
+
+      return {
+        topupTxnId,
+        orderRef: gatewayOrderId,
+        amount: numAmount,
+        amountPaise,
+        provider: "TWM_PAY",
+        gateway: "TWM_PAY",
+        gatewayOrderId,
+        checkoutUrl: twmOrder.checkoutUrl,
+        checkout_url: twmOrder.checkoutUrl,
+        paymentUrl: twmOrder.checkoutUrl,
+      };
+    } catch (err) {
+      await prisma.walletTopup.update({
+        where: { id: topupRecord.id },
+        data: { status: "FAILED" },
+      }).catch(() => {});
+      throw err;
+    }
+  }
+
+  // Create pending Cashfree top-up record in DB
   const topupRecord = await prisma.walletTopup.create({
     data: {
       walletId: wallet.id,
@@ -389,6 +601,7 @@ export const initiateTopup = async (
       currency: WALLET_CONFIG.CURRENCY,
       status: "PENDING",
       gateway: "CASHFREE",
+      idempotencyKey: cleanIdemKey,
     },
   });
 
@@ -518,58 +731,335 @@ export const verifyAndCreditTopup = async (
     }
   }
 
-  // Atomic transaction for balance credit + ledger append in local DB
-  const updatedWallet = await prisma.$transaction(async (tx) => {
-    const wallet = await tx.wallet.findUnique({ where: { id: topupRecord.walletId } });
-
-    if (!wallet || wallet.status !== "ACTIVE") {
-      throw new Error("Wallet is inactive or blocked");
-    }
-
-    const balanceBefore = round2(wallet.balance);
-    const balanceAfter = round2(balanceBefore + topupRecord.amount);
-
-    const updated = await tx.wallet.update({
-      where: { id: wallet.id },
-      data: { balance: balanceAfter },
-    });
-
-    await tx.walletTopup.update({
-      where: { id: topupRecord.id },
-      data: {
-        status: "SUCCESS",
-        gatewayOrderId: gatewayOrderId || topupRecord.gatewayOrderId,
-        gatewayPaymentId: gatewayPaymentId || null,
-      },
-    });
-
-    await tx.walletLedger.create({
-      data: {
-        walletId: wallet.id,
-        customerAccountId: wallet.customerAccountId,
-        type: "WALLET_TOPUP",
-        direction: "CREDIT",
-        amount: topupRecord.amount,
-        balanceBefore,
-        balanceAfter,
-        referenceType: "TOPUP",
-        referenceId: topupRecord.topupTxnId,
-        description: `Wallet top-up ₹${topupRecord.amount} via Cashfree`,
-        idempotencyKey: cleanIdempotencyKey,
-        status: "SUCCESS",
-      },
-    });
-
-    return updated;
+  // Atomic non-duplicating transaction for balance credit + ledger append in local DB
+  const { wallet: updatedWallet, alreadyCredited } = await creditWalletTopupAtomically(prisma, {
+    topupRecord,
+    gatewayOrderId,
+    gatewayPaymentId,
+    idempotencyKey: cleanIdempotencyKey,
+    description: `Wallet top-up ₹${topupRecord.amount} via Cashfree`,
   });
 
   return {
     success: true,
-    message: `₹${topupRecord.amount} added to your Tiffzy Wallet`,
+    alreadyProcessed: alreadyCredited,
+    message: alreadyCredited
+      ? "Top-up was already credited successfully"
+      : `₹${topupRecord.amount} added to your Tiffzy Wallet`,
     balance: round2(updatedWallet.balance),
     amount: topupRecord.amount,
     topupTxnId: topupRecord.topupTxnId,
   };
+};
+
+const findTwmWalletTopupRecord = async (prisma, { topupTxnId, orderRef }) => {
+  if (!prisma?.walletTopup) return null;
+  const candidates = [topupTxnId, orderRef]
+    .map((val) => String(val || "").trim())
+    .filter(Boolean);
+  if (candidates.length === 0) return null;
+
+  for (const ref of candidates) {
+    const foundByTxn = await prisma.walletTopup.findUnique({
+      where: { topupTxnId: ref },
+      include: { wallet: true },
+    });
+    if (foundByTxn) return foundByTxn;
+
+    const foundByGatewayOrder = await prisma.walletTopup.findFirst({
+      where: { gatewayOrderId: ref },
+      include: { wallet: true },
+      orderBy: { id: "desc" },
+    });
+    if (foundByGatewayOrder) return foundByGatewayOrder;
+  }
+
+  return null;
+};
+
+const applyVerifiedTwmTopupOutcome = async ({
+  prisma,
+  topupRecord,
+  normalized,
+  amountPaise,
+  txn,
+}) => {
+  recordTwmStatusMetric(normalized.gatewayStatus);
+
+  const expectedPaise = toPaise(topupRecord.amount);
+  const incomingPaise =
+    amountPaise !== undefined && amountPaise !== null && String(amountPaise).trim() !== ""
+      ? Number(amountPaise)
+      : null;
+
+  if (incomingPaise !== null && (!Number.isSafeInteger(incomingPaise) || incomingPaise !== expectedPaise)) {
+    const err = new Error(
+      `Payment amount mismatch for top-up ${topupRecord.topupTxnId}: expected ${expectedPaise} paise, got ${amountPaise}`
+    );
+    err.statusCode = 400;
+    err.code = "TWM_AMOUNT_MISMATCH";
+    throw err;
+  }
+
+  if (topupRecord.status === "SUCCESS") {
+    const freshWallet = await prisma.wallet.findUnique({ where: { id: topupRecord.walletId } });
+    return {
+      verified: true,
+      success: true,
+      alreadyProcessed: true,
+      status: "PAID",
+      paymentStatus: "PAID",
+      gatewayStatus: "PAID",
+      topupTxnId: topupRecord.topupTxnId,
+      orderRef: topupRecord.gatewayOrderId || topupRecord.topupTxnId,
+      amount: topupRecord.amount,
+      balance: round2(freshWallet?.balance ?? topupRecord.wallet?.balance ?? 0),
+      txn: txn || topupRecord.gatewayPaymentId || null,
+      message: "Top-up was already credited successfully",
+    };
+  }
+
+  if (normalized.paymentStatus === "PAID" || normalized.isPaid) {
+    const { wallet: updatedWallet, alreadyCredited } = await creditWalletTopupAtomically(prisma, {
+      topupRecord,
+      gatewayOrderId: topupRecord.gatewayOrderId || topupRecord.topupTxnId,
+      gatewayPaymentId: txn || null,
+      idempotencyKey: `CREDIT_${topupRecord.topupTxnId}`,
+      description: `Wallet top-up ₹${topupRecord.amount} via TWM Pay`,
+    });
+
+    return {
+      verified: true,
+      success: true,
+      alreadyProcessed: alreadyCredited,
+      status: "PAID",
+      paymentStatus: "PAID",
+      gatewayStatus: "PAID",
+      topupTxnId: topupRecord.topupTxnId,
+      orderRef: topupRecord.gatewayOrderId || topupRecord.topupTxnId,
+      amount: topupRecord.amount,
+      balance: round2(updatedWallet.balance),
+      txn: txn || topupRecord.gatewayPaymentId || null,
+      message: alreadyCredited
+        ? "Top-up was already credited successfully"
+        : `₹${topupRecord.amount} added to your Tiffzy Wallet`,
+    };
+  }
+
+  if (normalized.paymentStatus === "FAILED") {
+    if (typeof prisma.walletTopup?.updateMany === "function") {
+      await prisma.walletTopup.updateMany({
+        where: { id: topupRecord.id, status: { not: "SUCCESS" } },
+        data: {
+          status: "FAILED",
+          gatewayPaymentId: txn || topupRecord.gatewayPaymentId || null,
+        },
+      });
+    } else {
+      await prisma.walletTopup.update({
+        where: { id: topupRecord.id },
+        data: {
+          status: "FAILED",
+          gatewayPaymentId: txn || topupRecord.gatewayPaymentId || null,
+        },
+      });
+    }
+
+    return {
+      verified: true,
+      success: false,
+      alreadyProcessed: false,
+      status: "FAILED",
+      paymentStatus: "FAILED",
+      gatewayStatus: normalized.gatewayStatus,
+      topupTxnId: topupRecord.topupTxnId,
+      orderRef: topupRecord.gatewayOrderId || topupRecord.topupTxnId,
+      amount: topupRecord.amount,
+      balance: round2(topupRecord.wallet?.balance ?? 0),
+      txn: txn || topupRecord.gatewayPaymentId || null,
+      message:
+        normalized.gatewayStatus === "EXPIRED"
+          ? "Top-up payment session expired"
+          : "Top-up payment was rejected",
+    };
+  }
+
+  if (txn && txn !== topupRecord.gatewayPaymentId) {
+    await prisma.walletTopup.updateMany({
+      where: { id: topupRecord.id, status: { not: "SUCCESS" } },
+      data: { gatewayPaymentId: txn },
+    });
+  }
+
+  return {
+    verified: true,
+    success: false,
+    alreadyProcessed: false,
+    status: "PENDING",
+    paymentStatus: "PENDING",
+    gatewayStatus: normalized.gatewayStatus,
+    topupTxnId: topupRecord.topupTxnId,
+    orderRef: topupRecord.gatewayOrderId || topupRecord.topupTxnId,
+    amount: topupRecord.amount,
+    balance: round2(topupRecord.wallet?.balance ?? 0),
+    txn: txn || topupRecord.gatewayPaymentId || null,
+    message: normalized.message,
+  };
+};
+
+/**
+ * Reconcile TWM Pay Wallet Top-Up Status authoritatively via TWM Order Status API
+ */
+export const reconcileTwmTopupStatus = async ({
+  prisma: passedPrisma,
+  customerAccountId = null,
+  topupTxnId,
+  orderRef,
+  fetchImpl,
+}) => {
+  const prisma = getDb(passedPrisma);
+  const topupRecord = await findTwmWalletTopupRecord(prisma, { topupTxnId, orderRef });
+
+  if (!topupRecord) {
+    const err = new Error("Top-up transaction record not found");
+    err.statusCode = 404;
+    err.code = "TOPUP_NOT_FOUND";
+    throw err;
+  }
+
+  if (
+    customerAccountId !== null &&
+    customerAccountId !== undefined &&
+    topupRecord.customerAccountId !== Number(customerAccountId)
+  ) {
+    const err = new Error("Unauthorized top-up verification attempt");
+    err.statusCode = 403;
+    err.code = "UNAUTHORIZED";
+    throw err;
+  }
+
+  if (topupRecord.status === "SUCCESS") {
+    return applyVerifiedTwmTopupOutcome({
+      prisma,
+      topupRecord,
+      normalized: normalizeTwmStatus("paid"),
+      amountPaise: toPaise(topupRecord.amount),
+      txn: topupRecord.gatewayPaymentId,
+    });
+  }
+
+  const lookupRef = topupRecord.gatewayOrderId || topupRecord.topupTxnId;
+  const gatewayRes = await fetchTwmOrderStatus(lookupRef, { fetchImpl });
+  const normalized = gatewayRes.normalized || normalizeTwmStatus(gatewayRes.raw?.status);
+
+  return applyVerifiedTwmTopupOutcome({
+    prisma,
+    topupRecord,
+    normalized,
+    amountPaise: gatewayRes.amountPaise,
+    txn: gatewayRes.txn,
+  });
+};
+
+/**
+ * Process TWM Pay Redirect/Return Verification for Wallet Top-Up
+ */
+export const processTwmTopupReturn = async ({
+  prisma: passedPrisma,
+  customerAccountId,
+  payload,
+  fetchImpl,
+}) => {
+  const prisma = getDb(passedPrisma);
+  const input = payload || {};
+  const topupTxnId = String(input.topupTxnId || input.topup_id || "").trim();
+  const orderRef = String(input.order_ref || input.orderRef || "").trim();
+
+  if (
+    input.signature !== undefined ||
+    input.status !== undefined ||
+    input.amount_paise !== undefined
+  ) {
+    if (!verifyTwmSignature(input)) {
+      const err = new Error("Invalid payment signature");
+      err.statusCode = 400;
+      err.code = "INVALID_SIGNATURE";
+      throw err;
+    }
+
+    const topupRecord = await findTwmWalletTopupRecord(prisma, { topupTxnId, orderRef });
+    if (!topupRecord) {
+      const err = new Error("Top-up transaction record not found");
+      err.statusCode = 404;
+      err.code = "TOPUP_NOT_FOUND";
+      throw err;
+    }
+
+    if (topupRecord.customerAccountId !== Number(customerAccountId)) {
+      const err = new Error("Unauthorized top-up verification attempt");
+      err.statusCode = 403;
+      err.code = "UNAUTHORIZED";
+      throw err;
+    }
+
+    const normalized = normalizeTwmStatus(input.status);
+    return applyVerifiedTwmTopupOutcome({
+      prisma,
+      topupRecord,
+      normalized,
+      amountPaise: input.amount_paise,
+      txn: input.txn,
+    });
+  }
+
+  return reconcileTwmTopupStatus({
+    prisma,
+    customerAccountId,
+    topupTxnId,
+    orderRef,
+    fetchImpl,
+  });
+};
+
+/**
+ * Process Signed TWM Pay Webhook Notification for Wallet Top-Up
+ */
+export const processTwmTopupNotify = async ({
+  prisma: passedPrisma,
+  payload,
+}) => {
+  const prisma = getDb(passedPrisma);
+  const input = payload || {};
+  recordTwmNotificationMetric("received");
+
+  if (!verifyTwmSignature(input)) {
+    recordTwmNotificationMetric("rejected");
+    const err = new Error("Invalid TWM Pay notification signature");
+    err.statusCode = 400;
+    err.code = "INVALID_SIGNATURE";
+    throw err;
+  }
+
+  const orderRef = String(input.order_ref || "").trim();
+  const topupRecord = await findTwmWalletTopupRecord(prisma, { orderRef });
+  if (!topupRecord) {
+    const err = new Error(`Unknown TWM Pay top-up reference: ${orderRef}`);
+    err.statusCode = 404;
+    err.code = "TOPUP_NOT_FOUND";
+    throw err;
+  }
+
+  const normalized = normalizeTwmStatus(input.status);
+  const result = await applyVerifiedTwmTopupOutcome({
+    prisma,
+    topupRecord,
+    normalized,
+    amountPaise: input.amount_paise,
+    txn: input.txn,
+  });
+
+  recordTwmNotificationMetric("verified");
+  return result;
 };
 
 /**

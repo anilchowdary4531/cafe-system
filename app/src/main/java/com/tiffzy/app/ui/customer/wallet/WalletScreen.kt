@@ -1,5 +1,8 @@
 package com.tiffzy.app.ui.customer.wallet
 
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,12 +16,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tiffzy.app.data.model.TopupStep
 import com.tiffzy.app.data.model.WalletTransaction
+import com.tiffzy.app.data.model.resolvedCheckoutUrl
+import com.tiffzy.app.data.model.resolvedGatewayOrderId
+import com.tiffzy.app.data.model.resolvedTopupTxnId
+import com.tiffzy.app.ui.payment.TwmHostedCheckoutWebView
 import com.tiffzy.app.ui.theme.TiffzyPrimary
 
 
@@ -28,9 +39,12 @@ fun WalletScreen(
     onNavigateBack: () -> Unit = {},
     viewModel: WalletViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     var showTopupDialog by remember { mutableStateOf(false) }
     var customAmountText by remember { mutableStateOf("") }
+    var activeTwmCheckout by remember { mutableStateOf<TopupStep.TwmCheckout?>(null) }
+    var statusNotice by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         topBar = {
@@ -210,8 +224,19 @@ fun WalletScreen(
                         val amt = customAmountText.toDoubleOrNull()
                         if (amt != null && amt >= 10.0) {
                             showTopupDialog = false
-                            viewModel.initiateTopup(amt) { response ->
-                                // Trigger Cashfree PG SDK / Webview
+                            viewModel.initiateTopup(amt, provider = "TWM_PAY") { response ->
+                                val checkoutUrl = response.resolvedCheckoutUrl
+                                val txnId = response.resolvedTopupTxnId
+                                val orderRef = response.resolvedGatewayOrderId ?: txnId
+                                if (!checkoutUrl.isNullOrBlank() && !txnId.isNullOrBlank()) {
+                                    activeTwmCheckout = TopupStep.TwmCheckout(
+                                        topupTxnId = txnId,
+                                        orderRef = orderRef ?: txnId,
+                                        checkoutUrl = checkoutUrl,
+                                        amount = amt,
+                                        returnUrlPrefix = "https://tiffzy.com/profile/wallet"
+                                    )
+                                }
                             }
                         }
                     }
@@ -225,6 +250,68 @@ fun WalletScreen(
                 }
             }
         )
+    }
+
+    activeTwmCheckout?.let { twm ->
+        Dialog(
+            onDismissRequest = {
+                viewModel.checkTwmStatus(twm.topupTxnId, twm.orderRef) { res ->
+                    statusNotice = res.message
+                    activeTwmCheckout = null
+                }
+            },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(modifier = Modifier.fillMaxSize()) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    TwmHostedCheckoutWebView(
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        checkoutUrl = twm.checkoutUrl,
+                        returnUrlPrefix = twm.returnUrlPrefix,
+                        onExternalUpiLaunch = { targetUrl ->
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl))
+                                context.startActivity(Intent.createChooser(intent, "Complete UPI Payment"))
+                            } catch (_: Exception) {
+                                Toast.makeText(context, "No UPI app found", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        onReturnIntercepted = { params ->
+                            viewModel.verifyTwmReturn(twm.topupTxnId, twm.orderRef, params) { res ->
+                                statusNotice = res.message
+                                activeTwmCheckout = null
+                                statusNotice?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
+                            }
+                        },
+                        onReturnFallbackCheck = {
+                            viewModel.checkTwmStatus(twm.topupTxnId, twm.orderRef) { res ->
+                                statusNotice = res.message
+                                activeTwmCheckout = null
+                                statusNotice?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
+                            }
+                        },
+                        onBackPressed = {
+                            viewModel.checkTwmStatus(twm.topupTxnId, twm.orderRef) { res ->
+                                statusNotice = res.message
+                                activeTwmCheckout = null
+                            }
+                        }
+                    )
+                    Button(
+                        onClick = {
+                            viewModel.checkTwmStatus(twm.topupTxnId, twm.orderRef) { res ->
+                                statusNotice = res.message
+                                activeTwmCheckout = null
+                                statusNotice?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(16.dp)
+                    ) {
+                        Text("Check Payment Status")
+                    }
+                }
+            }
+        }
     }
 }
 

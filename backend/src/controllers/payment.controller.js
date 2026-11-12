@@ -9,6 +9,7 @@ import {
   reconcileTwmPayOrderStatus,
 } from "../services/twmPayPaymentService.js";
 import { getTwmPayMetrics } from "../services/twmPay.service.js";
+import { processTwmTopupNotify } from "../services/walletService.js";
 
 export const buildPaymentController = ({ prisma, realtime = null, fetchImpl } = {}) => {
   const resolveRealtime = (req) => req?.server?.realtime || req?.realtime || realtime || null;
@@ -795,11 +796,20 @@ export const buildPaymentController = ({ prisma, realtime = null, fetchImpl } = 
   const handleTwmNotify = async (req, reply) => {
     try {
       const payload = { ...(req.query || {}), ...(req.body && typeof req.body === "object" ? req.body : {}) };
-      const result = await processTwmPayNotify({
-        prisma,
-        payload,
-        realtime: resolveRealtime(req),
-      });
+      let result;
+      try {
+        result = await processTwmPayNotify({
+          prisma,
+          payload,
+          realtime: resolveRealtime(req),
+        });
+      } catch (notifyErr) {
+        if (notifyErr?.code === "PAYMENT_NOT_FOUND") {
+          result = await processTwmTopupNotify({ prisma, payload });
+        } else {
+          throw notifyErr;
+        }
+      }
       return reply.code(200).send({
         ok: true,
         status: "ok",

@@ -1517,7 +1517,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart, redirec
 
                                     {selectedPaymentMethod === "UPI" && (
                                         <div className="mt-2.5 flex flex-wrap gap-1.5 pl-9 sm:pl-10">
-                                            {(providerAvailability.twmPayConfigured || !providerAvailability.loaded || !providerAvailability.cashfreeConfigured) && (
+                                            {(providerAvailability.twmPayConfigured || !providerAvailability.loaded) && (
                                                 <button
                                                     type="button"
                                                     onClick={() => {
@@ -1533,7 +1533,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart, redirec
                                                     TWM Pay (UPI / QR)
                                                 </button>
                                             )}
-                                            {(providerAvailability.cashfreeConfigured || !providerAvailability.loaded || !providerAvailability.twmPayConfigured) && (
+                                            {(providerAvailability.cashfreeConfigured || !providerAvailability.loaded) && (
                                                 <button
                                                     type="button"
                                                     onClick={() => {
@@ -1549,6 +1549,13 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart, redirec
                                                     Cashfree Online
                                                 </button>
                                             )}
+                                            {providerAvailability.loaded &&
+                                                !providerAvailability.twmPayConfigured &&
+                                                !providerAvailability.cashfreeConfigured && (
+                                                    <span className="text-[11px] text-amber-600 dark:text-amber-400">
+                                                        No online payment gateway is currently configured.
+                                                    </span>
+                                                )}
                                         </div>
                                     )}
                                 </div>

@@ -129,6 +129,17 @@ interface ApiService {
         @Body request: WalletTopupVerifyRequest
     ): WalletTopupVerifyResponse
 
+    @POST("api/wallet/topup/twm/return")
+    suspend fun verifyTwmWalletTopupReturn(
+        @Body request: WalletTwmReturnVerifyRequest
+    ): WalletTwmStatusResponse
+
+    @GET("api/wallet/topup/twm/status/{topupTxnId}")
+    suspend fun getTwmWalletTopupStatus(
+        @Path("topupTxnId") topupTxnId: String,
+        @Query("order_ref") orderRef: String? = null
+    ): WalletTwmStatusResponse
+
     @GET("customer/notifications")
     suspend fun getNotifications(): NotificationsResponse
 

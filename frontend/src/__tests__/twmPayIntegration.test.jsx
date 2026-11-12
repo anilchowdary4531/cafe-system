@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import CheckoutPrompt from "../components/CheckoutPrompt";
 import PaymentStatus, { parsePaymentReturnParams } from "../pages/PaymentStatus";
+import WalletSection from "../pages/customer/profile/WalletSection";
 import { resolveFrontendEnvConfig } from "../config";
 import vercelConfig from "../../vercel.json";
 import { RestaurantContextProvider } from "../context/RestaurantContext";
@@ -485,6 +486,182 @@ describe("TWM Pay Frontend Checkout & Return Verification Suite", () => {
         await waitFor(() => {
             expect(screen.getByText("Payment Pending")).toBeInTheDocument();
             expect(screen.queryByText("Payment Successful")).not.toBeInTheDocument();
+        });
+    });
+
+    it("9. CheckoutPrompt hides TWM Pay when disabled and defaults cleanly to Cashfree", async () => {
+        api.get.mockImplementation((url) => {
+            if (url === "/api/payments/providers") {
+                return Promise.resolve({
+                    data: {
+                        defaultProvider: "CASHFREE",
+                        twmPay: { configured: false, enabled: false },
+                        cashfree: { configured: true, enabled: true },
+                    },
+                });
+            }
+            return Promise.resolve({ data: {} });
+        });
+
+        render(
+            <MemoryRouter initialEntries={["/r/mango-forest/menu"]}>
+                <AuthProvider>
+                    <RestaurantContextProvider>
+                        <CheckoutPrompt
+                            open={true}
+                            onClose={vi.fn()}
+                            cart={[
+                                {
+                                    cartItemKey: "item-1",
+                                    id: 11,
+                                    name: "Masala Dosa",
+                                    price: 120,
+                                    qty: 1,
+                                    veg: true,
+                                },
+                            ]}
+                            clearCart={vi.fn()}
+                        />
+                    </RestaurantContextProvider>
+                </AuthProvider>
+            </MemoryRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText(/Cashfree Online/i)).toBeInTheDocument();
+            expect(screen.queryByText(/TWM Pay \(UPI \/ QR\)/i)).not.toBeInTheDocument();
+        });
+    });
+
+    it("10. WalletSection supports TWM Pay top-up initiation, signed PAID verification, and EXPIRED failure display", async () => {
+        const redirectSpy = vi.fn();
+        api.get.mockImplementation((url) => {
+            if (url === "/api/payments/providers") {
+                return Promise.resolve({
+                    data: {
+                        defaultProvider: "TWM_PAY",
+                        twmPay: { configured: true, enabled: true },
+                        cashfree: { configured: true, enabled: true },
+                    },
+                });
+            }
+            if (url === "/api/wallet") {
+                return Promise.resolve({ data: { wallet: { balance: 350.5, status: "ACTIVE" } } });
+            }
+            if (url.startsWith("/api/wallet/analytics")) {
+                return Promise.resolve({ data: { data: { trend: [], summary: {} } } });
+            }
+            if (url.startsWith("/api/wallet/transactions")) {
+                return Promise.resolve({ data: { transactions: [], page: 1, limit: 10, total: 0, totalPages: 1 } });
+            }
+            return Promise.resolve({ data: {} });
+        });
+
+        api.post.mockImplementation((url) => {
+            if (url === "/api/wallet/topup/create") {
+                return Promise.resolve({
+                    data: {
+                        success: true,
+                        provider: "TWM_PAY",
+                        topupTxnId: "TOPUP_9_1001",
+                        orderRef: "TOPUP_9_1001",
+                        checkoutUrl: "https://pay.thewebsitemakers.in/checkout/TOPUP_9_1001",
+                    },
+                });
+            }
+            if (url === "/api/wallet/topup/twm/return") {
+                return Promise.resolve({
+                    data: {
+                        verified: true,
+                        success: true,
+                        status: "PAID",
+                        paymentStatus: "PAID",
+                        gatewayStatus: "PAID",
+                        topupTxnId: "TOPUP_9_1001",
+                        balance: 850.5,
+                        message: "₹500 added to your Tiffzy Wallet",
+                    },
+                });
+            }
+            return Promise.resolve({ data: {} });
+        });
+
+        // Case A: Return verification with PAID query params
+        const { unmount } = render(
+            <MemoryRouter
+                initialEntries={[
+                    "/profile/wallet?order_ref=TOPUP_9_1001&status=paid&amount_paise=50000&txn=UTR_W_1&signature=valid_sig",
+                ]}
+            >
+                <Routes>
+                    <Route
+                        path="/profile/wallet"
+                        element={<WalletSection customerToken="cust_jwt" redirectToCheckout={redirectSpy} />}
+                    />
+                </Routes>
+            </MemoryRouter>
+        );
+
+        await waitFor(() => {
+            expect(api.post).toHaveBeenCalledWith(
+                "/api/wallet/topup/twm/return",
+                expect.objectContaining({
+                    order_ref: "TOPUP_9_1001",
+                    status: "paid",
+                    amount_paise: "50000",
+                    txn: "UTR_W_1",
+                    signature: "valid_sig",
+                }),
+                expect.any(Object)
+            );
+            expect(screen.getByText(/₹500 added to your Tiffzy Wallet/i)).toBeInTheDocument();
+        });
+
+        // Initiate a new TWM Pay top-up via Add ₹500
+        await waitFor(() => {
+            expect(screen.getByRole("button", { name: /TWM Pay \(UPI \/ QR\)/i })).toBeInTheDocument();
+        });
+        fireEvent.click(screen.getByRole("button", { name: /Add ₹500/i }));
+
+        await waitFor(() => {
+            expect(api.post).toHaveBeenCalledWith(
+                "/api/wallet/topup/create",
+                expect.objectContaining({
+                    amount: 500,
+                    provider: "TWM_PAY",
+                }),
+                expect.any(Object)
+            );
+            expect(redirectSpy).toHaveBeenCalledWith("https://pay.thewebsitemakers.in/checkout/TOPUP_9_1001");
+        });
+        unmount();
+
+        // Case B: EXPIRED wallet top-up return shows failure error cleanly
+        api.post.mockResolvedValueOnce({
+            data: {
+                verified: true,
+                success: false,
+                status: "FAILED",
+                paymentStatus: "FAILED",
+                gatewayStatus: "EXPIRED",
+                message: "Top-up payment session expired",
+            },
+        });
+
+        render(
+            <MemoryRouter
+                initialEntries={[
+                    "/profile/wallet?order_ref=TOPUP_9_1002&status=expired&amount_paise=50000&txn=&signature=exp_sig",
+                ]}
+            >
+                <Routes>
+                    <Route path="/profile/wallet" element={<WalletSection customerToken="cust_jwt" />} />
+                </Routes>
+            </MemoryRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText(/Top-up payment session expired/i)).toBeInTheDocument();
         });
     });
 });

@@ -5,6 +5,9 @@ import {
   getWalletAnalytics,
   createTopupSession,
   verifyAndCreditTopup,
+  processTwmTopupReturn,
+  reconcileTwmTopupStatus,
+  processTwmTopupNotify,
   payOrderWithWallet,
   refundOrderToWallet,
   WALLET_CONFIG,
@@ -12,6 +15,7 @@ import {
 
 export default async function walletRoutes(app, deps) {
   const prisma = deps?.prisma || defaultPrisma;
+  const fetchImpl = deps?.fetchImpl;
 
   // Middleware: Require Customer Authentication
   const requireCustomer = async (req, reply) => {
@@ -111,15 +115,18 @@ export default async function walletRoutes(app, deps) {
     }
   });
 
-  // POST /api/wallet/topup/create -> Initiate Cashfree Top-Up Session
+  // POST /api/wallet/topup/create -> Initiate Wallet Top-Up Session (Cashfree or TWM Pay)
   app.post("/api/wallet/topup/create", { preHandler: requireCustomer }, async (req, reply) => {
     try {
-      const { amount, returnUrl, idempotencyKey } = req.body || {};
+      const { amount, returnUrl, idempotencyKey, provider } = req.body || {};
       const session = await createTopupSession(prisma, {
         customerAccountId: req.customerAccount.id,
         amount,
         returnUrl,
         idempotencyKey,
+        provider,
+        req,
+        fetchImpl,
       });
       return {
         success: true,
@@ -127,12 +134,151 @@ export default async function walletRoutes(app, deps) {
         paymentSessionId: session.paymentSessionId,
         payment_session_id: session.payment_session_id,
         topupTxnId: session.topupTxnId,
+        orderRef: session.orderRef || session.gatewayOrderId || session.topupTxnId,
         gatewayOrderId: session.gatewayOrderId,
+        provider: session.provider || session.gateway || "CASHFREE",
+        gateway: session.gateway || "CASHFREE",
+        amountPaise: session.amountPaise,
+        checkoutUrl: session.checkoutUrl,
+        checkout_url: session.checkout_url,
+        paymentUrl: session.paymentUrl,
       };
     } catch (err) {
       console.error("[Wallet] Top-up create error:", err);
-      return reply.code(400).send({ message: err.message || "Failed to create top-up session" });
+      const status = err.statusCode || 400;
+      return reply.code(status).send({
+        success: false,
+        error: err.code || "WALLET_TOPUP_CREATE_ERROR",
+        message: err.message || "Failed to create top-up session",
+      });
     }
+  });
+
+  // POST /api/wallet/topup/twm/create -> Dedicated TWM Pay Wallet Top-Up Session
+  app.post("/api/wallet/topup/twm/create", { preHandler: requireCustomer }, async (req, reply) => {
+    try {
+      const { amount, returnUrl, idempotencyKey } = req.body || {};
+      const session = await createTopupSession(prisma, {
+        customerAccountId: req.customerAccount.id,
+        amount,
+        returnUrl,
+        idempotencyKey,
+        provider: "TWM_PAY",
+        req,
+        fetchImpl,
+      });
+      return {
+        success: true,
+        session,
+        topupTxnId: session.topupTxnId,
+        orderRef: session.orderRef,
+        gatewayOrderId: session.gatewayOrderId,
+        provider: "TWM_PAY",
+        gateway: "TWM_PAY",
+        amount: session.amount,
+        amountPaise: session.amountPaise,
+        checkoutUrl: session.checkoutUrl,
+        checkout_url: session.checkout_url,
+        paymentUrl: session.paymentUrl,
+      };
+    } catch (err) {
+      console.error("[Wallet] TWM top-up create error:", err);
+      const status = err.statusCode || 400;
+      return reply.code(status).send({
+        success: false,
+        error: err.code || "TWM_WALLET_CREATE_ERROR",
+        message: err.message || "Failed to create TWM Pay wallet top-up session",
+      });
+    }
+  });
+
+  // GET & POST /api/wallet/topup/twm/return -> Verify TWM Pay redirect return or reconcile
+  const handleTwmWalletReturn = async (req, reply) => {
+    try {
+      const payload = req.method === "GET" ? req.query || {} : { ...(req.query || {}), ...(req.body || {}) };
+      const result = await processTwmTopupReturn({
+        prisma,
+        customerAccountId: req.customerAccount.id,
+        payload,
+        fetchImpl,
+      });
+      return reply.code(200).send(result);
+    } catch (err) {
+      const status = err.statusCode || 400;
+      return reply.code(status).send({
+        verified: false,
+        success: false,
+        status: status === 404 ? "UNKNOWN" : "FAILED",
+        paymentStatus: status === 400 ? "FAILED" : "UNKNOWN",
+        error: err.code || "TWM_WALLET_RETURN_ERROR",
+        message: err.message || "Failed to verify TWM Pay wallet top-up return",
+      });
+    }
+  };
+  app.get("/api/wallet/topup/twm/return", { preHandler: requireCustomer }, handleTwmWalletReturn);
+  app.post("/api/wallet/topup/twm/return", { preHandler: requireCustomer }, handleTwmWalletReturn);
+
+  // GET /api/wallet/topup/twm/status/:topupTxnId -> Authoritative TWM Pay wallet top-up polling
+  app.get("/api/wallet/topup/twm/status/:topupTxnId", { preHandler: requireCustomer }, async (req, reply) => {
+    try {
+      const topupTxnId = String(req.params?.topupTxnId || "").trim();
+      const orderRef = String(req.query?.order_ref || req.query?.orderRef || "").trim();
+      const result = await reconcileTwmTopupStatus({
+        prisma,
+        customerAccountId: req.customerAccount.id,
+        topupTxnId,
+        orderRef,
+        fetchImpl,
+      });
+      return reply.code(200).send(result);
+    } catch (err) {
+      const status = err.statusCode || 400;
+      return reply.code(status).send({
+        verified: false,
+        success: false,
+        status: status === 404 ? "UNKNOWN" : "FAILED",
+        paymentStatus: status === 404 ? "UNKNOWN" : "FAILED",
+        error: err.code || "TWM_WALLET_STATUS_ERROR",
+        message: err.message || "Failed to check TWM Pay wallet top-up status",
+      });
+    }
+  });
+
+  // POST /api/wallet/topup/twm/notify -> Server-to-server signed TWM Pay webhook for wallet top-up
+  app.register(async function twmWalletNotifyScope(scopedApp) {
+    scopedApp.addContentTypeParser(
+      "application/x-www-form-urlencoded",
+      { parseAs: "string" },
+      (req, body, done) => {
+        try {
+          done(null, Object.fromEntries(new URLSearchParams(body)));
+        } catch (err) {
+          done(err);
+        }
+      }
+    );
+
+    scopedApp.post("/api/wallet/topup/twm/notify", async (req, reply) => {
+      try {
+        const payload = {
+          ...(req.query || {}),
+          ...(req.body && typeof req.body === "object" ? req.body : {}),
+        };
+        const result = await processTwmTopupNotify({ prisma, payload });
+        return reply.code(200).send({
+          ok: true,
+          status: "ok",
+          ...result,
+        });
+      } catch (err) {
+        const status = err.statusCode || 400;
+        return reply.code(status).send({
+          ok: false,
+          error: err.code || "invalid",
+          message: err.message || "Invalid notification",
+        });
+      }
+    });
   });
 
   // POST /api/wallet/topup/verify -> Verify Cashfree Top-Up & Credit Wallet

@@ -2,6 +2,13 @@ package com.tiffzy.app.ui.payment
 
 import com.tiffzy.app.data.model.CashfreeCreateOrderResponse
 import com.tiffzy.app.data.model.PaymentResultStatus
+import com.tiffzy.app.data.model.TopupStep
+import com.tiffzy.app.data.model.WalletTopupCreateResponse
+import com.tiffzy.app.data.model.WalletTopupSession
+import com.tiffzy.app.data.model.resolvedCheckoutUrl
+import com.tiffzy.app.data.model.resolvedGatewayOrderId
+import com.tiffzy.app.data.model.resolvedProvider
+import com.tiffzy.app.data.model.resolvedTopupTxnId
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -115,5 +122,43 @@ class TwmPayHelperTest {
             PaymentResultStatus.FAILED,
             TwmCheckoutUrlHelper.mapTwmOutcomeStatus(verified = false, paymentStatus = "PENDING", gatewayStatus = "EXPIRED")
         )
+    }
+
+    @Test
+    fun `WalletTopupCreateResponse and TopupStep resolve TWM Pay fields cleanly`() {
+        val res = WalletTopupCreateResponse(
+            success = true,
+            provider = "twm_pay",
+            topupTxnId = "TOPUP_9_400",
+            orderRef = "TOPUP_9_400",
+            checkoutUrl = "https://pay.thewebsitemakers.in/checkout/TOPUP_9_400",
+            session = WalletTopupSession(
+                topupTxnId = "TOPUP_9_400",
+                amount = 250.0,
+                provider = "TWM_PAY"
+            )
+        )
+        assertEquals("TWM_PAY", res.resolvedProvider)
+        assertEquals("TOPUP_9_400", res.resolvedTopupTxnId)
+        assertEquals("TOPUP_9_400", res.resolvedGatewayOrderId)
+        assertEquals("https://pay.thewebsitemakers.in/checkout/TOPUP_9_400", res.resolvedCheckoutUrl)
+
+        val checkoutStep = TopupStep.TwmCheckout(
+            topupTxnId = "TOPUP_9_400",
+            orderRef = "TOPUP_9_400",
+            checkoutUrl = res.resolvedCheckoutUrl!!,
+            amount = 250.0,
+            returnUrlPrefix = "https://tiffzy.com/profile/wallet"
+        )
+        assertEquals("TOPUP_9_400", checkoutStep.orderRef)
+
+        val pendingUtr = TopupStep.Pending(
+            topupTxnId = "TOPUP_9_400",
+            orderRef = "TOPUP_9_400",
+            amount = 250.0,
+            gatewayStatus = "UTR_SUBMITTED",
+            message = "UTR submitted — verifying UPI payment"
+        )
+        assertEquals("UTR_SUBMITTED", pendingUtr.gatewayStatus)
     }
 }

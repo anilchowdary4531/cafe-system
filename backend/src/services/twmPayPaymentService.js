@@ -117,6 +117,9 @@ export const resolveOrderAndTwmPayment = async (prisma, { orderId, orderRef }) =
     err.statusCode = 503;
     throw err;
   }
+  if (!prisma.payment || !prisma.order) {
+    return { order: null, payment: null };
+  }
 
   let matchedPayment = null;
   let order = null;

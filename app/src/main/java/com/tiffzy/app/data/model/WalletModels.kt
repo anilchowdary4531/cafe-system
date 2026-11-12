@@ -60,7 +60,8 @@ data class WalletPayOrderResponse(
 data class WalletTopupCreateRequest(
     @SerializedName("amount") val amount: Double,
     @SerializedName("returnUrl") val returnUrl: String? = null,
-    @SerializedName("idempotencyKey") val idempotencyKey: String? = null
+    @SerializedName("idempotencyKey") val idempotencyKey: String? = null,
+    @SerializedName("provider") val provider: String? = null
 )
 
 data class WalletTopupCreateResponse(
@@ -68,16 +69,27 @@ data class WalletTopupCreateResponse(
     @SerializedName("session") val session: WalletTopupSession? = null,
     @SerializedName("paymentSessionId", alternate = ["payment_session_id"]) val paymentSessionId: String? = null,
     @SerializedName("topupTxnId", alternate = ["topup_txn_id"]) val topupTxnId: String? = null,
+    @SerializedName("orderRef", alternate = ["order_ref"]) val orderRef: String? = null,
     @SerializedName("gatewayOrderId", alternate = ["gateway_order_id", "cfOrderId", "cf_order_id"]) val gatewayOrderId: String? = null,
+    @SerializedName("provider") val provider: String? = null,
+    @SerializedName("gateway") val gateway: String? = null,
+    @SerializedName("checkoutUrl", alternate = ["checkout_url"]) val checkoutUrl: String? = null,
+    @SerializedName("paymentUrl", alternate = ["payment_url"]) val paymentUrl: String? = null,
+    @SerializedName("amountPaise", alternate = ["amount_paise"]) val amountPaise: Int? = null,
     @SerializedName("message") val message: String? = null
 )
 
 data class WalletTopupSession(
     @SerializedName("topupTxnId", alternate = ["topup_txn_id"]) val topupTxnId: String? = null,
+    @SerializedName("orderRef", alternate = ["order_ref"]) val orderRef: String? = null,
     @SerializedName("amount") val amount: Double? = null,
+    @SerializedName("amountPaise", alternate = ["amount_paise"]) val amountPaise: Int? = null,
     @SerializedName("paymentSessionId", alternate = ["payment_session_id"]) val paymentSessionId: String? = null,
     @SerializedName("cfOrderId", alternate = ["cf_order_id", "gatewayOrderId", "gateway_order_id"]) val cfOrderId: String? = null,
+    @SerializedName("provider") val provider: String? = null,
     @SerializedName("gateway") val gateway: String? = "CASHFREE",
+    @SerializedName("checkoutUrl", alternate = ["checkout_url"]) val checkoutUrl: String? = null,
+    @SerializedName("paymentUrl", alternate = ["payment_url"]) val paymentUrl: String? = null,
     @SerializedName("isProduction", alternate = ["is_production"]) val isProduction: Boolean? = null,
     @SerializedName("cfEnv", alternate = ["cf_env"]) val cfEnv: String? = null
 )
@@ -93,7 +105,20 @@ val WalletTopupCreateResponse.resolvedTopupTxnId: String?
 val WalletTopupCreateResponse.resolvedGatewayOrderId: String?
     get() = session?.cfOrderId?.takeIf { it.isNotBlank() }
         ?: gatewayOrderId?.takeIf { it.isNotBlank() }
+        ?: session?.orderRef?.takeIf { it.isNotBlank() }
+        ?: orderRef?.takeIf { it.isNotBlank() }
         ?: resolvedTopupTxnId
+
+val WalletTopupCreateResponse.resolvedProvider: String
+    get() = (session?.provider ?: provider ?: session?.gateway ?: gateway ?: "CASHFREE")
+        .trim()
+        .uppercase()
+
+val WalletTopupCreateResponse.resolvedCheckoutUrl: String?
+    get() = session?.checkoutUrl?.takeIf { it.isNotBlank() }
+        ?: checkoutUrl?.takeIf { it.isNotBlank() }
+        ?: session?.paymentUrl?.takeIf { it.isNotBlank() }
+        ?: paymentUrl?.takeIf { it.isNotBlank() }
 
 fun WalletTopupCreateResponse.resolvedIsProduction(baseUrl: String = "https://api.tiffzy.com/"): Boolean {
     val s = session
@@ -117,6 +142,30 @@ data class WalletTopupVerifyResponse(
     @SerializedName("topupTxnId") val topupTxnId: String? = null
 )
 
+data class WalletTwmReturnVerifyRequest(
+    @SerializedName("topupTxnId") val topupTxnId: String? = null,
+    @SerializedName("order_ref") val orderRef: String,
+    @SerializedName("status") val status: String? = null,
+    @SerializedName("amount_paise") val amountPaise: String? = null,
+    @SerializedName("txn") val txn: String? = null,
+    @SerializedName("signature") val signature: String? = null
+)
+
+data class WalletTwmStatusResponse(
+    @SerializedName("verified") val verified: Boolean = false,
+    @SerializedName("success") val success: Boolean = false,
+    @SerializedName("alreadyProcessed") val alreadyProcessed: Boolean = false,
+    @SerializedName("status") val status: String? = null,
+    @SerializedName("paymentStatus") val paymentStatus: String? = null,
+    @SerializedName("gatewayStatus") val gatewayStatus: String? = null,
+    @SerializedName("topupTxnId") val topupTxnId: String? = null,
+    @SerializedName("orderRef") val orderRef: String? = null,
+    @SerializedName("amount") val amount: Double? = null,
+    @SerializedName("balance") val balance: Double? = null,
+    @SerializedName("txn") val txn: String? = null,
+    @SerializedName("message") val message: String? = null
+)
+
 enum class TopupErrorType {
     TOPUP_CREATE_FAILED,
     CASHFREE_PAYMENT_FAILED,
@@ -130,7 +179,21 @@ sealed class TopupStep {
     object Idle : TopupStep()
     data class CreatingSession(val amount: Double) : TopupStep()
     data class OpeningPayment(val orderId: String, val amount: Double) : TopupStep()
+    data class TwmCheckout(
+        val topupTxnId: String,
+        val orderRef: String,
+        val checkoutUrl: String,
+        val amount: Double,
+        val returnUrlPrefix: String? = null
+    ) : TopupStep()
     data class VerifyingPayment(val orderId: String, val amount: Double) : TopupStep()
+    data class Pending(
+        val topupTxnId: String,
+        val orderRef: String,
+        val amount: Double,
+        val gatewayStatus: String,
+        val message: String
+    ) : TopupStep()
     data class Success(val amount: Double, val newBalance: Double, val message: String) : TopupStep()
     object Cancelled : TopupStep()
     data class Error(

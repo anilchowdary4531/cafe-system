@@ -1,7 +1,9 @@
 import { describe, it, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import Fastify from "fastify";
+import fastifyJwt from "@fastify/jwt";
 import paymentRoutes from "../routes/payment.routes.js";
+import walletRoutes from "../routes/wallet.routes.js";
 import {
   computeTwmSignature,
   verifyTwmSignature,
@@ -848,6 +850,227 @@ describe("TWM Pay Payment Gateway Integration Suite", () => {
     assert.equal(pendingRes.statusCode, 200);
     assert.equal(pendingRes.json().verified, false);
     assert.notEqual(pendingRes.json().code, "PAYMENT_SESSION_NOT_FOUND");
+
+    await app.close();
+  });
+
+  it("10. Wallet Top-Up via TWM Pay converts paise accurately, handles all statuses, and credits atomically once", async () => {
+    let topupSeq = 1;
+    let ledgerSeq = 1;
+    const customerAccount = { id: 77, name: "Rohan", phone: "9988776655", email: "rohan@test.com" };
+    const walletRow = { id: 9, customerAccountId: 77, balance: 100, currency: "INR", status: "ACTIVE" };
+    const topups = [];
+    const ledger = [];
+
+    const walletPrisma = {
+      customerAccount: {
+        findUnique: async ({ where } = {}) => (where?.id === 77 ? { ...customerAccount } : null),
+      },
+      wallet: {
+        findUnique: async ({ where } = {}) =>
+          where?.id === 9 || where?.customerAccountId === 77 ? { ...walletRow } : null,
+        update: async ({ where, data } = {}) => {
+          if (where?.id !== 9) throw new Error("Wallet not found");
+          Object.assign(walletRow, data);
+          return { ...walletRow };
+        },
+      },
+      walletTopup: {
+        findUnique: async ({ where } = {}) => {
+          if (where?.topupTxnId) {
+            const m = topups.find((t) => t.topupTxnId === where.topupTxnId);
+            return m ? { ...m, wallet: { ...walletRow } } : null;
+          }
+          if (where?.idempotencyKey) {
+            const m = topups.find((t) => t.idempotencyKey === where.idempotencyKey);
+            return m ? { ...m, wallet: { ...walletRow } } : null;
+          }
+          return null;
+        },
+        findFirst: async ({ where } = {}) => {
+          const matches = topups
+            .filter((t) => !where?.gatewayOrderId || t.gatewayOrderId === where.gatewayOrderId)
+            .sort((a, b) => b.id - a.id);
+          return matches[0] ? { ...matches[0], wallet: { ...walletRow } } : null;
+        },
+        create: async ({ data } = {}) => {
+          if (data.idempotencyKey && topups.some((t) => t.idempotencyKey === data.idempotencyKey)) {
+            throw new Error("Unique idempotencyKey conflict");
+          }
+          const row = { id: topupSeq++, ...data };
+          topups.push(row);
+          return { ...row };
+        },
+        update: async ({ where, data } = {}) => {
+          const target = topups.find((t) => t.id === where?.id);
+          if (!target) throw new Error("Topup not found");
+          Object.assign(target, data);
+          return { ...target };
+        },
+        updateMany: async ({ where, data } = {}) => {
+          let count = 0;
+          for (const t of topups) {
+            const idOk = where?.id === undefined || t.id === where.id;
+            const notStatusOk = !where?.status?.not || t.status !== where.status.not;
+            if (idOk && notStatusOk) {
+              Object.assign(t, data);
+              count += 1;
+            }
+          }
+          return { count };
+        },
+      },
+      walletLedger: {
+        create: async ({ data } = {}) => {
+          if (data.idempotencyKey && ledger.some((l) => l.idempotencyKey === data.idempotencyKey)) {
+            throw new Error("Duplicate ledger entry blocked");
+          }
+          const row = { id: ledgerSeq++, ...data };
+          ledger.push(row);
+          return { ...row };
+        },
+      },
+      $transaction: async (fn) => fn(walletPrisma),
+    };
+
+    const gatewayCalls = [];
+    let expectedCreatePaise = 25050;
+    let gatewayStatusPayload = { status: "utr_submitted", amount_paise: 25050, txn: "UTR_WALLET_1" };
+    const mockFetch = async (url, init = {}) => {
+      gatewayCalls.push({ url, init });
+      if (url.includes("/api/create-order.php")) {
+        const body = JSON.parse(init.body);
+        assert.equal(body.amount_paise, expectedCreatePaise);
+        assert.equal(init.headers["X-TWM-Merchant"], process.env.TWM_MERCHANT_ID);
+        assert.equal(init.headers["X-TWM-Secret"], process.env.TWM_API_SECRET);
+        return new Response(
+          JSON.stringify({
+            order_ref: body.order_ref,
+            checkout_url: `https://pay.thewebsitemakers.in/checkout/${body.order_ref}`,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/api/order-status.php")) {
+        const parsed = new URL(url);
+        return new Response(
+          JSON.stringify({
+            order_ref: parsed.searchParams.get("order_ref"),
+            ...gatewayStatusPayload,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const app = Fastify({ logger: false });
+    await app.register(fastifyJwt, { secret: "test_jwt_secret" });
+    await app.register(paymentRoutes, { prisma: walletPrisma, fetchImpl: mockFetch });
+    await app.register(walletRoutes, { prisma: walletPrisma, fetchImpl: mockFetch });
+    const customerJwt = app.jwt.sign({ customerAccountId: 77 });
+
+    // 1) Create TWM Pay wallet top-up for ₹250.50 -> 25050 paise
+    const createRes = await app.inject({
+      method: "POST",
+      url: "/api/wallet/topup/create",
+      headers: { Authorization: `Bearer ${customerJwt}` },
+      payload: { amount: 250.5, provider: "TWM_PAY" },
+    });
+    assert.equal(createRes.statusCode, 200);
+    const createdJson = createRes.json();
+    assert.equal(createdJson.provider, "TWM_PAY");
+    assert.equal(createdJson.amountPaise, 25050);
+    assert.ok(createdJson.topupTxnId.startsWith("TOPUP_9_"));
+    assert.ok(createdJson.checkoutUrl.includes(createdJson.topupTxnId));
+
+    const ref = createdJson.topupTxnId;
+
+    // 2) Tampered amount on return fails verification without crediting
+    const badAmountSig = computeTwmSignature({
+      order_ref: ref,
+      status: "paid",
+      amount_paise: "100",
+      txn: "UTR_BAD",
+    });
+    const badRes = await app.inject({
+      method: "POST",
+      url: "/api/wallet/topup/twm/return",
+      headers: { Authorization: `Bearer ${customerJwt}` },
+      payload: { order_ref: ref, status: "paid", amount_paise: "100", txn: "UTR_BAD", signature: badAmountSig },
+    });
+    assert.equal(badRes.statusCode, 400);
+    assert.equal(walletRow.balance, 100);
+
+    // 3) Polling when UTR_SUBMITTED leaves wallet at ₹100
+    const pendingRes = await app.inject({
+      method: "GET",
+      url: `/api/wallet/topup/twm/status/${ref}`,
+      headers: { Authorization: `Bearer ${customerJwt}` },
+    });
+    assert.equal(pendingRes.statusCode, 200);
+    assert.equal(pendingRes.json().gatewayStatus, "UTR_SUBMITTED");
+    assert.equal(pendingRes.json().paymentStatus, "PENDING");
+    assert.equal(walletRow.balance, 100);
+
+    // 4) Signed PAID return credits wallet to ₹350.50 with 1 ledger row
+    const paidSig = computeTwmSignature({
+      order_ref: ref,
+      status: "paid",
+      amount_paise: "25050",
+      txn: "UTR_WALLET_PAID",
+    });
+    const paidReturnRes = await app.inject({
+      method: "POST",
+      url: "/api/wallet/topup/twm/return",
+      headers: { Authorization: `Bearer ${customerJwt}` },
+      payload: {
+        order_ref: ref,
+        status: "paid",
+        amount_paise: "25050",
+        txn: "UTR_WALLET_PAID",
+        signature: paidSig,
+      },
+    });
+    assert.equal(paidReturnRes.statusCode, 200);
+    assert.equal(paidReturnRes.json().paymentStatus, "PAID");
+    assert.equal(paidReturnRes.json().balance, 350.5);
+    assert.equal(walletRow.balance, 350.5);
+    assert.equal(ledger.length, 1);
+
+    // 5) Duplicate webhook via unified /api/payments/twm/notify is idempotent (no double credit)
+    const dupNotify = await app.inject({
+      method: "POST",
+      url: "/api/payments/twm/notify",
+      payload: `order_ref=${encodeURIComponent(ref)}&status=paid&amount_paise=25050&txn=UTR_WALLET_PAID&signature=${paidSig}`,
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+    });
+    assert.equal(dupNotify.statusCode, 200);
+    assert.equal(dupNotify.json().ok, true);
+    assert.equal(dupNotify.json().alreadyProcessed, true);
+    assert.equal(walletRow.balance, 350.5);
+    assert.equal(ledger.length, 1);
+
+    // 6) Expired session marks second topup FAILED with zero credit
+    expectedCreatePaise = 15000;
+    const createRes2 = await app.inject({
+      method: "POST",
+      url: "/api/wallet/topup/twm/create",
+      headers: { Authorization: `Bearer ${customerJwt}` },
+      payload: { amount: 150 },
+    });
+    assert.equal(createRes2.statusCode, 200);
+    const ref2 = createRes2.json().topupTxnId;
+    gatewayStatusPayload = { status: "expired", amount_paise: 15000, txn: "" };
+    const expiredStatus = await app.inject({
+      method: "GET",
+      url: `/api/wallet/topup/twm/status/${ref2}`,
+      headers: { Authorization: `Bearer ${customerJwt}` },
+    });
+    assert.equal(expiredStatus.statusCode, 200);
+    assert.equal(expiredStatus.json().gatewayStatus, "EXPIRED");
+    assert.equal(expiredStatus.json().paymentStatus, "FAILED");
+    assert.equal(walletRow.balance, 350.5);
 
     await app.close();
   });
