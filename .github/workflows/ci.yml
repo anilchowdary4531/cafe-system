@@ -226,7 +226,7 @@ jobs:
             src/__tests__/checkoutAmountCalculation.test.jsx \
             --reporter=verbose --reporter=json --outputFile=test-reports/targeted-frontend.json 2>&1 | tee test-reports/targeted-frontend.log
 
-      - name: Run full frontend test suite (enforce no new regressions, report unrelated failures separately)
+      - name: Run full frontend test suite (required - zero failures)
         working-directory: frontend
         run: |
           set +e
@@ -238,7 +238,7 @@ jobs:
             const fs = require("node:fs");
             const data = JSON.parse(fs.readFileSync("test-reports/frontend-full.json", "utf8"));
             const results = data.testResults || [];
-            if (!results.length) {
+            if (!results.length || Number(data.numTotalTests || 0) <= 0) {
               console.error("ERROR: Full frontend test suite produced no results.");
               process.exit(1);
             }
@@ -259,32 +259,18 @@ jobs:
               }
             }
 
-            const knownUnrelatedFailures = new Set([
-              "src/__tests__/cashSettlementTableSync.test.jsx",
-              "src/__tests__/chefStationCompactLayout.test.jsx",
-              "src/__tests__/cleanerStationHistoryAndNotifications.test.jsx",
-              "src/__tests__/serverProfileNotifications.test.jsx",
-              "src/__tests__/stewardStationWorkspace.test.jsx",
-              "src/__tests__/swiperStationLayoutAndProfile.test.jsx",
-              "src/__tests__/tiffzyMapIntegration.test.jsx",
-            ]);
-
             const failedFiles = results.filter((r) => r.status === "failed");
-            const unexpectedFailures = [];
-            for (const f of failedFiles) {
-              const rel = String(f.name || "").replace(/^.*\/frontend\//, "");
-              if (!knownUnrelatedFailures.has(rel)) {
-                unexpectedFailures.push(rel);
-              }
-            }
-
-            if (unexpectedFailures.length > 0) {
-              console.error("ERROR: New frontend test regressions detected:", unexpectedFailures);
+            if (failedFiles.length > 0 || Number(data.numFailedTests || 0) > 0 || Number(data.numPendingTests || 0) > 0) {
+              console.error(
+                "ERROR: Frontend test failures/pending tests detected:",
+                failedFiles.map((f) => String(f.name || "").replace(/^.*\/frontend\//, ""))
+              );
               process.exit(1);
             }
 
-            console.log(`Tracked unrelated pre-existing failing files: ${failedFiles.length}`);
+            console.log(`Full frontend test suite passed: ${results.length} files, ${data.numPassedTests}/${data.numTotalTests} tests.`);
           '
+          exit "${FULL_EXIT}"
 
       - name: Build frontend with staging configuration & verify secret isolation
         working-directory: frontend
@@ -351,7 +337,7 @@ jobs:
               const full = JSON.parse(fs.readFileSync("test-reports/frontend-full.json", "utf8"));
               const failedFiles = (full.testResults || []).filter((r) => r.status === "failed");
               const passedFiles = (full.testResults || []).filter((r) => r.status === "passed");
-              lines.push(`| Full Frontend Suite (\`npm run test:run\`) | ${failedFiles.length === 0 ? "PASSED" : "UNRELATED PRE-EXISTING FAILURES"} | Files: ${passedFiles.length}/${(full.testResults || []).length} passed; Tests: ${full.numPassedTests}/${full.numTotalTests} passed (${full.numFailedTests} failed) |`);
+              lines.push(`| Full Frontend Suite (\`npm run test:run\`) | ${failedFiles.length === 0 ? "PASSED" : "FAILED"} | Files: ${passedFiles.length}/${(full.testResults || []).length} passed; Tests: ${full.numPassedTests}/${full.numTotalTests} passed (${full.numFailedTests} failed) |`);
 
               const stagingOk = fs.existsSync("build-artifacts/staging-dist/index.html");
               const prodOk = fs.existsSync("build-artifacts/production-dist/index.html");
@@ -359,7 +345,7 @@ jobs:
               lines.push(`| Production Frontend Build (\`vite build\`) | ${prodOk ? "PASSED" : "FAILED"} | \`VITE_API_URL=https://api.tiffzy.com\` |`);
 
               if (failedFiles.length > 0) {
-                lines.push("", "### Pre-Existing Unrelated Frontend Test Failures (Reported Separately)", "");
+                lines.push("", "### Frontend Test Failures", "");
                 for (const file of failedFiles) {
                   const rel = String(file.name || "").replace(/^.*\/frontend\//, "");
                   const failCount = (file.assertionResults || []).filter((a) => a.status === "failed").length;

@@ -76,17 +76,14 @@ export default function SwiperStation() {
                 (o) => o.status !== "CANCELLED" && o.paymentStatus !== "PAID" && o.paymentStatus !== "SUCCESS"
             );
             setOrders(unpaid);
-            if (selectedOrder) {
-                const refreshed = unpaid.find((o) => o.id === selectedOrder.id);
-                setSelectedOrder(refreshed || null);
-            }
+            setSelectedOrder((prev) => (prev ? unpaid.find((o) => o.id === prev.id) || null : null));
         } catch (err) {
             console.error("Failed to fetch unpaid tables for swiper:", err);
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [token, restaurantId, selectedOrder]);
+    }, [token, restaurantId]);
 
     useEffect(() => {
         fetchUnpaidTables();
@@ -211,6 +208,7 @@ export default function SwiperStation() {
                         <div className="relative w-full sm:w-64">
                             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#78716C]" />
                             <input
+                                id="swiper-tables-search"
                                 type="text"
                                 placeholder="Search table # or bill..."
                                 value={searchQuery}
@@ -235,6 +233,7 @@ export default function SwiperStation() {
                                 return (
                                     <button
                                         key={o.id}
+                                        data-testid={`swiper-table-card-${o.id}`}
                                         type="button"
                                         onClick={() => setSelectedOrder(o)}
                                         className={`p-3 rounded-xl border text-left transition min-h-[76px] ${
@@ -278,6 +277,7 @@ export default function SwiperStation() {
                                 </div>
                                 <div className="text-xs text-[#57534E] mt-1">
                                     Guest: {selectedOrder.customer?.name || "Walk-in Guest"}
+                                    {selectedOrder.customer?.phone ? ` • ${selectedOrder.customer.phone}` : ""}
                                 </div>
                             </div>
                             <div className="text-left sm:text-right">
@@ -290,14 +290,19 @@ export default function SwiperStation() {
 
                         {/* Ordered items preview */}
                         <div className="bg-stone-50 rounded-xl p-4 border border-[#E7E5E4] max-h-40 overflow-y-auto divide-y divide-[#E7E5E4]">
-                            {(selectedOrder.items || []).map((item, idx) => (
-                                <div key={idx} className="py-1.5 flex items-center justify-between text-xs">
-                                    <span className="text-[#57534E]">
-                                        {item.quantity}x {item.name || item.itemName}
-                                    </span>
-                                    <span className="font-semibold text-[#171717]">₹{item.price * item.quantity}</span>
-                                </div>
-                            ))}
+                            {(selectedOrder.items || []).map((item, idx) => {
+                                const qty = Number(item.qty ?? item.quantity ?? 1);
+                                const price = Number(item.price || 0);
+                                return (
+                                    <div key={idx} className="py-1.5 flex items-center justify-between text-xs">
+                                        <span className="text-[#57534E]">
+                                            <span className="font-bold text-[#EA580C]">{qty}x</span>{" "}
+                                            <span>{item.name || item.itemName}</span>
+                                        </span>
+                                        <span className="font-semibold text-[#171717]">₹{price * qty}</span>
+                                    </div>
+                                );
+                            })}
                         </div>
 
                         {/* EDC / Device Method Picker */}

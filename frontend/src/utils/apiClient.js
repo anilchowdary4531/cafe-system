@@ -11,8 +11,12 @@ const stableStringify = (value) => {
     return `{${keys.map((k) => `${k}:${stableStringify(value[k])}`).join(",")}}`;
 };
 
-export const api = typeof axios.create === "function"
+const createdApi = typeof axios.create === "function"
     ? axios.create({ baseURL: API, timeout: 15000 })
+    : null;
+
+export const api = createdApi && typeof createdApi.get === "function"
+    ? createdApi
     : axios;
 
 // Prevent duplicate in-flight requests for the same cache key.

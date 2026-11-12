@@ -240,6 +240,7 @@ export default function StewardStation() {
                     disabled={refreshing}
                     className="p-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 transition min-h-[44px] min-w-[44px] flex items-center justify-center border border-neutral-700/60"
                     title="Refresh data"
+                    aria-label="Refresh steward workstation data"
                 >
                     <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
                 </button>

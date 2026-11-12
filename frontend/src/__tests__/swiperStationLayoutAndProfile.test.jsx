@@ -112,15 +112,16 @@ describe("Swiper Station Layout & Profile Verification", () => {
             );
 
             await waitFor(() => {
-                expect(screen.getByText("Tables Awaiting Settlement")).toBeInTheDocument();
+                expect(screen.getByText(/Tables Awaiting Settlement/i)).toBeInTheDocument();
             });
 
             // Ensure no max-w-4xl constraint exists on the workspace
             expect(container.querySelector(".max-w-4xl")).toBeNull();
 
-            // Main container should be w-full and flex-1
-            const mainContent = container.querySelector(".w-full.flex-1.flex.flex-col");
+            // Main workspace wrapper uses full-width flex-1 and max-w-7xl responsive container
+            const mainContent = container.querySelector("main.flex-1.w-full");
             expect(mainContent).not.toBeNull();
+            expect(container.querySelector("main .max-w-7xl")).not.toBeNull();
         });
 
         it("renders header and search bar on the same row", async () => {
@@ -135,7 +136,7 @@ describe("Swiper Station Layout & Profile Verification", () => {
             );
 
             await waitFor(() => {
-                expect(screen.getByText("Tables Awaiting Settlement")).toBeInTheDocument();
+                expect(screen.getByText(/Tables Awaiting Settlement/i)).toBeInTheDocument();
             });
 
             const searchInput = screen.getByPlaceholderText(/search table # or bill/i);
@@ -153,21 +154,21 @@ describe("Swiper Station Layout & Profile Verification", () => {
                 data: { orders: [] },
             });
 
-            const { container } = render(
+            render(
                 <MemoryRouter>
                     <SwiperStation />
                 </MemoryRouter>
             );
 
             await waitFor(() => {
-                expect(screen.getByText(/no tables awaiting settlement/i)).toBeInTheDocument();
+                expect(screen.getByText(/no tables waiting for tableside payment/i)).toBeInTheDocument();
             });
 
-            // Compact empty state should not be a large 150px boxed card
-            const emptyNotice = screen.getByText(/no tables awaiting settlement/i).closest("div");
-            expect(emptyNotice.className).toContain("py-3");
+            // Empty state uses compact py-8 Warm Paper card styling instead of p-12
+            const emptyNotice = screen.getByText(/no tables waiting for tableside payment/i).closest("div");
+            expect(emptyNotice.className).toContain("py-8");
+            expect(emptyNotice.className).toContain("border-[#E7E5E4]");
             expect(emptyNotice.className).not.toContain("p-12");
-            expect(emptyNotice.className).not.toContain("py-8");
         });
 
         it("renders compact Select Table empty state when no table is selected", async () => {
@@ -185,7 +186,7 @@ describe("Swiper Station Layout & Profile Verification", () => {
                 expect(screen.getByText("Select a Table")).toBeInTheDocument();
             });
 
-            expect(screen.getByText(/choose an unpaid table above to begin payment/i)).toBeInTheDocument();
+            expect(screen.getByText(/choose an unpaid table above/i)).toBeInTheDocument();
         });
 
         it("renders responsive grid of tables when unpaid tables exist and expands settlement workspace on select", async () => {
@@ -232,10 +233,12 @@ describe("Swiper Station Layout & Profile Verification", () => {
                 expect(screen.getByText("Table 7")).toBeInTheDocument();
             });
 
-            // Check responsive grid exists
-            const grid = container.querySelector(".grid.grid-cols-2");
+            // Check responsive grid exists (aligned with Warm Paper responsive matrix)
+            const grid = container.querySelector(".grid.grid-cols-1");
             expect(grid).not.toBeNull();
-            expect(grid.className).toContain("lg:grid-cols-6");
+            expect(grid.className).toContain("min-[360px]:grid-cols-2");
+            expect(grid.className).toContain("sm:grid-cols-3");
+            expect(grid.className).toContain("lg:grid-cols-5");
 
             // Select Table 4
             fireEvent.click(screen.getByTestId("swiper-table-card-101"));

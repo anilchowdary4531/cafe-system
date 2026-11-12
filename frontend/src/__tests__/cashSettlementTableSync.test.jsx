@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import axios from "axios";
@@ -93,7 +93,7 @@ describe("Cash Settlement → Table Release State Sync", () => {
             </MemoryRouter>
         );
 
-    it("1. Delivered + unpaid order shows Payment Pending on Table 4 card", async () => {
+    it("1. Delivered + unpaid order shows Delivered status badge and PAYMENT PENDING receipt on Table 4", async () => {
         const table4Occupied = [
             {
                 id: 4,
@@ -122,13 +122,18 @@ describe("Cash Settlement → Table Release State Sync", () => {
         renderOwnerPanel();
 
         await waitFor(() => {
-            // Legend has 1, Table 4 card badge has 1 -> Total 2
-            const matches = screen.getAllByText("Payment Pending");
-            expect(matches.length).toBeGreaterThanOrEqual(2);
+            expect(screen.getByText("Delivered Table")).toBeInTheDocument();
+            expect(screen.getByText("Delivered")).toBeInTheDocument();
+        });
+
+        // Open Table 4 orders/receipt popover and verify unpaid PAYMENT PENDING status
+        fireEvent.click(screen.getByTitle("Show orders for table 4"));
+        await waitFor(() => {
+            expect(screen.getByText("PAYMENT PENDING")).toBeInTheDocument();
         });
     });
 
-    it("2. Delivered + paid order does NOT show Payment Pending badge on Table 4 card", async () => {
+    it("2. Delivered + paid order does NOT show unpaid Delivered badge on Table 4 card", async () => {
         const table4Paid = [
             {
                 id: 4,
@@ -157,9 +162,8 @@ describe("Cash Settlement → Table Release State Sync", () => {
         renderOwnerPanel();
 
         await waitFor(() => {
-            // Only the legend has "Payment Pending" -> exactly 1
-            const matches = screen.getAllByText("Payment Pending");
-            expect(matches.length).toBe(1);
+            expect(screen.getByText("Delivered Table")).toBeInTheDocument();
+            expect(screen.queryByText("Delivered")).not.toBeInTheDocument();
             expect(screen.getByText(/Available/i)).toBeInTheDocument();
         });
     });

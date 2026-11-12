@@ -32,28 +32,37 @@ export default function StaffProfileView({
     const location = useLocation();
     const { user, logout, token } = useAuth();
 
+    const [profileData, setProfileData] = useState(null);
+
+    const currentUser = profileData || user;
+    const effectiveRole = resolveEffectiveStaffRole(currentUser?.role, currentUser?.designation);
+    const restaurantId = Number(
+        currentUser?.restaurantId ||
+        currentUser?.restaurant?.id ||
+        currentUser?.restaurant_id ||
+        localStorage.getItem("restaurantId") ||
+        1
+    );
+    const restaurantName = String(currentUser?.restaurant?.name || user?.restaurant?.name || "Tiffzy Restaurant").trim();
+
     const handleBack = () => {
         if (typeof onBack === "function") {
             onBack();
+        } else if (effectiveRole === "SWIPER") {
+            navigate("/staff/swiper");
         } else {
             navigate(-1);
         }
     };
 
-    const effectiveRole = resolveEffectiveStaffRole(user?.role, user?.designation);
-    const restaurantId = Number(
-        user?.restaurantId ||
-        user?.restaurant?.id ||
-        user?.restaurant_id ||
-        localStorage.getItem("restaurantId") ||
-        1
-    );
-    const restaurantName = String(user?.restaurant?.name || "Tiffzy Restaurant").trim();
+    const resolvedBackLabel = backLabel !== "Back to Workspace"
+        ? backLabel
+        : (effectiveRole === "SWIPER" ? "Back to Swiper Station" : "Back to Workspace");
 
     // Editable profile state
     const [isEditing, setIsEditing] = useState(false);
-    const [name, setName] = useState(user?.name || "");
-    const [phone, setPhone] = useState(user?.phone || "");
+    const [name, setName] = useState(currentUser?.name || "");
+    const [phone, setPhone] = useState(currentUser?.phone || "");
     const [savingProfile, setSavingProfile] = useState(false);
     const [profileError, setProfileError] = useState("");
 
@@ -67,10 +76,44 @@ export default function StaffProfileView({
     const [passwordError, setPasswordError] = useState("");
     const [passwordSuccess, setPasswordSuccess] = useState("");
 
+    // Fetch live authenticated staff profile on mount
     useEffect(() => {
-        if (user?.name) setName(user.name);
-        if (user?.phone) setPhone(user.phone);
-    }, [user]);
+        let isMounted = true;
+        const fetchStaffProfile = async () => {
+            if (!token) return;
+            try {
+                const res = await axios.get(`${API}/api/staff/profile/me`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                if (res.data?.success && res.data?.user && isMounted) {
+                    setProfileData(res.data.user);
+                    if (res.data.user.name) setName(res.data.user.name);
+                    if (res.data.user.phone) setPhone(res.data.user.phone);
+                }
+            } catch {
+                try {
+                    const fallbackRes = await axios.get(`${API}/staff/profile/me`, {
+                        headers: { Authorization: `Bearer ${token}` },
+                    });
+                    if (fallbackRes.data?.success && fallbackRes.data?.user && isMounted) {
+                        setProfileData(fallbackRes.data.user);
+                        if (fallbackRes.data.user.name) setName(fallbackRes.data.user.name);
+                        if (fallbackRes.data.user.phone) setPhone(fallbackRes.data.user.phone);
+                    }
+                } catch {
+                    // Retain AuthContext fallback if offline or test environment
+                }
+            }
+        };
+
+        fetchStaffProfile();
+        return () => { isMounted = false; };
+    }, [token]);
+
+    useEffect(() => {
+        if (currentUser?.name && !isEditing) setName(currentUser.name);
+        if (currentUser?.phone && !isEditing) setPhone(currentUser.phone);
+    }, [currentUser, isEditing]);
 
     const handleSaveProfile = async (e) => {
         e.preventDefault();
@@ -91,6 +134,7 @@ export default function StaffProfileView({
             );
 
             if (res.data?.success) {
+                if (res.data?.user) setProfileData(res.data.user);
                 showToast({
                     title: "Profile Updated",
                     message: "Your profile details were updated successfully.",
@@ -176,13 +220,13 @@ export default function StaffProfileView({
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-[#FFF7ED] text-[#57534E] hover:text-[#171717] border border-[#E7E5E4] transition min-h-[38px] shadow-xs cursor-pointer text-xs font-semibold"
                         >
                             <ArrowLeft className="w-4 h-4 text-[#F97316]" />
-                            <span className="hidden sm:inline">{backLabel}</span>
+                            <span className="hidden sm:inline">{resolvedBackLabel}</span>
                         </button>
                         <div className="min-w-0">
                             <h1 className="text-base sm:text-lg font-bold text-[#171717] tracking-tight truncate flex items-center gap-2">
                                 <span>{displayTitle}</span>
                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FFF7ED] text-[#EA580C] border border-[#F97316]/30 uppercase">
-                                    {user?.designation || effectiveRole}
+                                    {currentUser?.designation || effectiveRole}
                                 </span>
                             </h1>
                             <div className="text-xs text-[#78716C] truncate hidden sm:block">
@@ -216,17 +260,17 @@ export default function StaffProfileView({
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E7E5E4]">
                         <div className="flex items-center gap-3">
                             <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-[#F97316] text-white flex items-center justify-center font-black text-xl shadow-xs shrink-0">
-                                {user?.name ? user.name.slice(0, 2).toUpperCase() : "ST"}
+                                {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : "ST"}
                             </div>
                             <div className="min-w-0">
                                 <h2 className="text-lg sm:text-xl font-bold text-[#171717] flex items-center gap-2 flex-wrap">
-                                    <span>{user?.name || "Staff Member"}</span>
+                                    <span>{currentUser?.name || "Staff Member"}</span>
                                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#ECFDF5] text-[#059669] border border-[#059669]/20">
                                         Active
                                     </span>
                                 </h2>
                                 <p className="text-xs text-[#57534E] flex items-center gap-1.5 mt-0.5">
-                                    <span className="text-[#EA580C] font-bold">{user?.designation || effectiveRole}</span>
+                                    <span className="text-[#EA580C] font-bold">{currentUser?.designation || effectiveRole}</span>
                                     <span>·</span>
                                     <span>{restaurantName}</span>
                                 </p>
@@ -247,8 +291,8 @@ export default function StaffProfileView({
                                     type="button"
                                     onClick={() => {
                                         setIsEditing(false);
-                                        setName(user?.name || "");
-                                        setPhone(user?.phone || "");
+                                        setName(currentUser?.name || "");
+                                        setPhone(currentUser?.phone || "");
                                     }}
                                     className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-[#F5F5F4] text-[#57534E] text-xs font-bold border border-[#E7E5E4] transition min-h-[36px] shadow-xs cursor-pointer"
                                 >
@@ -265,25 +309,25 @@ export default function StaffProfileView({
                                 <div className="text-[11px] font-semibold text-[#78716C] flex items-center gap-1.5 mb-1">
                                     <Mail className="w-3.5 h-3.5 text-[#F97316]" /> Email
                                 </div>
-                                <div className="font-bold text-[#171717] text-xs sm:text-sm truncate">{user?.email || "Not specified"}</div>
+                                <div className="font-bold text-[#171717] text-xs sm:text-sm truncate">{currentUser?.email || "Not specified"}</div>
                             </div>
                             <div className="bg-[#FFF7ED]/30 p-3 rounded-xl border border-[#E7E5E4]">
                                 <div className="text-[11px] font-semibold text-[#78716C] flex items-center gap-1.5 mb-1">
                                     <Phone className="w-3.5 h-3.5 text-[#F97316]" /> Phone
                                 </div>
-                                <div className="font-bold text-[#171717] text-xs sm:text-sm truncate">{user?.phone || "Not specified"}</div>
+                                <div className="font-bold text-[#171717] text-xs sm:text-sm truncate">{currentUser?.phone || "Not specified"}</div>
                             </div>
                             <div className="bg-[#FFF7ED]/30 p-3 rounded-xl border border-[#E7E5E4]">
                                 <div className="text-[11px] font-semibold text-[#78716C] flex items-center gap-1.5 mb-1">
                                     <Shield className="w-3.5 h-3.5 text-[#F97316]" /> Designation
                                 </div>
-                                <div className="font-bold text-[#171717] text-xs sm:text-sm truncate">{user?.designation || effectiveRole}</div>
+                                <div className="font-bold text-[#171717] text-xs sm:text-sm truncate">{currentUser?.designation || effectiveRole}</div>
                             </div>
                             <div className="bg-[#FFF7ED]/30 p-3 rounded-xl border border-[#E7E5E4]">
                                 <div className="text-[11px] font-semibold text-[#78716C] flex items-center gap-1.5 mb-1">
                                     <Sparkles className="w-3.5 h-3.5 text-[#F97316]" /> Staff ID
                                 </div>
-                                <div className="font-bold text-[#171717] text-xs sm:text-sm truncate">#{user?.id || "N/A"}</div>
+                                <div className="font-bold text-[#171717] text-xs sm:text-sm truncate">#{currentUser?.id || "N/A"}</div>
                             </div>
                         </div>
                     ) : (

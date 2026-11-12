@@ -327,7 +327,9 @@ describe("ServerNotificationsView Unit Tests", () => {
         expect(initialGetCount).toBe(1);
 
         const initialOnCallCount = mockSocket.on.mock.calls.length;
-        expect(initialOnCallCount).toBe(6);
+        const uniqueRegisteredEvents = new Set(mockSocket.on.mock.calls.map(([evt]) => evt));
+        expect(uniqueRegisteredEvents.size).toBe(9);
+        expect(initialOnCallCount).toBe(9);
         expect(mockSocket.off).not.toHaveBeenCalled();
 
         // Simulate parent clock tick re-rendering with new anonymous callback
@@ -345,7 +347,7 @@ describe("ServerNotificationsView Unit Tests", () => {
 
         // Socket listeners should NOT have been detached or re-attached
         expect(mockSocket.off).not.toHaveBeenCalled();
-        expect(mockSocket.on.mock.calls.length).toBe(6);
+        expect(mockSocket.on.mock.calls.length).toBe(9);
     });
 
     it("waiting 15 seconds on the page produces no periodic notification REST requests (no polling)", async () => {
@@ -590,7 +592,7 @@ describe("ServerNotificationsView Unit Tests", () => {
         expect(screen.queryByText("Order Sent to Kitchen")).not.toBeInTheDocument();
     });
 
-    it("unmount removes all 6 registered socket listeners", async () => {
+    it("unmount removes all 9 registered socket listeners", async () => {
         const { unmount } = renderWithProviders(<ServerNotificationsView onBackToFloorPlan={vi.fn()} />);
 
         await waitFor(() => {
@@ -604,7 +606,10 @@ describe("ServerNotificationsView Unit Tests", () => {
         expect(mockSocket.off).toHaveBeenCalledWith("notification:new", expect.any(Function));
         expect(mockSocket.off).toHaveBeenCalledWith("table:waiter_assigned", expect.any(Function));
         expect(mockSocket.off).toHaveBeenCalledWith("order:created", expect.any(Function));
+        expect(mockSocket.off).toHaveBeenCalledWith("order:updated", expect.any(Function));
+        expect(mockSocket.off).toHaveBeenCalledWith("food:delivered", expect.any(Function));
         expect(mockSocket.off).toHaveBeenCalledWith("kot:status_updated", expect.any(Function));
+        expect(mockSocket.off).toHaveBeenCalledWith("kitchen:item_served", expect.any(Function));
         expect(mockSocket.off).toHaveBeenCalledWith("bill:requested", expect.any(Function));
         expect(mockSocket.off).toHaveBeenCalledWith("waiter:called", expect.any(Function));
     });

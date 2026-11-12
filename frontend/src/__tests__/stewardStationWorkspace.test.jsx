@@ -6,6 +6,7 @@ import axios from "axios";
 import StewardStation from "../pages/staff/StewardStation";
 import { StaffSocketProvider, useStaffSocket } from "../context/StaffSocketContext";
 import StaffShell from "../components/StaffShell";
+import { connectivityService } from "../utils/offline/connectivityService";
 
 // Mock axios
 vi.mock("axios");
@@ -160,6 +161,7 @@ describe("TIFFZY STEWARD WORKSPACE — THEME, DENSITY & REALTIME WORKFLOW SUITE"
 
     beforeEach(() => {
         vi.clearAllMocks();
+        connectivityService.recordApiSuccess();
         mockSocketInstance = new MockSocket();
         mockSocketState = {
             socket: mockSocketInstance,
@@ -197,15 +199,17 @@ describe("TIFFZY STEWARD WORKSPACE — THEME, DENSITY & REALTIME WORKFLOW SUITE"
             expect(screen.getByText("Steward Station — Floor Service & Food Runner")).toBeInTheDocument();
         });
 
-        // Verify root uses Tiffzy adaptive slate theme, not hardcoded pitch-black bg-neutral-950
+        // Verify root uses Warm Paper adaptive light theme, not hardcoded pitch-black bg-neutral-950
         const root = container.querySelector(".min-h-screen");
         expect(root).toBeInTheDocument();
-        expect(root.className).toContain("bg-slate-50/60");
+        expect(root.className).toContain("bg-white");
+        expect(root.className).toContain("text-[#171717]");
         expect(root.className).not.toContain("bg-neutral-950");
 
-        // Verify top header uses white/slate theme
+        // Verify top header uses white/warm stone border theme
         const header = container.querySelector("header");
         expect(header.className).toContain("bg-white/95");
+        expect(header.className).toContain("border-[#E7E5E4]");
         expect(header.className).not.toContain("bg-neutral-900/95");
     });
 
@@ -231,11 +235,11 @@ describe("TIFFZY STEWARD WORKSPACE — THEME, DENSITY & REALTIME WORKFLOW SUITE"
             expect(screen.getByText("No Food Waiting")).toBeInTheDocument();
         });
 
-        // Compact empty state should not have oversized p-12 padding
+        // Empty state uses unified Warm Paper card styling without dark neutral boxes
         const emptyState = screen.getByText("No Food Waiting").closest("div");
-        expect(emptyState.className).toContain("py-7");
-        expect(emptyState.className).not.toContain("p-12");
-        expect(emptyState.className).toContain("border-dashed");
+        expect(emptyState.className).toContain("bg-white");
+        expect(emptyState.className).toContain("border-[#E7E5E4]");
+        expect(emptyState.className).toContain("rounded-xl");
     });
 
     // 3. Responsive layout & header controls
@@ -252,8 +256,8 @@ describe("TIFFZY STEWARD WORKSPACE — THEME, DENSITY & REALTIME WORKFLOW SUITE"
 
         const refreshBtn = screen.getByRole("button", { name: /refresh steward workstation data/i });
         expect(refreshBtn).toBeInTheDocument();
-        expect(refreshBtn.className).toContain("min-h-[40px]");
-        expect(refreshBtn.className).toContain("min-w-[40px]");
+        expect(refreshBtn.className).toContain("min-h-[44px]");
+        expect(refreshBtn.className).toContain("min-w-[44px]");
     });
 
     // 4. Food runner navigation & dish cards
@@ -403,8 +407,8 @@ describe("TIFFZY STEWARD WORKSPACE — THEME, DENSITY & REALTIME WORKFLOW SUITE"
         expect(screen.queryByText("Offline")).not.toBeInTheDocument();
     });
 
-    // 9. Realtime Socket Status: Offline when disconnected
-    it("J. Displays Offline when Socket.IO is disconnected", async () => {
+    // 9. Realtime Socket Status: Offline when network is offline
+    it("J. Displays Offline when device/network connectivity goes offline", async () => {
         mockSocketState = {
             socket: mockSocketInstance,
             connected: false,
@@ -422,14 +426,22 @@ describe("TIFFZY STEWARD WORKSPACE — THEME, DENSITY & REALTIME WORKFLOW SUITE"
             </BrowserRouter>
         );
 
+        await act(async () => {
+            window.dispatchEvent(new Event("offline"));
+        });
+
         await waitFor(() => {
             expect(screen.getByText("Offline")).toBeInTheDocument();
         });
         expect(screen.queryByText("Live")).not.toBeInTheDocument();
+
+        await act(async () => {
+            connectivityService.recordApiSuccess();
+        });
     });
 
-    // 10. Realtime Socket Status: Reconnecting state
-    it("K. Displays Reconnecting... when socket is attempting reconnection", async () => {
+    // 10. Realtime Socket Status: Reconnecting state when online & socket disconnected
+    it("K. Displays Reconnecting when online and socket is attempting reconnection", async () => {
         mockSocketState = {
             socket: mockSocketInstance,
             connected: false,
@@ -448,7 +460,7 @@ describe("TIFFZY STEWARD WORKSPACE — THEME, DENSITY & REALTIME WORKFLOW SUITE"
         );
 
         await waitFor(() => {
-            expect(screen.getByText("Reconnecting...")).toBeInTheDocument();
+            expect(screen.getByText("Reconnecting")).toBeInTheDocument();
         });
     });
 
