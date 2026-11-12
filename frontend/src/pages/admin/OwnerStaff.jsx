@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
@@ -241,6 +241,7 @@ export default function OwnerStaff() {
     const [users, setUsers] = useState([]);
     const [modules, setModules] = useState(Object.keys(ACCESS_LABELS));
     const [query, setQuery] = useState("");
+    const prevQueryRef = useRef(query);
     const [roleFilter, setRoleFilter] = useState("ALL");
     const [statusFilter, setStatusFilter] = useState("ALL");
     const [loading, setLoading] = useState(true);
@@ -358,6 +359,9 @@ export default function OwnerStaff() {
     }, [restaurantId, roleFilter, statusFilter]);
 
     useEffect(() => {
+        // Skip initial mount so [restaurantId, roleFilter, statusFilter] owns the first fetch cleanly
+        if (prevQueryRef.current === query) return undefined;
+        prevQueryRef.current = query;
         const timer = setTimeout(() => {
             loadStaff({ silent: true });
         }, 350);

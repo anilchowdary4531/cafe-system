@@ -434,11 +434,16 @@ describe("Staff Passwordless Login Link UI & Flow", () => {
             },
         });
 
-        // Edit PUT
+        // Edit PUT (profile update + module access update)
         axios.put.mockResolvedValueOnce({
             data: {
                 message: "Staff updated successfully",
                 user: { ...mockStaffUsers[0], name: "John Waiter Updated" },
+            },
+        });
+        axios.put.mockResolvedValueOnce({
+            data: {
+                message: "Staff access updated successfully",
             },
         });
 
