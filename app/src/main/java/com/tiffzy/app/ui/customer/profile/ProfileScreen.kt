@@ -41,17 +41,19 @@ fun ProfileScreen(
     onEditProfile: () -> Unit,
     onOrdersClick: () -> Unit,
     onFavoritesClick: () -> Unit = {},
-    onWalletClick: () -> Unit = {},
     onPayLaterClick: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onDeleteAccount: () -> Unit,
     onLogout: () -> Unit,
     onBack: () -> Unit,
+    onWalletClick: () -> Unit = {},
+    onAddressesClick: () -> Unit = {},
     onNavigateToWeb: (String, String) -> Unit = { _, _ -> },
     viewModel: ProfileViewModel = viewModel(),
     authViewModel: AuthViewModel = viewModel()
 ) {
+    val walletBalance by viewModel.walletBalance.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
     val nickname by viewModel.nickname.collectAsState()
     val avatar by viewModel.avatar.collectAsState()
@@ -106,16 +108,18 @@ fun ProfileScreen(
                     totalOrders = totalOrders,
                     totalSpend = totalSpend,
                     activeOrders = activeOrders,
+                    walletBalance = walletBalance,
                     onEditProfile = onEditProfile,
+                    onWalletClick = onWalletClick,
                     onOrdersClick = onOrdersClick,
                     onFavoritesClick = onFavoritesClick,
-                onWalletClick = onWalletClick,
                     onPayLaterClick = onPayLaterClick,
                     onNotificationsClick = onNotificationsClick,
                     onSettingsClick = onSettingsClick,
                     onLogout = { viewModel.logout(onLogout) },
                     onLanguageClick = { showLanguageSelector = true },
                     onDeleteAccount = onDeleteAccount,
+                    onAddressesClick = onAddressesClick,
                     onNavigateToWeb = onNavigateToWeb,
                     currentLanguage = currentLanguage,
                     modifier = Modifier
@@ -137,10 +141,12 @@ fun ProfileContent(
     totalOrders: Int,
     totalSpend: Double,
     activeOrders: Int,
+    walletBalance: Double = 0.0,
     onEditProfile: () -> Unit,
+    onWalletClick: () -> Unit = {},
+    onAddressesClick: () -> Unit = {},
     onOrdersClick: () -> Unit,
     onFavoritesClick: () -> Unit,
-    onWalletClick: () -> Unit = {},
     onPayLaterClick: () -> Unit,
     onNotificationsClick: () -> Unit,
     onSettingsClick: () -> Unit,
@@ -154,21 +160,21 @@ fun ProfileContent(
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 4.dp) // ~98% width
+            .padding(horizontal = 16.dp)
     ) {
-        Spacer(modifier = Modifier.height(Dimens.PaddingLarge))
+        Spacer(modifier = Modifier.height(8.dp))
 
         Text(
             text = "Logged in as ${customer.phone}",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 12.dp)
+            modifier = Modifier.padding(start = 2.dp)
         )
         
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
-        // 1. Unified Identity Card
+        // 1. Unified Identity (Flat Header)
         ProfileHeaderCard(
             customer = customer, 
             nickname = nickname, 
@@ -176,13 +182,16 @@ fun ProfileContent(
             onEditClick = onEditProfile
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        HorizontalDivider(
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f),
+            modifier = Modifier.padding(vertical = 4.dp)
+        )
 
         // Web-style Quick Stats Row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp),
+                .padding(vertical = 6.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -210,7 +219,10 @@ fun ProfileContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
+        HorizontalDivider(
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f),
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
 
         // 2. Latest Activity (Recent Order)
         Text(
@@ -219,46 +231,63 @@ fun ProfileContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             letterSpacing = 2.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 4.dp)
+            modifier = Modifier.padding(start = 2.dp)
         )
-        Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
+        Spacer(modifier = Modifier.height(2.dp))
         
-        Card(
+        Surface(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { onOrdersClick() },
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = MaterialTheme.shapes.large,
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            color = Color.Transparent
         ) {
             if (lastOrder != null) {
                 Row(
-                    modifier = Modifier.padding(Dimens.PaddingLarge),
+                    modifier = Modifier.padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(40.dp)
-                            .background(MaterialTheme.colorScheme.primaryContainer, shape = CircleShape),
+                            .size(36.dp)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), shape = CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.ShoppingBag, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.ShoppingBag, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                     }
-                    Spacer(modifier = Modifier.width(Dimens.SpacingMedium))
+                    Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = "Order #${lastOrder.orderNo}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
                         Text(text = lastOrder.status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                     }
                     Text(text = "₹${lastOrder.total.toInt()}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             } else {
-                Box(modifier = Modifier.padding(Dimens.PaddingLarge).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text(text = "No recent orders found.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "No recent orders found.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
+        HorizontalDivider(
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f),
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
 
         // 3. Rewards Section (Visual Stats)
         Text(
@@ -267,19 +296,23 @@ fun ProfileContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             letterSpacing = 2.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 4.dp)
+            modifier = Modifier.padding(start = 2.dp)
         )
-        Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
+        Spacer(modifier = Modifier.height(4.dp))
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Dimens.SpacingSmall)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
             ModernRewardCard(
-                modifier = Modifier.weight(1f).clickable { onWalletClick() },
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onWalletClick() },
                 icon = Icons.Default.AccountBalanceWallet,
                 label = "Wallet",
-                value = "₹0",
+                value = "₹${walletBalance.toInt()}",
                 color = Color(0xFFF59E0B) // Amber
             )
             ModernRewardCard(
@@ -298,7 +331,10 @@ fun ProfileContent(
             )
         }
 
-        Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
+        HorizontalDivider(
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f),
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
 
         // 4. Action Groups
         Text(
@@ -307,41 +343,51 @@ fun ProfileContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             letterSpacing = 2.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 4.dp)
+            modifier = Modifier.padding(start = 2.dp)
         )
-        Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
+        Spacer(modifier = Modifier.height(2.dp))
         
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = MaterialTheme.shapes.large,
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-        ) {
-            Column {
-                ProfileMenuItem(
-                    icon = Icons.AutoMirrored.Filled.List,
-                    title = "My Orders",
-                    subtitle = "History & tracking",
-                    onClick = onOrdersClick
-                )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = Dimens.PaddingLarge), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                ProfileMenuItem(
-                    icon = Icons.Default.Favorite,
-                    title = "Favorites",
-                    subtitle = "Your liked dishes",
-                    onClick = onFavoritesClick
-                )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = Dimens.PaddingLarge), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                ProfileMenuItem(
-                    icon = Icons.Default.Payments,
-                    title = "Digital Khata",
-                    subtitle = "Pay later accounts",
-                    onClick = onPayLaterClick
-                )
-            }
+        Column(modifier = Modifier.fillMaxWidth()) {
+            ProfileMenuItem(
+                icon = Icons.Default.AccountBalanceWallet,
+                title = "Tiffzy Wallet",
+                subtitle = "Balance: ₹${walletBalance.toInt()} • Add Money",
+                onClick = onWalletClick
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+            ProfileMenuItem(
+                icon = Icons.AutoMirrored.Filled.List,
+                title = "My Orders",
+                subtitle = "History & tracking",
+                onClick = onOrdersClick
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+            ProfileMenuItem(
+                icon = Icons.Default.Favorite,
+                title = "Favorites",
+                subtitle = "Your liked dishes",
+                onClick = onFavoritesClick
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+            ProfileMenuItem(
+                icon = Icons.Default.Payments,
+                title = "Digital Khata",
+                subtitle = "Pay later accounts",
+                onClick = onPayLaterClick
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+            ProfileMenuItem(
+                icon = Icons.Default.LocationOn,
+                title = "Saved Addresses",
+                subtitle = "Delivery locations",
+                onClick = onAddressesClick
+            )
         }
 
-        Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
+        HorizontalDivider(
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f),
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
 
         Text(
             text = "PREFERENCES",
@@ -349,43 +395,41 @@ fun ProfileContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             letterSpacing = 2.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 4.dp)
+            modifier = Modifier.padding(start = 2.dp)
         )
-        Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
+        Spacer(modifier = Modifier.height(2.dp))
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = MaterialTheme.shapes.large,
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-        ) {
-            Column {
-                ProfileMenuItem(
-                    icon = Icons.Default.Notifications,
-                    title = "Notifications",
-                    onClick = onNotificationsClick
-                )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = Dimens.PaddingLarge), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                ProfileMenuItem(
-                    icon = Icons.Default.Settings,
-                    title = "Settings",
-                    onClick = onSettingsClick
-                )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = Dimens.PaddingLarge), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                ProfileMenuItem(
-                    icon = Icons.Default.Language,
-                    title = "App Language",
-                    subtitle = "${currentLanguage.flag} ${currentLanguage.name}",
-                    onClick = onLanguageClick
-                )
-            }
+        Column(modifier = Modifier.fillMaxWidth()) {
+            ProfileMenuItem(
+                icon = Icons.Default.Notifications,
+                title = "Notifications",
+                onClick = onNotificationsClick
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+            ProfileMenuItem(
+                icon = Icons.Default.Settings,
+                title = "Settings",
+                onClick = onSettingsClick
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+            ProfileMenuItem(
+                icon = Icons.Default.Language,
+                title = "App Language",
+                subtitle = "${currentLanguage.flag} ${currentLanguage.name}",
+                onClick = onLanguageClick
+            )
         }
 
-        Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
+        HorizontalDivider(
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f),
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         TiffzyLogoutButton(onClick = onLogout)
         
-        Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
+        Spacer(modifier = Modifier.height(4.dp))
         
         TextButton(
             onClick = onDeleteAccount,
@@ -395,7 +439,7 @@ fun ProfileContent(
             Text("Delete Account", style = MaterialTheme.typography.labelMedium)
         }
 
-        Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
+        Spacer(modifier = Modifier.height(14.dp))
         
         // Footer Section
         TiffzyFooter(
@@ -415,7 +459,7 @@ fun ProfileContent(
             onDeleteAccountClick = onDeleteAccount
         )
 
-        Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
@@ -426,24 +470,22 @@ fun ProfileHeaderCard(
     avatarUrl: String? = null,
     onEditClick: () -> Unit
 ) {
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onEditClick() }, // Make the whole card clickable for easier editing
-        shape = MaterialTheme.shapes.extraLarge,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            .clickable { onEditClick() },
+        color = Color.Transparent
     ) {
         Row(
             modifier = Modifier
-                .padding(Dimens.PaddingLarge)
+                .padding(vertical = 8.dp)
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Profile Picture or Initials Avatar
             Box(
                 modifier = Modifier
-                    .size(72.dp)
+                    .size(52.dp)
                     .clip(CircleShape)
                     .background(
                         brush = Brush.linearGradient(
@@ -464,19 +506,19 @@ fun ProfileHeaderCard(
                     val initials = nickname?.take(1)?.uppercase() ?: customer.name?.take(1)?.uppercase() ?: customer.phone.take(1)
                     Text(
                         text = initials,
-                        style = MaterialTheme.typography.headlineMedium,
+                        style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Black,
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(Dimens.SpacingLarge))
+            Spacer(modifier = Modifier.width(14.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = if (!nickname.isNullOrEmpty()) nickname else customer.name ?: "Hello Guest",
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
@@ -485,7 +527,7 @@ fun ProfileHeaderCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 
                 Surface(
                     color = Color(0xFF10B981).copy(alpha = 0.1f),
@@ -510,7 +552,11 @@ fun ProfileHeaderCard(
             }
 
             IconButton(onClick = onEditClick) {
-                Icon(Icons.Default.ChevronRight, contentDescription = "Edit")
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = "Edit",
+                    tint = MaterialTheme.colorScheme.outline
+                )
             }
         }
     }
@@ -524,29 +570,27 @@ fun ModernRewardCard(
     value: String,
     color: Color
 ) {
-    Card(
+    Surface(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = MaterialTheme.shapes.large,
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        color = Color.Transparent
     ) {
         Column(
             modifier = Modifier
-                .padding(Dimens.PaddingMedium)
+                .padding(vertical = 6.dp)
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(MaterialTheme.shapes.medium)
-                    .background(color.copy(alpha = 0.1f)),
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(color.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
+                Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
             }
             
-            Spacer(modifier = Modifier.height(Dimens.SpacingSmall))
+            Spacer(modifier = Modifier.height(4.dp))
             
             Text(
                 text = value,
@@ -573,12 +617,12 @@ fun ProfileMenuItem(icon: ImageVector, title: String, subtitle: String? = null, 
         color = Color.Transparent
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = Dimens.PaddingMedium, vertical = Dimens.PaddingLarge),
+            modifier = Modifier.padding(vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(34.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
                 contentAlignment = Alignment.Center
@@ -586,7 +630,7 @@ fun ProfileMenuItem(icon: ImageVector, title: String, subtitle: String? = null, 
                 Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
             }
             
-            Spacer(modifier = Modifier.width(Dimens.SpacingMedium))
+            Spacer(modifier = Modifier.width(12.dp))
             
             Column(modifier = Modifier.weight(1f)) {
                 Text(

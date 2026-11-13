@@ -29,6 +29,7 @@ import com.tiffzy.app.ui.customer.search.SearchScreen
 import kotlinx.coroutines.launch
 import com.tiffzy.app.data.repository.CartRepository
 import com.tiffzy.app.ui.theme.Dimens
+import com.tiffzy.app.ui.theme.TiffzyOrange
 
 @Composable
 fun MainScreen(
@@ -51,7 +52,8 @@ fun MainScreen(
     initialTab: Int = 0,
     locationViewModel: LocationViewModel,
     onMapClick: () -> Unit = {},
-    onWalletClick: () -> Unit = {}
+    onWalletClick: () -> Unit = {},
+    onAddressesClick: () -> Unit = {}
 ) {
     val pagerState = rememberPagerState(initialPage = initialTab.coerceIn(0, bottomNavItems.size - 1)) { bottomNavItems.size }
     val scope = rememberCoroutineScope()
@@ -153,7 +155,7 @@ fun MainScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(48.dp),
+                                .height(42.dp),
                             horizontalArrangement = Arrangement.SpaceAround,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -177,16 +179,16 @@ fun MainScreen(
                                     Icon(
                                         imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
                                         contentDescription = item.label,
-                                        tint = if (isSelected) Color(0xFFFE5102) else Color(0xFF757575),
+                                        tint = if (isSelected) TiffzyOrange else Color(0xFF757575),
                                         modifier = Modifier.size(22.dp)
                                     )
-                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Spacer(modifier = Modifier.height(1.dp))
                                     Text(
                                         text = item.label,
                                         style = MaterialTheme.typography.labelSmall,
                                         fontSize = 10.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) Color(0xFFFE5102) else Color(0xFF757575),
+                                        color = if (isSelected) TiffzyOrange else Color(0xFF757575),
                                         maxLines = 1
                                     )
                                 }
@@ -255,6 +257,7 @@ fun MainScreen(
                         scope.launch { pagerState.animateScrollToPage(0) }
                     },
                     onWalletClick = onWalletClick,
+                    onAddressesClick = onAddressesClick,
                     onNavigateToWeb = onNavigateToWeb,
                     authViewModel = authViewModel
                 )

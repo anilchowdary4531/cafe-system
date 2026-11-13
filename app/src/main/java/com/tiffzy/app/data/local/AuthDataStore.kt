@@ -100,7 +100,8 @@ class AuthDataStore(context: Context) {
         autoDetect: Boolean? = null,
         notify: Boolean? = null,
         sound: Boolean? = null,
-        vibration: Boolean? = null
+        vibration: Boolean? = null,
+        darkTheme: Boolean? = null
     ) {
         appContext.dataStore.edit { preferences ->
             remember?.let { preferences[REMEMBER_SESSION] = it }
@@ -108,6 +109,7 @@ class AuthDataStore(context: Context) {
             notify?.let { preferences[NOTIFICATIONS_ENABLED] = it }
             sound?.let { preferences[NOTIFICATION_SOUND_ENABLED] = it }
             vibration?.let { preferences[NOTIFICATION_VIBRATION_ENABLED] = it }
+            darkTheme?.let { preferences[DARK_THEME] = it }
         }
     }
 

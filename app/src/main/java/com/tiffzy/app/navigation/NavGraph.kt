@@ -340,7 +340,8 @@ fun NavGraph(
                 onPayLaterClick = { navController.navigate(Routes.PayLater) },
                 onSettingsClick = { navController.navigate(Routes.Settings) },
                 onMapClick = { navController.navigate(Routes.Map) },
-                onWalletClick = { navController.navigate(Routes.Wallet) }
+                onWalletClick = { navController.navigate(Routes.Wallet) },
+                onAddressesClick = { navController.navigate(Routes.SavedAddresses) }
             )
         }
 

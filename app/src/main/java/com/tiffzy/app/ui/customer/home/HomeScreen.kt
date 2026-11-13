@@ -36,7 +36,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import kotlinx.coroutines.delay
 import com.tiffzy.app.data.model.BannerResponse
-import com.tiffzy.app.data.model.NearbyRestaurant
 import coil.compose.AsyncImage
 import com.tiffzy.app.R
 import com.tiffzy.app.ui.auth.AuthUiState
@@ -86,6 +85,7 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val authState by authViewModel.uiState.collectAsState()
+    val cartItems by com.tiffzy.app.data.repository.CartRepository.getInstance().cartItems.collectAsState()
 
     LaunchedEffect(authState) {
         if (authState is AuthUiState.Idle) {
@@ -100,7 +100,8 @@ fun HomeScreen(
                 subtitle = locationName ?: "Set Location",
                 onSubtitleClick = onChangeLocation,
                 onNotificationsClick = onNotificationsClick,
-                onMapClick = onMapClick
+                onSearchClick = onSearchClick,
+                onScanClick = onScanClick
             ) 
         },
         containerColor = MaterialTheme.colorScheme.background,
@@ -221,10 +222,14 @@ fun HomeScreen(
                                         )
                                     ) {
                                         items(categoryItems) { item ->
+                                            val inCartQty = cartItems.find { it.menuItem.id == item.id }?.quantity ?: 0
                                             TiffzyDiscoveryItemCard(
                                                 item = item,
                                                 onClick = { onRestaurantClick(item.restaurant.slug) },
                                                 onAddClick = { viewModel.addToCart(item) },
+                                                quantity = inCartQty,
+                                                onIncrease = { com.tiffzy.app.data.repository.CartRepository.getInstance().increaseQuantity(item.id) },
+                                                onDecrease = { com.tiffzy.app.data.repository.CartRepository.getInstance().decreaseQuantity(item.id) },
                                                 modifier = Modifier.width(136.dp)
                                             )
                                         }
@@ -243,11 +248,15 @@ fun HomeScreen(
                                     horizontalArrangement = Arrangement.spacedBy(Dimens.SpacingMedium)
                                 ) {
                                     rowItems.forEach { item ->
+                                        val inCartQty = cartItems.find { it.menuItem.id == item.id }?.quantity ?: 0
                                         Box(modifier = Modifier.weight(1f)) {
                                             TiffzyDiscoveryItemCard(
                                                 item = item,
                                                 onClick = { onRestaurantClick(item.restaurant.slug) },
-                                                onAddClick = { viewModel.addToCart(item) }
+                                                onAddClick = { viewModel.addToCart(item) },
+                                                quantity = inCartQty,
+                                                onIncrease = { com.tiffzy.app.data.repository.CartRepository.getInstance().increaseQuantity(item.id) },
+                                                onDecrease = { com.tiffzy.app.data.repository.CartRepository.getInstance().decreaseQuantity(item.id) }
                                             )
                                         }
                                     }

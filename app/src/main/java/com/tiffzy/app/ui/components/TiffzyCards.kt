@@ -9,7 +9,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
@@ -32,6 +31,7 @@ import coil.compose.SubcomposeAsyncImage
 import com.tiffzy.app.data.model.Restaurant
 import com.tiffzy.app.data.model.SearchItem
 import com.tiffzy.app.ui.theme.Dimens
+import com.tiffzy.app.ui.theme.TiffzyOrange
 import com.tiffzy.app.utils.ImageUtils
 import java.util.Locale
 
@@ -125,18 +125,18 @@ fun TiffzyRestaurantSmallCard(
     modifier: Modifier = Modifier
 ) {
     val rating = "4.2"
-    val deliveryTime = "25-30 min"
 
-    Card(
+    Surface(
         modifier = modifier
-            .width(160.dp) // Compact width
+            .width(140.dp)
+            .clip(RoundedCornerShape(12.dp))
             .clickable { onClick() },
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        shape = RoundedCornerShape(12.dp),
+        color = Color(0xFFFAFAFA),
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, Color(0xFFEEEEEE))
     ) {
         Column {
-            Box(modifier = Modifier.height(90.dp).fillMaxWidth()) {
+            Box(modifier = Modifier.height(80.dp).fillMaxWidth()) {
                 val imageUrl = ImageUtils.resolveImageUrl(restaurant.logo ?: restaurant.bannerUrl)
                 
                 SubcomposeAsyncImage(
@@ -162,28 +162,30 @@ fun TiffzyRestaurantSmallCard(
                 
                 Surface(
                     modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
-                    color = Color.White.copy(alpha = 0.9f),
-                    shape = MaterialTheme.shapes.extraSmall
+                    color = Color.Black.copy(alpha = 0.7f),
+                    shape = RoundedCornerShape(4.dp)
                 ) {
                     Row(modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(rating, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.Black)
-                        Icon(Icons.Default.Star, null, modifier = Modifier.size(10.dp), tint = MaterialTheme.colorScheme.primary)
+                        Text(rating, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Icon(Icons.Default.Star, null, modifier = Modifier.size(9.dp), tint = TiffzyOrange)
                     }
                 }
             }
             
-            Column(modifier = Modifier.padding(8.dp)) {
+            Column(modifier = Modifier.padding(6.dp)) {
                 Text(
                     text = restaurant.name,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Black,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = if (restaurant.id % 2 == 0) "Pizza, Burger" else "Biryani, Indian",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    fontSize = 10.sp,
+                    color = Color.Gray,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -191,227 +193,194 @@ fun TiffzyRestaurantSmallCard(
         }
     }
 }
-
-@Composable
-fun TiffzyNearbyRestaurantCard(
-    restaurant: com.tiffzy.app.data.model.NearbyRestaurant,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .width(200.dp)
-            .clickable { onClick() },
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column {
-            Box(modifier = Modifier.height(110.dp).fillMaxWidth()) {
-                val imageUrl = ImageUtils.resolveImageUrl(restaurant.bannerUrl ?: restaurant.logoUrl)
-                SubcomposeAsyncImage(
-                    model = imageUrl,
-                    contentDescription = restaurant.name,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                    loading = {
-                        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant))
-                    },
-                    error = {
-                        RestaurantDesignPlaceholder(restaurant.name, showName = false)
-                    },
-                    success = { state ->
-                        Image(
-                            painter = state.painter,
-                            contentDescription = restaurant.name,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
-                )
-
-                // Distance Badge on top left
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(6.dp),
-                    color = Color.Black.copy(alpha = 0.7f),
-                    shape = MaterialTheme.shapes.extraSmall
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.LocationOn,
-                            contentDescription = null,
-                            modifier = Modifier.size(11.dp),
-                            tint = Color(0xFFFF8A1F)
-                        )
-                        Spacer(modifier = Modifier.width(2.dp))
-                        Text(
-                            text = "${restaurant.distanceKm} km",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-                }
-
-                // Open / Closed Badge on top right
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(6.dp),
-                    color = if (restaurant.isOpen) Color(0xFF10B981) else Color(0xFF4B5563),
-                    shape = MaterialTheme.shapes.extraSmall
-                ) {
-                    Text(
-                        text = if (restaurant.isOpen) "Open" else "Closed",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-
-                // ETA on bottom left
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(6.dp),
-                    color = Color.Black.copy(alpha = 0.65f),
-                    shape = MaterialTheme.shapes.extraSmall
-                ) {
-                    Text(
-                        text = "${restaurant.estimatedDeliveryMinutes} min",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-                    )
-                }
-            }
-
-            Column(modifier = Modifier.padding(8.dp)) {
-                Text(
-                    text = restaurant.name,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Black,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                // Deliverability status
-                Text(
-                    text = if (restaurant.canDeliver) "✓ Delivery available" else "Outside delivery area",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (restaurant.canDeliver) Color(0xFF059669) else Color(0xFFD97706),
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-    }
-}
-
 
 @Composable
 fun TiffzyDiscoveryItemCard(
     item: SearchItem,
     onClick: () -> Unit,
     onAddClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    quantity: Int = 0,
+    onIncrease: () -> Unit = onAddClick,
+    onDecrease: () -> Unit = {}
 ) {
-    Card(
+    Surface(
         modifier = modifier
-            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
             .clickable { onClick() },
-        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 0.dp, bottomEnd = 0.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        color = Color.Transparent
     ) {
-        Column {
-            Box {
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // Food Image + Rating Overlay
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(95.dp)
+                    .clip(RoundedCornerShape(12.dp))
+            ) {
                 AsyncImage(
                     model = ImageUtils.resolveImageUrl(item.image),
                     contentDescription = item.name,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(85.dp) 
-                        .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 0.dp, bottomEnd = 0.dp)),
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(12.dp)),
                     contentScale = ContentScale.Crop,
                     placeholder = androidx.compose.ui.graphics.vector.rememberVectorPainter(Icons.Default.Restaurant),
                     error = androidx.compose.ui.graphics.vector.rememberVectorPainter(Icons.Default.Restaurant)
                 )
                 
+                // Restaurant name at TOP of image (plain text, NO background)
+                Text(
+                    text = item.restaurant.name,
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = androidx.compose.ui.text.TextStyle(
+                        shadow = androidx.compose.ui.graphics.Shadow(
+                            color = Color.Black.copy(alpha = 0.85f),
+                            offset = androidx.compose.ui.geometry.Offset(1f, 1f),
+                            blurRadius = 4f
+                        )
+                    ),
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(start = 6.dp, top = 5.dp, end = 6.dp)
+                )
+
+                // Rating Overlay at BOTTOM of image
                 if (item.rating != null && item.rating > 0) {
                     Surface(
-                        modifier = Modifier.align(Alignment.TopEnd).padding(2.dp),
-                        color = Color.White.copy(alpha = 0.9f),
-                        shape = MaterialTheme.shapes.extraSmall
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(4.dp),
+                        color = Color.Black.copy(alpha = 0.7f),
+                        shape = RoundedCornerShape(4.dp)
                     ) {
-                        Row(modifier = Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = String.format("%.1f", item.rating), style = androidx.compose.ui.text.TextStyle(fontSize = 7.sp), fontWeight = FontWeight.Bold, color = Color.Black)
-                            Icon(Icons.Default.Star, null, modifier = Modifier.size(5.dp), tint = Color(0xFFFE5102))
+                        Row(
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = String.format("%.1f", item.rating),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                modifier = Modifier.size(9.dp),
+                                tint = TiffzyOrange
+                            )
                         }
                     }
                 }
             }
             
-            Column(modifier = Modifier.padding(top = 2.dp, bottom = 0.dp)) { 
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            // Food Name below image
+            Text(
+                text = item.name,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Price and compact ADD button Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = item.name,
-                    style = androidx.compose.ui.text.TextStyle(
-                        fontSize = 10.sp, 
-                        fontWeight = FontWeight.ExtraBold,
-                        fontFamily = FontFamily.SansSerif
-                    ),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    lineHeight = 11.sp,
+                    text = "₹${item.price.toInt()}",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Text(
-                    text = item.restaurant.name.uppercase(),
-                    style = androidx.compose.ui.text.TextStyle(
-                        fontSize = 7.sp, 
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
-                    ),
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    lineHeight = 8.sp
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "₹${item.price.toInt()}",
-                        style = androidx.compose.ui.text.TextStyle(
-                            fontSize = 11.sp, 
-                            fontWeight = FontWeight.Black,
-                            fontFamily = FontFamily.SansSerif
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    
+                
+                if (quantity > 0) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = Color.White,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, TiffzyOrange),
+                        modifier = Modifier.height(24.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clickable { onDecrease() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "-",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TiffzyOrange
+                                )
+                            }
+                            Text(
+                                text = "$quantity",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TiffzyOrange,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clickable { onIncrease() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "+",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TiffzyOrange
+                                )
+                            }
+                        }
+                    }
+                } else {
                     Surface(
                         onClick = onAddClick,
-                        color = Color.Transparent,
-                        shape = CircleShape,
-                        border = androidx.compose.foundation.BorderStroke(0.5.dp, Color(0xFF16A34A).copy(alpha = 0.6f))
+                        shape = RoundedCornerShape(6.dp),
+                        color = Color.White,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, TiffzyOrange),
+                        modifier = Modifier.height(24.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Add",
-                            tint = Color(0xFF16A34A),
-                            modifier = Modifier.size(14.dp)
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "ADD",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TiffzyOrange
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Add",
+                                tint = TiffzyOrange,
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -499,6 +468,127 @@ fun TiffzySearchItemCard(
                 Text(text = "${item.restaurant.name} • ${item.restaurant.city}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(Dimens.SpacingSmall))
                 Text(text = "Rs ${item.price.toInt()}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+fun TiffzyNearbyRestaurantCard(
+    restaurant: com.tiffzy.app.data.model.NearbyRestaurant,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .width(200.dp)
+            .clickable { onClick() },
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column {
+            Box(modifier = Modifier.height(110.dp).fillMaxWidth()) {
+                val imageUrl = ImageUtils.resolveImageUrl(restaurant.bannerUrl ?: restaurant.logoUrl)
+                SubcomposeAsyncImage(
+                    model = imageUrl,
+                    contentDescription = restaurant.name,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                    loading = {
+                        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant))
+                    },
+                    error = {
+                        RestaurantDesignPlaceholder(restaurant.name, showName = false)
+                    },
+                    success = { state ->
+                        Image(
+                            painter = state.painter,
+                            contentDescription = restaurant.name,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                )
+
+                // Distance Badge on top left
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(6.dp),
+                    color = Color.Black.copy(alpha = 0.7f),
+                    shape = MaterialTheme.shapes.extraSmall
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "${restaurant.distanceKm} km",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+
+                // Open / Closed Badge on top right
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp),
+                    color = if (restaurant.isOpen) Color(0xFF10B981) else Color(0xFF4B5563),
+                    shape = MaterialTheme.shapes.extraSmall
+                ) {
+                    Text(
+                        text = if (restaurant.isOpen) "Open" else "Closed",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+
+                // ETA on bottom left
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(6.dp),
+                    color = Color.Black.copy(alpha = 0.65f),
+                    shape = MaterialTheme.shapes.extraSmall
+                ) {
+                    Text(
+                        text = "${restaurant.estimatedDeliveryMinutes} mins",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .padding(Dimens.PaddingMedium)
+                    .fillMaxWidth()
+            ) {
+                Text(
+                    text = restaurant.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                
+                Spacer(modifier = Modifier.height(2.dp))
+                
+                Text(
+                    text = listOfNotNull(restaurant.city, restaurant.state).joinToString(", ").ifEmpty { "Delivery within ${restaurant.deliveryRadiusKm.toInt()} km" },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
