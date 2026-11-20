@@ -1,14 +1,9 @@
 package com.tiffzy.app.ui.payment
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.util.Log
-import android.webkit.WebResourceRequest
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -29,7 +24,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import com.cashfree.pg.api.CFPaymentGatewayService
 import com.cashfree.pg.core.api.CFSession
 import com.cashfree.pg.core.api.callback.CFCheckoutResponseCallback
@@ -37,7 +31,6 @@ import com.cashfree.pg.core.api.exception.CFException
 import com.cashfree.pg.core.api.utils.CFErrorResponse
 import com.cashfree.pg.core.api.webcheckout.CFWebCheckoutPayment
 import com.tiffzy.app.data.model.PaymentResultStatus
-import com.tiffzy.app.data.model.TwmReturnVerifyRequest
 import com.tiffzy.app.ui.theme.TiffzyAppTheme
 
 class PaymentActivity : AppCompatActivity(), CFCheckoutResponseCallback {
@@ -72,12 +65,10 @@ class PaymentActivity : AppCompatActivity(), CFCheckoutResponseCallback {
         customerEmail = intent.getStringExtra(EXTRA_CUSTOMER_EMAIL)
         restaurantId = intent.getStringExtra(EXTRA_RESTAURANT_ID)
 
-        if (!paymentProvider.uppercase().contains("TWM")) {
-            try {
-                CFPaymentGatewayService.getInstance().setCheckoutCallback(this)
-            } catch (e: Exception) {
-                Log.e("CASHFREE_DEBUG", "Failed to set callback: ${e.message}")
-            }
+        try {
+            CFPaymentGatewayService.getInstance().setCheckoutCallback(this)
+        } catch (e: Exception) {
+            Log.e("CASHFREE_DEBUG", "Failed to set callback: ${e.message}")
         }
 
         if (savedInstanceState == null && currentOrderId.isNotBlank() && currentAmount > 0) {
@@ -140,10 +131,6 @@ class PaymentActivity : AppCompatActivity(), CFCheckoutResponseCallback {
                     onBackClick = {
                         if (uiState.status == PaymentResultStatus.SUCCESS) {
                             navigateToOrderSuccess()
-                        } else if (uiState.provider == "TWM_PAY" &&
-                            uiState.status == PaymentResultStatus.HOSTED_CHECKOUT_READY
-                        ) {
-                            viewModel.reconcileTwmStatus(pollIfPending = false)
                         } else {
                             finish()
                         }
@@ -169,27 +156,11 @@ class PaymentActivity : AppCompatActivity(), CFCheckoutResponseCallback {
                         }
                     },
                     onRefreshStatusClick = {
-                        if (uiState.provider == "TWM_PAY") {
-                            viewModel.reconcileTwmStatus()
-                        } else {
-                            viewModel.verifyPaymentWithBackend(uiState.orderId ?: currentOrderId)
-                        }
-                    },
-                    onTwmReturnIntercepted = { request ->
-                        viewModel.verifyTwmReturn(request)
-                    },
-                    onTwmReturnFallbackCheck = {
-                        viewModel.reconcileTwmStatus()
-                    },
-                    onExternalUpiLaunch = { url ->
-                        launchExternalUpiApp(url)
+                        viewModel.verifyPaymentWithBackend(uiState.orderId ?: currentOrderId)
                     },
                     onDoneClick = {
                         if (uiState.status == PaymentResultStatus.SUCCESS) {
                             navigateToOrderSuccess()
-                        } else if (uiState.provider == "TWM_PAY") {
-                            viewModel.reconcileTwmStatus()
-                            return@PaymentScreen
                         } else {
                             viewModel.verifyPaymentWithBackend(uiState.orderId ?: currentOrderId)
                             finish()
@@ -197,24 +168,6 @@ class PaymentActivity : AppCompatActivity(), CFCheckoutResponseCallback {
                     }
                 )
             }
-        }
-    }
-
-    private fun launchExternalUpiApp(url: String) {
-        try {
-            val intent = if (url.startsWith("intent://", ignoreCase = true)) {
-                Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
-            } else {
-                Intent(Intent.ACTION_VIEW, Uri.parse(url))
-            }
-            startActivity(intent)
-        } catch (e: Exception) {
-            Log.w("TWM_PAY_DEBUG", "Unable to open external UPI app for URL: ${e.message}")
-            Toast.makeText(
-                this,
-                "No UPI app found to open this payment link directly. You can scan/pay inside checkout.",
-                Toast.LENGTH_LONG
-            ).show()
         }
     }
 
@@ -337,13 +290,9 @@ fun PaymentScreen(
     onRetryClick: () -> Unit,
     onManualOpenClick: () -> Unit,
     onRefreshStatusClick: () -> Unit = {},
-    onTwmReturnIntercepted: (TwmReturnVerifyRequest) -> Unit = {},
-    onTwmReturnFallbackCheck: () -> Unit = {},
-    onExternalUpiLaunch: (String) -> Unit = {},
     onDoneClick: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val isTwm = uiState.provider == "TWM_PAY"
     val displayError = uiState.errorMessage ?: if (uiState.status == PaymentResultStatus.CANCELLED) "Payment transaction was cancelled" else null
 
     Scaffold(
@@ -351,7 +300,7 @@ fun PaymentScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = if (isTwm) "TWM Pay Checkout" else "Cashfree Payment",
+                        text = "Cashfree Payment",
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp
                     )
@@ -365,21 +314,6 @@ fun PaymentScreen(
             )
         }
     ) { paddingValues ->
-        if (uiState.status == PaymentResultStatus.HOSTED_CHECKOUT_READY && !uiState.checkoutUrl.isNullOrBlank()) {
-            TwmHostedCheckoutWebView(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                checkoutUrl = uiState.checkoutUrl,
-                returnUrlPrefix = uiState.returnUrlPrefix,
-                onExternalUpiLaunch = onExternalUpiLaunch,
-                onReturnIntercepted = onTwmReturnIntercepted,
-                onReturnFallbackCheck = onTwmReturnFallbackCheck,
-                onBackPressed = onBackClick
-            )
-            return@Scaffold
-        }
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -397,12 +331,6 @@ fun PaymentScreen(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(text = "Order ID", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(text = uiState.orderId ?: "N/A", fontWeight = FontWeight.SemiBold)
-                    }
-                    if (!uiState.orderRef.isNullOrBlank()) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(text = "Gateway Ref", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(text = uiState.orderRef, fontWeight = FontWeight.Medium, fontSize = 12.sp)
-                        }
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(text = "Amount Payable", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -423,7 +351,7 @@ fun PaymentScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                         Text(
-                            text = uiState.txMsg ?: if (isTwm) "Connecting to TWM Pay..." else "Initializing Cashfree...",
+                            text = uiState.txMsg ?: "Initializing Cashfree...",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -465,21 +393,16 @@ fun PaymentScreen(
                         onSupportClick = {
                             Toast.makeText(context, "Support requested.", Toast.LENGTH_LONG).show()
                         },
-                        isExpired = uiState.gatewayStatus == "EXPIRED",
-                        providerName = if (isTwm) "TWM Pay" else "Cashfree"
+                        isExpired = false,
+                        providerName = "Cashfree"
                     )
                 }
                 PaymentResultStatus.PENDING -> {
-                    val isUtr = uiState.gatewayStatus == "UTR_SUBMITTED"
                     StatusBanner(
                         icon = Icons.Default.HourglassTop,
                         iconTint = Color(0xFFFFB300),
-                        title = if (isUtr) "UPI Verification in Progress" else "Payment Pending",
-                        subtitle = uiState.txMsg ?: if (isUtr) {
-                            "UPI reference received. Waiting for confirmation from TWM Pay..."
-                        } else {
-                            "Your transaction is pending confirmation."
-                        },
+                        title = "Payment Pending",
+                        subtitle = uiState.txMsg ?: "Your transaction is pending confirmation.",
                         backgroundColor = Color(0xFFFFF8E1)
                     )
                     Button(onClick = onRefreshStatusClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
@@ -490,118 +413,6 @@ fun PaymentScreen(
                     Text(text = "Preparing payment...", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-        }
-    }
-}
-
-@SuppressLint("SetJavaScriptEnabled")
-@Composable
-fun TwmHostedCheckoutWebView(
-    modifier: Modifier = Modifier,
-    checkoutUrl: String,
-    returnUrlPrefix: String?,
-    onExternalUpiLaunch: (String) -> Unit,
-    onReturnIntercepted: (TwmReturnVerifyRequest) -> Unit,
-    onReturnFallbackCheck: () -> Unit,
-    onBackPressed: () -> Unit
-) {
-    var webViewRef by remember { mutableStateOf<WebView?>(null) }
-    var pageLoading by remember { mutableStateOf(true) }
-    var handledReturn by remember { mutableStateOf(false) }
-
-    BackHandler {
-        val wv = webViewRef
-        if (wv != null && wv.canGoBack()) {
-            wv.goBack()
-        } else {
-            onBackPressed()
-        }
-    }
-
-    Box(modifier = modifier) {
-        if (!TwmCheckoutUrlHelper.isSafeHttpUrl(checkoutUrl)) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(24.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text("Invalid checkout URL", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
-            }
-            return@Box
-        }
-
-        val dispatchReturnInterception: (String) -> Unit = { targetUrl ->
-            if (!handledReturn) {
-                handledReturn = true
-                val params = TwmCheckoutUrlHelper.extractTwmReturnParams(targetUrl)
-                if (params != null) {
-                    onReturnIntercepted(params)
-                } else {
-                    onReturnFallbackCheck()
-                }
-            }
-        }
-
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { ctx ->
-                WebView(ctx).apply {
-                    settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
-                    settings.loadWithOverviewMode = true
-                    settings.useWideViewPort = true
-                    settings.allowFileAccess = false
-
-                    webViewClient = object : WebViewClient() {
-                        override fun shouldOverrideUrlLoading(
-                            view: WebView?,
-                            request: WebResourceRequest?
-                        ): Boolean {
-                            val targetUrl = request?.url?.toString().orEmpty()
-                            if (targetUrl.isBlank()) return false
-
-                            if (TwmCheckoutUrlHelper.isUpiOrExternalScheme(targetUrl)) {
-                                onExternalUpiLaunch(targetUrl)
-                                return true
-                            }
-
-                            if (TwmCheckoutUrlHelper.isTwmReturnUrl(targetUrl, returnUrlPrefix)) {
-                                dispatchReturnInterception(targetUrl)
-                                return true
-                            }
-
-                            return !TwmCheckoutUrlHelper.isSafeHttpUrl(targetUrl)
-                        }
-
-                        override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
-                            super.onPageStarted(view, url, favicon)
-                            val targetUrl = url.orEmpty()
-                            if (targetUrl.isNotBlank() && TwmCheckoutUrlHelper.isTwmReturnUrl(targetUrl, returnUrlPrefix)) {
-                                view?.stopLoading()
-                                dispatchReturnInterception(targetUrl)
-                                return
-                            }
-                            pageLoading = true
-                        }
-
-                        override fun onPageFinished(view: WebView?, url: String?) {
-                            super.onPageFinished(view, url)
-                            pageLoading = false
-                        }
-                    }
-
-                    webViewRef = this
-                    loadUrl(checkoutUrl)
-                }
-            }
-        )
-
-        if (pageLoading) {
-            LinearProgressIndicator(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter)
-            )
         }
     }
 }

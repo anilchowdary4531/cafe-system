@@ -8,26 +8,6 @@ import {
 } from "lucide-react";
 import { api } from "../../../utils/apiClient";
 
-const WALLET_TWM_PENDING_KEY = "tiffzy_pending_twm_wallet_topup";
-
-const readPendingTwmWalletTopup = () => {
-    try {
-        const raw = sessionStorage.getItem(WALLET_TWM_PENDING_KEY);
-        if (!raw) return null;
-        return JSON.parse(raw);
-    } catch {
-        return null;
-    }
-};
-
-const clearPendingTwmWalletTopup = () => {
-    try {
-        sessionStorage.removeItem(WALLET_TWM_PENDING_KEY);
-    } catch {
-        // Ignore storage errors
-    }
-};
-
 // Modular Subcomponents
 import WalletBalanceHero from "./wallet/WalletBalanceHero";
 import WalletAnalyticsRow from "./wallet/WalletAnalyticsRow";
@@ -84,10 +64,8 @@ export default function WalletSection({ customerToken, redirectToCheckout = null
     const [analyticsError, setAnalyticsError] = useState("");
     const [successMsg, setSuccessMsg] = useState("");
     const [pendingMsg, setPendingMsg] = useState("");
-    const [pendingTwmTopupTxnId, setPendingTwmTopupTxnId] = useState("");
     const [selectedProvider, setSelectedProvider] = useState("CASHFREE");
     const [providerAvailability, setProviderAvailability] = useState({
-        twmPayConfigured: false,
         cashfreeConfigured: true,
         loaded: false,
     });
@@ -197,63 +175,7 @@ export default function WalletSection({ customerToken, redirectToCheckout = null
         fetchTransactions(newPage, activeFilter);
     };
 
-    // Poll TWM Pay top-up status when UTR_SUBMITTED / CREATED
-    const reconcileTwmWalletTopup = useCallback(
-        async ({ topupTxnId, orderRef, attempt = 0 }) => {
-            if (!topupTxnId && !orderRef) return;
-            const config = getAuthConfig();
-            const targetTxnId = encodeURIComponent(topupTxnId || orderRef);
-            const res = await api.get(
-                `/api/wallet/topup/twm/status/${targetTxnId}${orderRef ? `?order_ref=${encodeURIComponent(orderRef)}` : ""}`,
-                config
-            );
-            const data = res?.data || res;
-            const gatewayStatus = String(data?.gatewayStatus || "").toUpperCase();
-            const paymentStatus = String(data?.paymentStatus || data?.status || "").toUpperCase();
-
-            if (paymentStatus === "PAID" || paymentStatus === "SUCCESS" || gatewayStatus === "PAID") {
-                clearPendingTwmWalletTopup();
-                setPendingTwmTopupTxnId("");
-                setPendingMsg("");
-                setError("");
-                setSuccessMsg(`Success! ${data?.message || "Wallet top-up verified via TWM Pay."}`);
-                await Promise.allSettled([fetchWallet(), fetchAnalytics(selectedPeriod), fetchTransactions(1, activeFilter)]);
-                return;
-            }
-
-            if (paymentStatus === "FAILED" || gatewayStatus === "REJECTED" || gatewayStatus === "EXPIRED") {
-                clearPendingTwmWalletTopup();
-                setPendingTwmTopupTxnId("");
-                setPendingMsg("");
-                setError(
-                    data?.message ||
-                        (gatewayStatus === "EXPIRED"
-                            ? "Top-up payment session expired. Please try again."
-                            : "Top-up payment was rejected. Please try again.")
-                );
-                return;
-            }
-
-            const activeRef = data?.topupTxnId || topupTxnId || orderRef;
-            setPendingTwmTopupTxnId(activeRef);
-            setPendingMsg(
-                gatewayStatus === "UTR_SUBMITTED"
-                    ? "UTR submitted — verifying your UPI transfer with TWM Pay..."
-                    : "Payment pending confirmation from TWM Pay."
-            );
-
-            if (attempt < 3) {
-                pollTimerRef.current = window.setTimeout(() => {
-                    reconcileTwmWalletTopup({ topupTxnId: activeRef, orderRef: data?.orderRef || orderRef, attempt: attempt + 1 }).catch(
-                        () => {}
-                    );
-                }, 4000);
-            }
-        },
-        [activeFilter, fetchAnalytics, fetchTransactions, fetchWallet, getAuthConfig, selectedPeriod]
-    );
-
-    // Fetch provider availability & run Initial Load + Cashfree / TWM Pay Redirect Verification
+    // Fetch provider availability & run Initial Load + Cashfree Redirect Verification
     useEffect(() => {
         let cancelled = false;
 
@@ -267,101 +189,19 @@ export default function WalletSection({ customerToken, redirectToCheckout = null
                     .then((res) => {
                         if (cancelled || !res?.data) return;
                         const data = res.data;
-                        const twmConfigured = Boolean(data.twmPay?.configured);
                         const cfConfigured = Boolean(data.cashfree?.configured);
                         setProviderAvailability({
-                            twmPayConfigured: twmConfigured,
                             cashfreeConfigured: cfConfigured,
                             loaded: true,
                         });
-                        if (twmConfigured && !cfConfigured) {
-                            setSelectedProvider("TWM_PAY");
-                        } else if (!twmConfigured && cfConfigured) {
-                            setSelectedProvider("CASHFREE");
-                        } else if (data.defaultProvider === "TWM_PAY" || data.defaultProvider === "CASHFREE") {
-                            setSelectedProvider(data.defaultProvider);
-                        }
+                        setSelectedProvider("CASHFREE");
                     })
-                    .catch(() => {});
+                    .catch(() => { });
             }
 
             const redirectOrderId = searchParams.get("order_id") || searchParams.get("topup_id");
-            const twmOrderRef = searchParams.get("order_ref") || "";
-            const twmStatus = searchParams.get("status") || "";
-            const twmAmountPaise = searchParams.get("amount_paise") || "";
-            const twmTxn = searchParams.get("txn") || "";
-            const twmSignature = searchParams.get("signature") || "";
-            const pendingTwm = readPendingTwmWalletTopup();
 
-            const hasTwmReturnParams = Boolean(twmOrderRef || twmSignature || twmStatus || twmAmountPaise);
-            const hasPendingTwm = Boolean(pendingTwm?.topupTxnId && !redirectOrderId);
-
-            if (hasTwmReturnParams || hasPendingTwm) {
-                try {
-                    const config = getAuthConfig();
-                    let vData;
-                    if (hasTwmReturnParams) {
-                        const verifyRes = await api.post(
-                            "/api/wallet/topup/twm/return",
-                            {
-                                topupTxnId: twmOrderRef || pendingTwm?.topupTxnId || "",
-                                order_ref: twmOrderRef || pendingTwm?.orderRef || "",
-                                status: twmStatus,
-                                amount_paise: twmAmountPaise,
-                                txn: twmTxn,
-                                signature: twmSignature,
-                            },
-                            config
-                        );
-                        vData = verifyRes?.data || verifyRes;
-                    } else {
-                        const statusRes = await api.get(
-                            `/api/wallet/topup/twm/status/${encodeURIComponent(pendingTwm.topupTxnId)}`,
-                            config
-                        );
-                        vData = statusRes?.data || statusRes;
-                    }
-
-                    const paymentStatus = String(vData?.paymentStatus || vData?.status || "").toUpperCase();
-                    const gatewayStatus = String(vData?.gatewayStatus || "").toUpperCase();
-                    if (paymentStatus === "PAID" || paymentStatus === "SUCCESS" || gatewayStatus === "PAID") {
-                        clearPendingTwmWalletTopup();
-                        setPendingMsg("");
-                        setSuccessMsg(`Success! ${vData?.message || "Payment verified and credited to your wallet."}`);
-                    } else if (paymentStatus === "FAILED" || gatewayStatus === "REJECTED" || gatewayStatus === "EXPIRED") {
-                        clearPendingTwmWalletTopup();
-                        setPendingMsg("");
-                        setError(
-                            vData?.message ||
-                                (gatewayStatus === "EXPIRED"
-                                    ? "Top-up payment session expired. Please try again."
-                                    : "Top-up payment was rejected. Please try again.")
-                        );
-                    } else if (paymentStatus === "PENDING" || gatewayStatus === "UTR_SUBMITTED" || gatewayStatus === "CREATED") {
-                        const activeRef = vData?.topupTxnId || twmOrderRef || pendingTwm?.topupTxnId;
-                        setPendingTwmTopupTxnId(activeRef);
-                        setPendingMsg(
-                            gatewayStatus === "UTR_SUBMITTED"
-                                ? "UTR submitted — verifying your UPI transfer with TWM Pay..."
-                                : "Payment pending confirmation from TWM Pay."
-                        );
-                        pollTimerRef.current = window.setTimeout(() => {
-                            reconcileTwmWalletTopup({ topupTxnId: activeRef, orderRef: twmOrderRef, attempt: 1 }).catch(() => {});
-                        }, 4000);
-                    }
-                } catch (err) {
-                    console.error("[WalletSection] TWM redirect verify error:", err);
-                    setError(err.response?.data?.message || err.message || "Could not verify TWM Pay top-up status");
-                } finally {
-                    if (hasTwmReturnParams) {
-                        const newParams = new URLSearchParams(searchParams);
-                        ["order_ref", "status", "amount_paise", "txn", "signature", "topup_id", "order_id"].forEach((k) =>
-                            newParams.delete(k)
-                        );
-                        setSearchParams(newParams, { replace: true });
-                    }
-                }
-            } else if (redirectOrderId && redirectOrderId.startsWith("TOPUP_")) {
+            if (redirectOrderId && redirectOrderId.startsWith("TOPUP_")) {
                 try {
                     const config = getAuthConfig();
                     const verifyRes = await api.post(
@@ -409,7 +249,7 @@ export default function WalletSection({ customerToken, redirectToCheckout = null
         };
     }, []);
 
-    // Add Money Flow (TWM Pay Redirect + Working Cashfree Drop-in / SDK)
+    // Add Money Flow (Cashfree Drop-in / SDK)
     const handleAddMoney = async (amountToAdd, providerOverride = null) => {
         const amt = Number(amountToAdd);
         if (Number.isNaN(amt) || amt < 10) {
@@ -426,10 +266,7 @@ export default function WalletSection({ customerToken, redirectToCheckout = null
             setPendingMsg("");
 
             const config = getAuthConfig();
-            const isTwm = activeProvider === "TWM_PAY";
-            const returnUrl = isTwm
-                ? `${window.location.origin}/profile/wallet`
-                : `${window.location.origin}/profile/wallet?order_id={order_id}`;
+            const returnUrl = `${window.location.origin}/profile/wallet?order_id={order_id}`;
 
             // Step 1: Create top-up session
             const res = await api.post(
@@ -444,37 +281,6 @@ export default function WalletSection({ customerToken, redirectToCheckout = null
 
             const data = res?.data || res;
             const session = data?.session || data;
-
-            if (isTwm || String(session?.provider || session?.gateway || data?.provider || "").toUpperCase() === "TWM_PAY") {
-                const topupTxnId = session?.topupTxnId || data?.topupTxnId;
-                const checkoutUrl =
-                    session?.checkoutUrl ||
-                    session?.checkout_url ||
-                    session?.paymentUrl ||
-                    data?.checkoutUrl ||
-                    data?.checkout_url;
-                if (!topupTxnId || !checkoutUrl) {
-                    throw new Error("TWM Pay did not return a checkout URL");
-                }
-                try {
-                    sessionStorage.setItem(
-                        WALLET_TWM_PENDING_KEY,
-                        JSON.stringify({
-                            topupTxnId,
-                            orderRef: session?.orderRef || data?.orderRef || topupTxnId,
-                            amount: amt,
-                        })
-                    );
-                } catch {
-                    // Ignore storage error
-                }
-                const doRedirect =
-                    typeof redirectToCheckout === "function"
-                        ? redirectToCheckout
-                        : (url) => window.location.assign(url);
-                doRedirect(checkoutUrl);
-                return;
-            }
 
             const sessionId =
                 session?.paymentSessionId ||
@@ -494,8 +300,8 @@ export default function WalletSection({ customerToken, redirectToCheckout = null
                     session.isProduction !== undefined
                         ? Boolean(session.isProduction)
                         : session.is_production !== undefined
-                        ? Boolean(session.is_production)
-                        : String(session.cfEnv || session.cf_env || "").toUpperCase() === "PRODUCTION";
+                            ? Boolean(session.is_production)
+                            : String(session.cfEnv || session.cf_env || "").toUpperCase() === "PRODUCTION";
 
                 const envSetting = (import.meta.env.VITE_CASHFREE_ENV || "").toUpperCase();
                 const isProdHostname =
@@ -621,15 +427,6 @@ export default function WalletSection({ customerToken, redirectToCheckout = null
                         <Clock size={15} className="shrink-0" />
                         <span>{pendingMsg}</span>
                     </div>
-                    {pendingTwmTopupTxnId && (
-                        <button
-                            type="button"
-                            onClick={() => reconcileTwmWalletTopup({ topupTxnId: pendingTwmTopupTxnId })}
-                            className="font-bold text-amber-800 hover:underline dark:text-amber-200 cursor-pointer shrink-0"
-                        >
-                            Check Status
-                        </button>
-                    )}
                 </div>
             )}
 

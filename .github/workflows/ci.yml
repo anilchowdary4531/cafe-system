@@ -83,12 +83,11 @@ jobs:
         working-directory: backend
         run: VALIDATE_BOOT=1 NODE_ENV=production node src/server.js
 
-      - name: Run targeted TWM Pay, Cashfree, Wallet & Billing suites (required)
+      - name: Run targeted Cashfree, Wallet & Billing suites (required)
         working-directory: backend
         run: |
           set -euo pipefail
           mkdir -p test-reports
-          node --test --test-reporter=spec src/tests/twmPay.integration.test.js 2>&1 | tee test-reports/twm-pay-backend.log
           node --test --test-reporter=spec --test-concurrency=1 \
             src/tests/cashfree.payment.test.js \
             src/tests/cashfreePpiPreparation.test.js \
@@ -161,10 +160,6 @@ jobs:
               "| --- | --- | --- | --- | --- |",
             ];
 
-            const twm = extract("test-reports/twm-pay-backend.log");
-            if (twm) {
-              lines.push(`| Targeted TWM Pay (\`twmPay.integration.test.js\`) | ${twm.tests} | ${twm.pass} | ${twm.fail} | ${twm.skipped} |`);
-            }
             const pay = extract("test-reports/payment-wallet-billing-backend.log");
             if (pay) {
               lines.push(`| Cashfree, Wallet & Billing Suites | ${pay.tests} | ${pay.pass} | ${pay.fail} | ${pay.skipped} |`);
@@ -212,13 +207,12 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Run targeted TWM Pay, Wallet & Checkout frontend tests (required)
+      - name: Run targeted Wallet & Checkout frontend tests (required)
         working-directory: frontend
         run: |
           set -euo pipefail
           mkdir -p test-reports
           npx vitest run \
-            src/__tests__/twmPayIntegration.test.jsx \
             src/__tests__/walletRedesign.test.jsx \
             src/__tests__/unifiedCheckout.test.jsx \
             src/__tests__/thankYouNavigation.test.jsx \
@@ -244,7 +238,6 @@ jobs:
             }
 
             const requiredFiles = [
-              "twmPayIntegration.test.jsx",
               "walletRedesign.test.jsx",
               "unifiedCheckout.test.jsx",
               "thankYouNavigation.test.jsx",
@@ -287,10 +280,6 @@ jobs:
             echo "::error::Expected staging-api.tiffzy.com in staging frontend bundle."
             exit 1
           fi
-          if grep -rqE "TWM_API_SECRET|TWM_SIGNING_KEY|X-TWM-Secret" dist/assets/*.js; then
-            echo "::error::Sensitive TWM secret reference found in staging frontend bundle!"
-            exit 1
-          fi
           mkdir -p build-artifacts/staging-dist
           cp -R dist/* build-artifacts/staging-dist/
 
@@ -305,10 +294,6 @@ jobs:
           set -euo pipefail
           npm run build
           test -f dist/index.html
-          if grep -rqE "TWM_API_SECRET|TWM_SIGNING_KEY|X-TWM-Secret" dist/assets/*.js; then
-            echo "::error::Sensitive TWM secret reference found in production frontend bundle!"
-            exit 1
-          fi
           mkdir -p build-artifacts/production-dist
           cp -R dist/* build-artifacts/production-dist/
 
@@ -446,10 +431,6 @@ jobs:
           test -f "$APK_PATH"
           if ! grep -Fq "BASE_URL = \"${STAGING_URL}\"" "$BUILD_CFG"; then
             echo "::error::Staging BuildConfig.BASE_URL mismatch in ${BUILD_CFG}"
-            exit 1
-          fi
-          if grep -rqE "TWM_API_SECRET|TWM_SIGNING_KEY|X-TWM-Secret" app/src/ "$BUILD_CFG"; then
-            echo "::error::Sensitive TWM secret reference found in Android source or BuildConfig!"
             exit 1
           fi
           APK_SIZE=$(stat -c%s "$APK_PATH" 2>/dev/null || wc -c < "$APK_PATH")

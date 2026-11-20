@@ -17,6 +17,5 @@ This directory contains ready-to-apply templates for running Tiffzy (`main` or a
 5. Clone the target branch (e.g., `main`) to `/home/ubuntu/cafe-system-staging` and create `/home/ubuntu/cafe-system-staging/backend/.env` from `deploy/staging/backend.env.staging.example`.
 6. Run `bash /home/ubuntu/cafe-system-staging/deploy/staging/setup-staging.sh`.
 7. In **Vercel Project Settings -> Environment Variables (Preview scope only)**, configure the variables from `deploy/staging/frontend.env.preview.example` and redeploy the Preview branch.
-8. Add your Vercel Preview hostname to TWM Pay Admin -> **Allowed websites** (no separate TWM Pay sandbox exists; live merchant keys verify against the allowlisted domain).
-9. (Optional Android staging APK): build with `./gradlew assembleDebug -PTIFFZY_BASE_URL=https://staging-api.tiffzy.com/`.
+8. (Optional Android staging APK): build with `./gradlew assembleDebug -PTIFFZY_BASE_URL=https://staging-api.tiffzy.com/`.
 

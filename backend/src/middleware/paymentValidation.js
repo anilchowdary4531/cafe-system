@@ -4,7 +4,6 @@
 export const normalizePaymentProvider = (rawProvider) => {
   const upper = String(rawProvider || "").trim().toUpperCase();
   if (!upper) return "CASHFREE";
-  if (upper === "TWM" || upper === "TWM_PAY" || upper === "TWMPAY") return "TWM_PAY";
   return upper;
 };
 
@@ -23,15 +22,10 @@ export const validateCreateOrderPayload = (body) => {
     errors.push("orderId is required");
   }
 
-  // For Cashfree legacy callers, amount remains required; for TWM Pay, backend always computes authoritative DB total
-  if (provider !== "TWM_PAY") {
-    if (rawAmount === undefined || rawAmount === null || Number.isNaN(amount)) {
-      errors.push("amount is required and must be a valid number");
-    } else if (amount <= 0) {
-      errors.push("amount must be greater than 0");
-    }
-  } else if (amount !== null && (Number.isNaN(amount) || !Number.isFinite(amount) || amount <= 0)) {
-    errors.push("amount must be a valid positive number when provided");
+  if (rawAmount === undefined || rawAmount === null || Number.isNaN(amount)) {
+    errors.push("amount is required and must be a valid number");
+  } else if (amount <= 0) {
+    errors.push("amount must be greater than 0");
   }
 
   return {

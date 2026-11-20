@@ -53,7 +53,7 @@ class WalletViewModel(
 
     fun initiateTopup(
         amount: Double,
-        provider: String = "TWM_PAY",
+        provider: String = "CASHFREE",
         onSessionCreated: (WalletTopupCreateResponse) -> Unit
     ) {
         viewModelScope.launch {
@@ -68,52 +68,6 @@ class WalletViewModel(
                 onSessionCreated(res)
             } catch (e: Exception) {
                 _uiState.value = WalletUiState.Error(e.message ?: "Topup failed")
-            }
-        }
-    }
-
-    fun verifyTwmReturn(
-        topupTxnId: String,
-        orderRef: String,
-        params: TwmReturnVerifyRequest,
-        onResult: (WalletTwmStatusResponse) -> Unit
-    ) {
-        viewModelScope.launch {
-            try {
-                val res = walletRepository.verifyTwmWalletTopupReturn(
-                    WalletTwmReturnVerifyRequest(
-                        topupTxnId = topupTxnId,
-                        orderRef = (params.orderRef ?: "").ifBlank { orderRef },
-                        status = params.status,
-                        amountPaise = params.amountPaise,
-                        txn = params.txn,
-                        signature = params.signature
-                    )
-                )
-                onResult(res)
-                if (res.success || res.paymentStatus.equals("PAID", ignoreCase = true)) {
-                    loadWalletData()
-                }
-            } catch (e: Exception) {
-                _uiState.value = WalletUiState.Error(e.message ?: "Topup verification failed")
-            }
-        }
-    }
-
-    fun checkTwmStatus(
-        topupTxnId: String,
-        orderRef: String,
-        onResult: (WalletTwmStatusResponse) -> Unit
-    ) {
-        viewModelScope.launch {
-            try {
-                val res = walletRepository.getTwmWalletTopupStatus(topupTxnId, orderRef)
-                onResult(res)
-                if (res.success || res.paymentStatus.equals("PAID", ignoreCase = true)) {
-                    loadWalletData()
-                }
-            } catch (e: Exception) {
-                _uiState.value = WalletUiState.Error(e.message ?: "Status check failed")
             }
         }
     }

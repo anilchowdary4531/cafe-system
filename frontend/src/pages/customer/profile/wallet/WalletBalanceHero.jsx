@@ -22,7 +22,6 @@ export default function WalletBalanceHero({
 }) {
     const [selectedAmount, setSelectedAmount] = useState(500);
 
-    const showTwmOption = Boolean(providerAvailability?.twmPayConfigured);
     const showCashfreeOption =
         providerAvailability == null ||
         !providerAvailability.loaded ||
@@ -106,11 +105,10 @@ export default function WalletBalanceHero({
                                     type="button"
                                     onClick={() => handleQuickSelect(amt)}
                                     disabled={topupLoading}
-                                    className={`px-2 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
-                                        isSelected
+                                    className={`px-2 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${isSelected
                                             ? "bg-[var(--app-primary)] text-white shadow-sm font-bold"
                                             : "border border-[color:var(--app-border)]/60 theme-muted hover:text-[color:var(--app-text)] hover:bg-[color:var(--app-border)]/20"
-                                    }`}
+                                        }`}
                                 >
                                     +₹{amt.toLocaleString("en-IN")}
                                 </button>
@@ -118,38 +116,7 @@ export default function WalletBalanceHero({
                         })}
                     </div>
 
-                    {/* Gateway Selector (shown when TWM Pay or multiple gateways configured) */}
-                    {(showTwmOption && typeof onProviderChange === "function") && (
-                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                            <span className="text-[11px] font-medium theme-muted mr-1">Pay via:</span>
-                            <button
-                                type="button"
-                                disabled={topupLoading}
-                                onClick={() => onProviderChange("TWM_PAY")}
-                                className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold transition-all cursor-pointer ${
-                                    selectedProvider === "TWM_PAY"
-                                        ? "border-[var(--app-primary)] bg-[var(--app-primary)] text-white shadow-sm"
-                                        : "border-[color:var(--app-border)]/60 theme-muted hover:text-[color:var(--app-text)]"
-                                }`}
-                            >
-                                TWM Pay (UPI / QR)
-                            </button>
-                            {showCashfreeOption && (
-                                <button
-                                    type="button"
-                                    disabled={topupLoading}
-                                    onClick={() => onProviderChange("CASHFREE")}
-                                    className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold transition-all cursor-pointer ${
-                                        selectedProvider === "CASHFREE"
-                                            ? "border-[var(--app-primary)] bg-[var(--app-primary)] text-white shadow-sm"
-                                            : "border-[color:var(--app-border)]/60 theme-muted hover:text-[color:var(--app-text)]"
-                                    }`}
-                                >
-                                    Cashfree Online
-                                </button>
-                            )}
-                        </div>
-                    )}
+
 
                     {/* Custom Amount Form & Inline Add Button */}
                     <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">

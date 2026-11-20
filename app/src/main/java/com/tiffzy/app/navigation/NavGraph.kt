@@ -507,8 +507,8 @@ fun NavGraph(
                 onBack = { navController.popBackStack() },
                 onOrderSuccess = { order ->
                     val uiState = checkoutViewModel.uiState.value
-                    if (uiState.selectedPaymentMethod == "CASHFREE" || uiState.selectedPaymentMethod == "TWM_PAY") {
-                        // Start Online Payment Activity (TWM Pay or Cashfree)
+                    if (uiState.selectedPaymentMethod == "CASHFREE") {
+                        // Start Online Payment Activity (Cashfree)
                         PaymentActivity.start(
                             context = context,
                             orderId = order.id.toString(),

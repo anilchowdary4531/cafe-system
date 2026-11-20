@@ -57,14 +57,7 @@ class WalletViewModel(
                 val configured = res.providers.filter { it.configured }
                 _availableOnlineProviders.value = configured
                 _providersLoaded.value = true
-                if (configured.any { it.id.equals("TWM_PAY", ignoreCase = true) }) {
-                    val preferred = res.defaultProvider?.uppercase()
-                    _selectedProvider.value = if (preferred == "CASHFREE" && configured.any { it.id.equals("CASHFREE", ignoreCase = true) }) {
-                        "CASHFREE"
-                    } else {
-                        "TWM_PAY"
-                    }
-                } else if (configured.any { it.id.equals("CASHFREE", ignoreCase = true) }) {
+                if (configured.any { it.id.equals("CASHFREE", ignoreCase = true) }) {
                     _selectedProvider.value = "CASHFREE"
                 }
             } catch (_: Exception) {
@@ -195,25 +188,6 @@ class WalletViewModel(
                 Log.d("WALLET_TOPUP", "4. create response received: success=${response.success}, provider=${response.resolvedProvider}")
 
                 val targetOrderId = response.resolvedTopupTxnId
-                if (response.success && response.resolvedProvider == "TWM_PAY") {
-                    val checkoutUrl = response.resolvedCheckoutUrl
-                    if (targetOrderId.isNullOrBlank() || checkoutUrl.isNullOrBlank()) {
-                        _topupStep.value = TopupStep.Error(
-                            message = response.message ?: "TWM Pay did not return a checkout URL.",
-                            errorType = TopupErrorType.TOPUP_CREATE_FAILED
-                        )
-                        return@launch
-                    }
-                    _topupStep.value = TopupStep.TwmCheckout(
-                        topupTxnId = targetOrderId,
-                        orderRef = response.resolvedGatewayOrderId ?: targetOrderId,
-                        checkoutUrl = checkoutUrl,
-                        amount = amount,
-                        returnUrlPrefix = "https://tiffzy.com/profile/wallet"
-                    )
-                    return@launch
-                }
-
                 val sessionId = response.resolvedSessionId
 
                 if (!response.success || sessionId.isNullOrBlank() || targetOrderId.isNullOrBlank()) {
@@ -399,114 +373,6 @@ class WalletViewModel(
         )
         _statusBanner.value = "Payment failed. Your wallet was not credited."
         _isBannerSuccess.value = false
-    }
-
-    fun verifyTwmTopupReturn(
-        topupTxnId: String,
-        orderRef: String,
-        amount: Double,
-        params: TwmReturnVerifyRequest
-    ) {
-        _topupStep.value = TopupStep.VerifyingPayment(topupTxnId, amount)
-        viewModelScope.launch {
-            try {
-                val res = walletRepository.verifyTwmWalletTopupReturn(
-                    WalletTwmReturnVerifyRequest(
-                        topupTxnId = topupTxnId,
-                        orderRef = (params.orderRef ?: "").ifBlank { orderRef },
-                        status = params.status,
-                        amountPaise = params.amountPaise,
-                        txn = params.txn,
-                        signature = params.signature
-                    )
-                )
-                applyTwmTopupOutcome(res, topupTxnId, orderRef, amount)
-            } catch (e: Exception) {
-                val errMsg = "Payment verification pending. Please check status or refresh your wallet."
-                _topupStep.value = TopupStep.Error(
-                    message = errMsg,
-                    errorType = TopupErrorType.TOPUP_VERIFY_FAILED,
-                    canRetry = true
-                )
-                _statusBanner.value = errMsg
-                _isBannerSuccess.value = false
-            }
-        }
-    }
-
-    fun checkTwmTopupStatus(topupTxnId: String, orderRef: String, amount: Double) {
-        _topupStep.value = TopupStep.VerifyingPayment(topupTxnId, amount)
-        viewModelScope.launch {
-            try {
-                val res = walletRepository.getTwmWalletTopupStatus(topupTxnId, orderRef)
-                applyTwmTopupOutcome(res, topupTxnId, orderRef, amount)
-            } catch (e: Exception) {
-                val errMsg = e.message ?: "Unable to verify TWM Pay status right now. Please retry."
-                _topupStep.value = TopupStep.Error(
-                    message = errMsg,
-                    errorType = TopupErrorType.TOPUP_VERIFY_FAILED,
-                    canRetry = true
-                )
-                _statusBanner.value = errMsg
-                _isBannerSuccess.value = false
-            }
-        }
-    }
-
-    private fun applyTwmTopupOutcome(
-        res: WalletTwmStatusResponse,
-        topupTxnId: String,
-        orderRef: String,
-        amount: Double
-    ) {
-        val paymentStatus = (res.paymentStatus ?: res.status ?: "").trim().uppercase()
-        val gatewayStatus = (res.gatewayStatus ?: "").trim().uppercase()
-
-        when {
-            paymentStatus == "PAID" || paymentStatus == "SUCCESS" || gatewayStatus == "PAID" -> {
-                val newBalance = res.balance ?: 0.0
-                val credited = res.amount ?: amount
-                val msg = res.message ?: "₹${credited.toInt()} added to your Tiffzy Wallet"
-                _topupStep.value = TopupStep.Success(
-                    amount = credited,
-                    newBalance = newBalance,
-                    message = msg
-                )
-                _statusBanner.value = msg
-                _isBannerSuccess.value = true
-                loadWallet()
-            }
-            paymentStatus == "FAILED" || gatewayStatus == "REJECTED" || gatewayStatus == "EXPIRED" -> {
-                val msg = res.message ?: if (gatewayStatus == "EXPIRED") {
-                    "Top-up payment session expired."
-                } else {
-                    "Payment rejected. Your wallet was not credited."
-                }
-                _topupStep.value = TopupStep.Error(
-                    message = msg,
-                    errorType = TopupErrorType.CASHFREE_PAYMENT_FAILED,
-                    canRetry = true
-                )
-                _statusBanner.value = msg
-                _isBannerSuccess.value = false
-            }
-            else -> {
-                val msg = res.message ?: if (gatewayStatus == "UTR_SUBMITTED") {
-                    "UTR submitted — verifying UPI payment"
-                } else {
-                    "Payment pending confirmation from TWM Pay."
-                }
-                _topupStep.value = TopupStep.Pending(
-                    topupTxnId = res.topupTxnId ?: topupTxnId,
-                    orderRef = res.orderRef ?: orderRef,
-                    amount = res.amount ?: amount,
-                    gatewayStatus = gatewayStatus.ifBlank { "CREATED" },
-                    message = msg
-                )
-                _statusBanner.value = msg
-                _isBannerSuccess.value = false
-            }
-        }
     }
 
     fun clearBanner() {

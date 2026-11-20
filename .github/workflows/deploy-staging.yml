@@ -1,4 +1,4 @@
-name: Staging CI & Isolated AWS Deployment (TWM Pay)
+name: Staging CI & Isolated AWS Deployment
 
 on:
   push:
@@ -136,12 +136,6 @@ jobs:
           STAGING_EC2_SSH_KEY: ${{ secrets.STAGING_EC2_SSH_KEY }}
           STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
           STAGING_JWT_SECRET: ${{ secrets.STAGING_JWT_SECRET }}
-          STAGING_TWM_MERCHANT_ID: ${{ secrets.STAGING_TWM_MERCHANT_ID }}
-          STAGING_TWM_API_SECRET: ${{ secrets.STAGING_TWM_API_SECRET }}
-          STAGING_TWM_SIGNING_KEY: ${{ secrets.STAGING_TWM_SIGNING_KEY }}
-          TWM_ENABLED: ${{ vars.STAGING_TWM_ENABLED || 'true' }}
-          TWM_NOTIFY_URL: ${{ vars.STAGING_TWM_NOTIFY_URL || 'https://staging-api.tiffzy.com/api/payments/twm/notify' }}
-          TWM_RETURN_URL: ${{ vars.STAGING_TWM_RETURN_URL || '' }}
           STAGING_API_HOST: staging-api.tiffzy.com
         run: |
           set -euo pipefail
@@ -164,9 +158,6 @@ jobs:
           check_secret "STAGING_EC2_SSH_KEY" "${STAGING_EC2_SSH_KEY}"
           check_secret "STAGING_DATABASE_URL" "${STAGING_DATABASE_URL}"
           check_secret "STAGING_JWT_SECRET" "${STAGING_JWT_SECRET}"
-          check_secret "STAGING_TWM_MERCHANT_ID" "${STAGING_TWM_MERCHANT_ID}"
-          check_secret "STAGING_TWM_API_SECRET" "${STAGING_TWM_API_SECRET}"
-          check_secret "STAGING_TWM_SIGNING_KEY" "${STAGING_TWM_SIGNING_KEY}"
 
           PROD_API_IP=$(dig +short api.tiffzy.com A | head -n1 || true)
           STAGING_DNS_IP=$(dig +short "${STAGING_API_HOST}" A | head -n1 || true)
@@ -229,18 +220,11 @@ jobs:
           STAGING_BACKEND_URL: "https://staging-api.tiffzy.com"
           STAGING_CASHFREE_CLIENT_ID: ${{ secrets.STAGING_CASHFREE_CLIENT_ID || '' }}
           STAGING_CASHFREE_CLIENT_SECRET: ${{ secrets.STAGING_CASHFREE_CLIENT_SECRET || '' }}
-          TWM_ENABLED: ${{ vars.STAGING_TWM_ENABLED || 'true' }}
-          TWM_MERCHANT_ID: ${{ secrets.STAGING_TWM_MERCHANT_ID }}
-          TWM_API_SECRET: ${{ secrets.STAGING_TWM_API_SECRET }}
-          TWM_SIGNING_KEY: ${{ secrets.STAGING_TWM_SIGNING_KEY }}
-          TWM_URL: ${{ vars.STAGING_TWM_URL || 'https://pay.thewebsitemakers.in' }}
-          TWM_NOTIFY_URL: ${{ vars.STAGING_TWM_NOTIFY_URL || 'https://staging-api.tiffzy.com/api/payments/twm/notify' }}
-          TWM_RETURN_URL: ${{ vars.STAGING_TWM_RETURN_URL || '' }}
         with:
           host: ${{ secrets.STAGING_EC2_HOST }}
           username: ${{ secrets.STAGING_EC2_USER }}
           key: ${{ secrets.STAGING_EC2_SSH_KEY }}
-          envs: TARGET_SHA,TARGET_BRANCH,STAGING_DATABASE_URL,STAGING_JWT_SECRET,STAGING_FRONTEND_URL,STAGING_CORS_ORIGINS,STAGING_CORS_ORIGIN_PATTERNS,STAGING_BACKEND_URL,STAGING_CASHFREE_CLIENT_ID,STAGING_CASHFREE_CLIENT_SECRET,TWM_ENABLED,TWM_MERCHANT_ID,TWM_API_SECRET,TWM_SIGNING_KEY,TWM_URL,TWM_NOTIFY_URL,TWM_RETURN_URL
+          envs: TARGET_SHA,TARGET_BRANCH,STAGING_DATABASE_URL,STAGING_JWT_SECRET,STAGING_FRONTEND_URL,STAGING_CORS_ORIGINS,STAGING_CORS_ORIGIN_PATTERNS,STAGING_BACKEND_URL,STAGING_CASHFREE_CLIENT_ID,STAGING_CASHFREE_CLIENT_SECRET
           script: |
             set -euo pipefail
 
@@ -297,14 +281,6 @@ jobs:
             CASHFREE_ENV=SANDBOX
             CASHFREE_CLIENT_ID=${STAGING_CASHFREE_CLIENT_ID}
             CASHFREE_CLIENT_SECRET=${STAGING_CASHFREE_CLIENT_SECRET}
-            TWM_ENABLED=${TWM_ENABLED}
-            TWM_MERCHANT_ID=${TWM_MERCHANT_ID}
-            TWM_API_SECRET=${TWM_API_SECRET}
-            TWM_SIGNING_KEY=${TWM_SIGNING_KEY}
-            TWM_URL=${TWM_URL}
-            TWM_TIMEOUT_MS=15000
-            TWM_NOTIFY_URL=${TWM_NOTIFY_URL}
-            TWM_RETURN_URL=${TWM_RETURN_URL}
             EOF
             mv .env.staging.tmp .env
             chmod 600 .env
@@ -352,7 +328,7 @@ jobs:
             sudo journalctl -u "$STAGING_SERVICE" -n 50 --no-pager
             exit 1
 
-      - name: Verify public staging API and TWM Pay readiness
+      - name: Verify public staging API readiness
         run: |
           set -euo pipefail
           HEALTH_JSON=$(curl -fsS https://staging-api.tiffzy.com/health)
@@ -361,11 +337,7 @@ jobs:
           echo "Staging /api/payments/providers: ${PROVIDERS_JSON}"
           node -e '
             const health = JSON.parse(process.argv[1]);
-            const providers = JSON.parse(process.argv[2]);
             if (health.status !== "ok") {
               throw new Error(`Expected health.status=ok, got ${health.status}`);
-            }
-            if (!providers?.twmPay?.configured) {
-              throw new Error("Expected TWM Pay to report configured=true on staging");
             }
           ' "${HEALTH_JSON}" "${PROVIDERS_JSON}"

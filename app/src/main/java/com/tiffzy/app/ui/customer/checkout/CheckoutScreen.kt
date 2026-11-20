@@ -79,7 +79,7 @@ fun CheckoutScreen(
                         val currentOrder = uiState.orderSuccess
                         if (
                             currentOrder != null &&
-                            (uiState.selectedPaymentMethod == "CASHFREE" || uiState.selectedPaymentMethod == "TWM_PAY")
+                            (uiState.selectedPaymentMethod == "CASHFREE")
                         ) {
                             // If order already exists, just re-trigger the selected online payment gateway
                             onOrderSuccess(currentOrder.order)
@@ -175,7 +175,7 @@ fun CheckoutScreen(
 
                 Spacer(modifier = Modifier.height(Dimens.SpacingLarge))
 
-                // 5. Payment Method Selector (TWM Pay / Cashfree / Wallet / Cash)
+                // 5. Payment Method Selector (Cashfree / Wallet / Cash)
                 SectionHeader("Select Payment Method", Icons.Default.Payment)
                 PaymentMethodSelectorCard(
                     selectedMethod = uiState.selectedPaymentMethod,
@@ -325,8 +325,6 @@ fun PaymentMethodSelectorCard(
     providersLoaded: Boolean = false,
     onSelectMethod: (String) -> Unit
 ) {
-    val showTwmPay = !providersLoaded ||
-        availableOnlineProviders.any { it.id.equals("TWM_PAY", ignoreCase = true) && it.configured }
     val showCashfree = !providersLoaded ||
         availableOnlineProviders.any { it.id.equals("CASHFREE", ignoreCase = true) && it.configured }
 
@@ -399,77 +397,6 @@ fun PaymentMethodSelectorCard(
                     selected = selectedMethod == "WALLET",
                     onClick = { onSelectMethod("WALLET") },
                     colors = RadioButtonDefaults.colors(selectedColor = Color(0xFF6366F1))
-                )
-            }
-        }
-
-        // TWM Pay Option (UPI / QR / Hosted Online)
-        if (showTwmPay) Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onSelectMethod("TWM_PAY") },
-            colors = CardDefaults.cardColors(
-                containerColor = if (selectedMethod == "TWM_PAY")
-                    Color(0xFF0EA5E9).copy(alpha = 0.06f)
-                else MaterialTheme.colorScheme.surface
-            ),
-            border = if (selectedMethod == "TWM_PAY")
-                BorderStroke(2.dp, Color(0xFF0EA5E9))
-            else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(if (selectedMethod == "TWM_PAY") Color(0xFF0EA5E9).copy(alpha = 0.15f) else Color.Gray.copy(alpha = 0.1f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CreditCard,
-                        contentDescription = null,
-                        tint = if (selectedMethod == "TWM_PAY") Color(0xFF0EA5E9) else Color.Gray,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "TWM Pay",
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Surface(
-                            color = Color(0xFF0EA5E9),
-                            shape = RoundedCornerShape(4.dp)
-                        ) {
-                            Text(
-                                text = "UPI / QR",
-                                color = Color.White,
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Black,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-                    Text(
-                        text = "Instant UPI apps, QR & hosted online checkout",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                RadioButton(
-                    selected = selectedMethod == "TWM_PAY",
-                    onClick = { onSelectMethod("TWM_PAY") },
-                    colors = RadioButtonDefaults.colors(selectedColor = Color(0xFF0EA5E9))
                 )
             }
         }
@@ -702,7 +629,6 @@ fun CheckoutBottomBar(total: Double, isLoading: Boolean, selectedMethod: String,
                 enabled = !isLoading,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = when (selectedMethod) {
-                        "TWM_PAY" -> Color(0xFF0EA5E9)
                         "CASHFREE" -> Color(0xFF10B981)
                         else -> MaterialTheme.colorScheme.primary
                     }
@@ -712,8 +638,6 @@ fun CheckoutBottomBar(total: Double, isLoading: Boolean, selectedMethod: String,
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
                 } else {
                     val label = when {
-                        isOrderPlaced && selectedMethod == "TWM_PAY" -> "OPEN TWM PAY"
-                        selectedMethod == "TWM_PAY" -> "PAY VIA TWM PAY"
                         isOrderPlaced && selectedMethod == "CASHFREE" -> "OPEN PAYMENT GATEWAY"
                         selectedMethod == "CASHFREE" -> "PAY ONLINE"
                         else -> "PLACE ORDER"

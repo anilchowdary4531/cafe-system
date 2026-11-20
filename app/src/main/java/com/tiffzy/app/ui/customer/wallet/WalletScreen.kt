@@ -29,7 +29,6 @@ import com.tiffzy.app.data.model.WalletTransaction
 import com.tiffzy.app.data.model.resolvedCheckoutUrl
 import com.tiffzy.app.data.model.resolvedGatewayOrderId
 import com.tiffzy.app.data.model.resolvedTopupTxnId
-import com.tiffzy.app.ui.payment.TwmHostedCheckoutWebView
 import com.tiffzy.app.ui.theme.TiffzyPrimary
 
 
@@ -43,7 +42,6 @@ fun WalletScreen(
     val uiState by viewModel.uiState.collectAsState()
     var showTopupDialog by remember { mutableStateOf(false) }
     var customAmountText by remember { mutableStateOf("") }
-    var activeTwmCheckout by remember { mutableStateOf<TopupStep.TwmCheckout?>(null) }
     var statusNotice by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
@@ -224,19 +222,8 @@ fun WalletScreen(
                         val amt = customAmountText.toDoubleOrNull()
                         if (amt != null && amt >= 10.0) {
                             showTopupDialog = false
-                            viewModel.initiateTopup(amt, provider = "TWM_PAY") { response ->
-                                val checkoutUrl = response.resolvedCheckoutUrl
-                                val txnId = response.resolvedTopupTxnId
-                                val orderRef = response.resolvedGatewayOrderId ?: txnId
-                                if (!checkoutUrl.isNullOrBlank() && !txnId.isNullOrBlank()) {
-                                    activeTwmCheckout = TopupStep.TwmCheckout(
-                                        topupTxnId = txnId,
-                                        orderRef = orderRef ?: txnId,
-                                        checkoutUrl = checkoutUrl,
-                                        amount = amt,
-                                        returnUrlPrefix = "https://tiffzy.com/profile/wallet"
-                                    )
-                                }
+                            viewModel.initiateTopup(amt, provider = "CASHFREE") { response ->
+                                Toast.makeText(context, response.message ?: "Top-up initiated", Toast.LENGTH_SHORT).show()
                             }
                         }
                     }
@@ -250,68 +237,6 @@ fun WalletScreen(
                 }
             }
         )
-    }
-
-    activeTwmCheckout?.let { twm ->
-        Dialog(
-            onDismissRequest = {
-                viewModel.checkTwmStatus(twm.topupTxnId, twm.orderRef) { res ->
-                    statusNotice = res.message
-                    activeTwmCheckout = null
-                }
-            },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
-        ) {
-            Surface(modifier = Modifier.fillMaxSize()) {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    TwmHostedCheckoutWebView(
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                        checkoutUrl = twm.checkoutUrl,
-                        returnUrlPrefix = twm.returnUrlPrefix,
-                        onExternalUpiLaunch = { targetUrl ->
-                            try {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl))
-                                context.startActivity(Intent.createChooser(intent, "Complete UPI Payment"))
-                            } catch (_: Exception) {
-                                Toast.makeText(context, "No UPI app found", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        onReturnIntercepted = { params ->
-                            viewModel.verifyTwmReturn(twm.topupTxnId, twm.orderRef, params) { res ->
-                                statusNotice = res.message
-                                activeTwmCheckout = null
-                                statusNotice?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
-                            }
-                        },
-                        onReturnFallbackCheck = {
-                            viewModel.checkTwmStatus(twm.topupTxnId, twm.orderRef) { res ->
-                                statusNotice = res.message
-                                activeTwmCheckout = null
-                                statusNotice?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
-                            }
-                        },
-                        onBackPressed = {
-                            viewModel.checkTwmStatus(twm.topupTxnId, twm.orderRef) { res ->
-                                statusNotice = res.message
-                                activeTwmCheckout = null
-                            }
-                        }
-                    )
-                    Button(
-                        onClick = {
-                            viewModel.checkTwmStatus(twm.topupTxnId, twm.orderRef) { res ->
-                                statusNotice = res.message
-                                activeTwmCheckout = null
-                                statusNotice?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().padding(16.dp)
-                    ) {
-                        Text("Check Payment Status")
-                    }
-                }
-            }
-        }
     }
 }
 

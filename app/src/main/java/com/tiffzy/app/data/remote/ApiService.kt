@@ -129,17 +129,6 @@ interface ApiService {
         @Body request: WalletTopupVerifyRequest
     ): WalletTopupVerifyResponse
 
-    @POST("api/wallet/topup/twm/return")
-    suspend fun verifyTwmWalletTopupReturn(
-        @Body request: WalletTwmReturnVerifyRequest
-    ): WalletTwmStatusResponse
-
-    @GET("api/wallet/topup/twm/status/{topupTxnId}")
-    suspend fun getTwmWalletTopupStatus(
-        @Path("topupTxnId") topupTxnId: String,
-        @Query("order_ref") orderRef: String? = null
-    ): WalletTwmStatusResponse
-
     @GET("customer/notifications")
     suspend fun getNotifications(): NotificationsResponse
 
@@ -175,12 +164,6 @@ interface ApiService {
 
     @GET("api/payments/status/{orderId}")
     suspend fun getPaymentStatus(@Path("orderId") orderId: String): CashfreeVerifyOrderResponse
-
-    @POST("api/payments/twm/return")
-    suspend fun verifyTwmReturn(@Body request: TwmReturnVerifyRequest): CashfreeVerifyOrderResponse
-
-    @GET("api/payments/twm/status/{orderId}")
-    suspend fun getTwmPaymentStatus(@Path("orderId") orderId: String): CashfreeVerifyOrderResponse
 
     @GET("api/restaurant/settlements")
     suspend fun getRestaurantSettlements(

@@ -42,12 +42,8 @@ export default function ThankYou({ orderFromStatus = null, onRefreshStatus = nul
     const fulfillment = String(merged?.fulfillment || searchParams.get("fulfillment") || "").trim().toLowerCase();
 
     const paymentModeRaw = String(merged?.paymentMethod || merged?.paymentMode || searchParams.get("paymentMode") || "ONLINE").trim().toUpperCase();
-    const providerRaw = String(merged?.provider || searchParams.get("provider") || "").trim().toUpperCase();
-    const isTwmPayment = providerRaw === "TWM_PAY" || providerRaw === "TWM" || paymentModeRaw.includes("TWM");
-    const isOnlinePayment = isTwmPayment || paymentModeRaw.includes("ONLINE") || paymentModeRaw.includes("UPI") || paymentModeRaw.includes("CASHFREE") || paymentModeRaw.includes("CARD");
-    const paymentModeLabel = isTwmPayment
-        ? "Online (TWM Pay)"
-        : isOnlinePayment
+    const isOnlinePayment = paymentModeRaw.includes("ONLINE") || paymentModeRaw.includes("UPI") || paymentModeRaw.includes("CASHFREE") || paymentModeRaw.includes("CARD");
+    const paymentModeLabel = isOnlinePayment
         ? "Online (Cashfree)"
         : paymentModeRaw === "PAY_LATER"
         ? "Khata Pay Later"
@@ -136,11 +132,7 @@ export default function ThankYou({ orderFromStatus = null, onRefreshStatus = nul
                                 : "Your payment could not be completed. If any amount was deducted, it will be refunded within 3-5 business days.")
                         )}
                         {isCancelled && "You cancelled the payment checkout session. You can try again whenever you are ready."}
-                        {isPending && (
-                            isUtrSubmitted
-                                ? "We received your UPI reference and are waiting for confirmation from TWM Pay. Do not pay again — tap Refresh Status in a few seconds."
-                                : `Your payment is still being processed by ${isTwmPayment ? "TWM Pay" : "Cashfree"}. Please wait for gateway confirmation.`
-                        )}
+                        {isPending && "Your payment is still being processed by Cashfree. Please wait for gateway confirmation."}
                         {isUnknown && "We could not confirm the payment status right now. Please do not make another payment until you check your order status."}
                     </p>
 

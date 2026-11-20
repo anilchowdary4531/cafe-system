@@ -20,7 +20,7 @@ data class CheckoutUiState(
     val deliveryInstructions: String = "",
     val restaurant: Restaurant? = null,
     val checkoutPreview: CheckoutPreviewResponse? = null,
-    val selectedPaymentMethod: String = "TWM_PAY",
+    val selectedPaymentMethod: String = "CASHFREE",
     val availableOnlineProviders: List<PaymentProviderItem> = emptyList(),
     val providersLoaded: Boolean = false,
     val orderSuccess: OrderResponse? = null,
@@ -49,7 +49,7 @@ class CheckoutViewModel(
                 val configuredProviders = providersRes?.providers?.filter { it.configured }.orEmpty()
                 val currentSelection = _uiState.value.selectedPaymentMethod
                 val updatedDefault = if (
-                    (currentSelection == "TWM_PAY" || currentSelection == "CASHFREE") &&
+                    currentSelection == "CASHFREE" &&
                     configuredProviders.isNotEmpty()
                 ) {
                     providersRes?.defaultProvider ?: configuredProviders.first().id

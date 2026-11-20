@@ -1,15 +1,6 @@
 import { validateCreateOrderPayload } from "../middleware/paymentValidation.js";
 import { createCashfreePaymentSession, verifyCashfreeOrderSession, verifyCashfreeWebhookSignature, getPaymentMetrics, createCashfreeRefund } from "../services/cashfree.service.js";
 import { completeSessionAndReleaseTable } from "../services/tableSessionService.js";
-import {
-  createTwmPayCheckoutSession,
-  getAvailablePaymentProviders,
-  processTwmPayNotify,
-  processTwmPayReturn,
-  reconcileTwmPayOrderStatus,
-} from "../services/twmPayPaymentService.js";
-import { getTwmPayMetrics } from "../services/twmPay.service.js";
-import { processTwmTopupNotify } from "../services/walletService.js";
 
 export const buildPaymentController = ({ prisma, realtime = null, fetchImpl } = {}) => {
   const resolveRealtime = (req) => req?.server?.realtime || req?.realtime || realtime || null;
@@ -40,26 +31,6 @@ export const buildPaymentController = ({ prisma, realtime = null, fetchImpl } = 
         idempotencyKey,
         forceNewSession,
       } = validation.data;
-
-      if (provider === "TWM_PAY") {
-        const twmSession = await createTwmPayCheckoutSession({
-          prisma,
-          req,
-          orderId,
-          restaurantId,
-          slug: req.params?.slug || null,
-          customerId,
-          customerName: inputName,
-          customerEmail: inputEmail,
-          customerPhone: inputPhone,
-          returnUrl,
-          description,
-          idempotencyKey,
-          forceNewSession,
-          fetchImpl,
-        });
-        return reply.code(200).send(twmSession);
-      }
 
       let resolvedName = inputName;
       let resolvedPhone = inputPhone;
@@ -212,8 +183,8 @@ export const buildPaymentController = ({ prisma, realtime = null, fetchImpl } = 
 
       // If it's a Cashfree or Validation error, return 400. Otherwise 500.
       const isValidationError = message.toLowerCase().includes("required") ||
-                              message.toLowerCase().includes("invalid") ||
-                              message.toLowerCase().includes("already exists");
+        message.toLowerCase().includes("invalid") ||
+        message.toLowerCase().includes("already exists");
 
       return reply.code(isValidationError ? 400 : 500).send({
         success: false,
@@ -271,46 +242,10 @@ export const buildPaymentController = ({ prisma, realtime = null, fetchImpl } = 
               where: { orderId: existingOrder.id },
               orderBy: { id: "desc" },
             });
-          } else {
-            const twmMatch = await prisma.payment.findFirst({
-              where: {
-                provider: "TWM_PAY",
-                providerOrderId: requestedRef || orderId,
-              },
-              orderBy: { id: "desc" },
-            });
-            if (twmMatch) {
-              latestPayment = twmMatch;
-              if (twmMatch.orderId) {
-                existingOrder = await prisma.order.findUnique({
-                  where: { id: twmMatch.orderId },
-                  include: { restaurant: { select: { slug: true } } },
-                });
-              }
-            }
           }
         } catch (dbErr) {
           console.warn("[PaymentController] DB order lookup warning:", dbErr.message);
         }
-      }
-
-      if (
-        requestedProvider === "TWM" ||
-        requestedProvider === "TWM_PAY" ||
-        requestedProvider === "TWMPAY" ||
-        requestedRef ||
-        latestPayment?.provider === "TWM_PAY"
-      ) {
-        const twmStatus = await reconcileTwmPayOrderStatus({
-          prisma,
-          orderId,
-          orderRef: requestedRef || null,
-          restaurantId: query.restaurantId || body.restaurantId || null,
-          slug: req.params?.slug || query.slug || null,
-          realtime: resolveRealtime(req),
-          fetchImpl,
-        });
-        return reply.code(200).send(twmStatus);
       }
 
       // If already verified & paid in DB, return verified SUCCESS immediately (Idempotent guard)
@@ -341,7 +276,7 @@ export const buildPaymentController = ({ prisma, realtime = null, fetchImpl } = 
               where: { id: existingOrder.id },
               data: { paymentStatus: "UNKNOWN" },
             });
-          } catch {}
+          } catch { }
         }
         return reply.code(200).send({
           verified: false,
@@ -363,14 +298,14 @@ export const buildPaymentController = ({ prisma, realtime = null, fetchImpl } = 
 
         if (amountDiff > 0.05) {
           console.error(`[PaymentController] SECURITY ALERT: Amount mismatch for Order ${orderId}! Expected: ₹${expectedTotal}, Cashfree returned: ₹${actualAmount}`);
-          
+
           if (prisma) {
             try {
               await prisma.order.update({
                 where: { id: existingOrder.id },
                 data: { paymentStatus: "UNKNOWN" },
               });
-            } catch {}
+            } catch { }
           }
 
           return reply.code(200).send({
@@ -447,7 +382,7 @@ export const buildPaymentController = ({ prisma, realtime = null, fetchImpl } = 
               where: { id: existingOrder.id },
               data: { paymentStatus: "CANCELLED" },
             });
-          } catch {}
+          } catch { }
         }
 
         return reply.code(200).send({
@@ -472,7 +407,7 @@ export const buildPaymentController = ({ prisma, realtime = null, fetchImpl } = 
               where: { id: existingOrder.id },
               data: { paymentStatus: "FAILED" },
             });
-          } catch {}
+          } catch { }
         }
 
         return reply.code(200).send({
@@ -497,7 +432,7 @@ export const buildPaymentController = ({ prisma, realtime = null, fetchImpl } = 
               where: { id: existingOrder.id },
               data: { paymentStatus: "PENDING" },
             });
-          } catch {}
+          } catch { }
         }
 
         return reply.code(200).send({
@@ -691,7 +626,6 @@ export const buildPaymentController = ({ prisma, realtime = null, fetchImpl } = 
   const getHealthCheck = async (req, reply) => {
     try {
       const metrics = getPaymentMetrics();
-      const twmMetrics = getTwmPayMetrics();
       let dbConnected = false;
 
       if (prisma) {
@@ -703,33 +637,13 @@ export const buildPaymentController = ({ prisma, realtime = null, fetchImpl } = 
         }
       }
 
-      const anyConfigured = metrics.isConfigured || twmMetrics.isConfigured;
-
       return reply.code(200).send({
-        status: anyConfigured ? "HEALTHY" : "MISCONFIGURED",
+        status: metrics.isConfigured ? "HEALTHY" : "MISCONFIGURED",
         timestamp: new Date().toISOString(),
         cashfreeEnv: metrics.cashfreeEnv,
         isProduction: metrics.isProduction,
         isConfigured: metrics.isConfigured,
         clientIdMasked: metrics.clientIdMasked,
-        twmPay: {
-          enabled: twmMetrics.enabled,
-          isConfigured: twmMetrics.isConfigured,
-          baseUrl: twmMetrics.baseUrl,
-          merchantIdMasked: twmMetrics.merchantIdMasked,
-          metrics: {
-            ordersCreated: twmMetrics.ordersCreated,
-            ordersPaid: twmMetrics.ordersPaid,
-            ordersUtrSubmitted: twmMetrics.ordersUtrSubmitted,
-            ordersRejected: twmMetrics.ordersRejected,
-            ordersExpired: twmMetrics.ordersExpired,
-            notificationsReceived: twmMetrics.notificationsReceived,
-            notificationsVerified: twmMetrics.notificationsVerified,
-            notificationsRejected: twmMetrics.notificationsRejected,
-            reconciliations: twmMetrics.reconciliations,
-            errors: twmMetrics.errors,
-          },
-        },
         dbConnected,
         metrics: {
           ordersCreated: metrics.ordersCreated,
@@ -751,116 +665,34 @@ export const buildPaymentController = ({ prisma, realtime = null, fetchImpl } = 
 
   const getProviders = async (req, reply) => {
     try {
+      const cfConfigured = Boolean(
+        process.env.CASHFREE_CLIENT_ID && process.env.CASHFREE_CLIENT_SECRET
+      );
       return reply.code(200).send({
         success: true,
-        ...getAvailablePaymentProviders(),
+        defaultProvider: "CASHFREE",
+        cashfree: {
+          id: "CASHFREE",
+          enabled: cfConfigured,
+          configured: cfConfigured,
+          label: "Cashfree Online",
+          checkoutType: "SDK",
+        },
+        providers: cfConfigured
+          ? [
+              {
+                id: "CASHFREE",
+                label: "Cashfree Online",
+                checkoutType: "SDK",
+                configured: true,
+              },
+            ]
+          : [],
       });
     } catch (err) {
       return reply.code(500).send({
         success: false,
         message: err.message || "Failed to load payment providers",
-      });
-    }
-  };
-
-  const createTwmOrder = async (req, reply) => {
-    req.body = { ...(req.body || {}), provider: "TWM_PAY" };
-    return createOrder(req, reply);
-  };
-
-  const handleTwmReturn = async (req, reply) => {
-    try {
-      const payload = req.method === "GET" ? req.query || {} : { ...(req.query || {}), ...(req.body || {}) };
-      const result = await processTwmPayReturn({
-        prisma,
-        payload,
-        restaurantId: req.query?.restaurantId || req.body?.restaurantId || null,
-        slug: req.params?.slug || req.query?.slug || null,
-        realtime: resolveRealtime(req),
-        fetchImpl,
-      });
-      return reply.code(200).send(result);
-    } catch (err) {
-      const status = err.statusCode || 500;
-      return reply.code(status).send({
-        verified: false,
-        success: false,
-        status: "FAILED",
-        paymentStatus: status === 400 ? "FAILED" : "UNKNOWN",
-        error: err.code || "TWM_RETURN_ERROR",
-        message: err.message || "Failed to verify TWM Pay return payload",
-      });
-    }
-  };
-
-  const handleTwmNotify = async (req, reply) => {
-    try {
-      const payload = { ...(req.query || {}), ...(req.body && typeof req.body === "object" ? req.body : {}) };
-      let result;
-      try {
-        result = await processTwmPayNotify({
-          prisma,
-          payload,
-          realtime: resolveRealtime(req),
-        });
-      } catch (notifyErr) {
-        if (notifyErr?.code === "PAYMENT_NOT_FOUND") {
-          result = await processTwmTopupNotify({ prisma, payload });
-        } else {
-          throw notifyErr;
-        }
-      }
-      return reply.code(200).send({
-        ok: true,
-        status: "ok",
-        ...result,
-      });
-    } catch (err) {
-      const status = err.statusCode || 400;
-      return reply.code(status).send({
-        ok: false,
-        error: err.code || "invalid",
-        message: err.message || "Invalid notification",
-      });
-    }
-  };
-
-  const getTwmStatus = async (req, reply) => {
-    try {
-      const query = req.query || {};
-      const body = req.body || {};
-      const orderId = String(req.params?.orderId || query.order_id || query.orderId || body.orderId || "").trim();
-      const orderRef = String(query.order_ref || query.orderRef || body.orderRef || body.order_ref || "").trim();
-
-      if (!orderId && !orderRef) {
-        return reply.code(400).send({
-          verified: false,
-          success: false,
-          status: "UNKNOWN",
-          paymentStatus: "UNKNOWN",
-          message: "orderId or order_ref is required",
-        });
-      }
-
-      const result = await reconcileTwmPayOrderStatus({
-        prisma,
-        orderId: orderId || null,
-        orderRef: orderRef || null,
-        restaurantId: query.restaurantId || body.restaurantId || null,
-        slug: req.params?.slug || query.slug || null,
-        realtime: resolveRealtime(req),
-        fetchImpl,
-      });
-      return reply.code(200).send(result);
-    } catch (err) {
-      const status = err.statusCode || 500;
-      return reply.code(status).send({
-        verified: false,
-        success: false,
-        status: status === 404 ? "UNKNOWN" : "FAILED",
-        paymentStatus: "UNKNOWN",
-        error: err.code || "TWM_STATUS_ERROR",
-        message: err.message || "Failed to fetch TWM Pay status",
       });
     }
   };
@@ -978,10 +810,6 @@ export const buildPaymentController = ({ prisma, realtime = null, fetchImpl } = 
     getHealthCheck,
     initiateRefund,
     getProviders,
-    createTwmOrder,
-    handleTwmReturn,
-    handleTwmNotify,
-    getTwmStatus,
   };
 };
 

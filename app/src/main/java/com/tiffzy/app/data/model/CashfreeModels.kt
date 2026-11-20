@@ -53,15 +53,6 @@ data class CashfreeVerifyOrderRequest(
     @SerializedName("orderId") val orderId: String
 )
 
-data class TwmReturnVerifyRequest(
-    @SerializedName("order_ref") val orderRef: String? = null,
-    @SerializedName("status") val status: String? = null,
-    @SerializedName("amount_paise") val amountPaise: String? = null,
-    @SerializedName("txn") val txn: String? = null,
-    @SerializedName("signature") val signature: String? = null,
-    @SerializedName("orderId") val orderId: String? = null
-)
-
 data class CashfreeVerifyOrderResponse(
     @SerializedName("verified") val verified: Boolean = false,
     @SerializedName("status") val status: String = "PENDING",
@@ -85,7 +76,7 @@ data class PaymentProviderItem(
 
 data class PaymentProvidersResponse(
     @SerializedName("success") val success: Boolean = true,
-    @SerializedName("defaultProvider") val defaultProvider: String = "TWM_PAY",
+    @SerializedName("defaultProvider") val defaultProvider: String = "CASHFREE",
     @SerializedName("providers") val providers: List<PaymentProviderItem> = emptyList()
 )
 
@@ -93,7 +84,6 @@ enum class PaymentResultStatus {
     IDLE,
     LOADING,
     SESSION_CREATED,
-    HOSTED_CHECKOUT_READY,
     SUCCESS,
     FAILED,
     CANCELLED,
