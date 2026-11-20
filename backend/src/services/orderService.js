@@ -802,6 +802,43 @@ export const updateOrderStatus = async ({ prisma, actor, orderId, nextStatus, no
       }
     }
 
+    // Trigger Restaurant Notifications on Order ACCEPTED or CANCELLED
+    if (targetStatus === "ACCEPTED" && updated?.restaurantId) {
+      try {
+        await createAndDispatchNotification({
+          prisma,
+          realtime,
+          recipientType: RECIPIENT_TYPES.RESTAURANT,
+          recipientId: updated.restaurantId,
+          orderId: id,
+          restaurantId: updated.restaurantId,
+          notificationType: NOTIFICATION_TYPES.ORDER_ACCEPTED,
+          title: "Order Accepted",
+          message: `Order #${updated.orderNo || id} has been accepted.`,
+          data: { orderId: id, orderNo: updated.orderNo, status: "ACCEPTED" },
+          idempotencyKey: `order_accepted_rest_${updated.restaurantId}_${id}`,
+        }).catch(() => {});
+      } catch (_) {}
+    }
+
+    if (targetStatus === "CANCELLED" && updated?.restaurantId) {
+      try {
+        await createAndDispatchNotification({
+          prisma,
+          realtime,
+          recipientType: RECIPIENT_TYPES.RESTAURANT,
+          recipientId: updated.restaurantId,
+          orderId: id,
+          restaurantId: updated.restaurantId,
+          notificationType: NOTIFICATION_TYPES.ORDER_CANCELLED,
+          title: "Order Cancelled",
+          message: `Order #${updated.orderNo || id} was cancelled.`,
+          data: { orderId: id, orderNo: updated.orderNo, status: "CANCELLED" },
+          idempotencyKey: `order_cancelled_rest_${updated.restaurantId}_${id}`,
+        }).catch(() => {});
+      } catch (_) {}
+    }
+
     // Trigger Server and Restaurant Notifications on Order DELIVERED
     if (targetStatus === "DELIVERED") {
       try {

@@ -1,6 +1,8 @@
 import { validateCreateOrderPayload } from "../middleware/paymentValidation.js";
 import { createCashfreePaymentSession, verifyCashfreeOrderSession, verifyCashfreeWebhookSignature, getPaymentMetrics, createCashfreeRefund } from "../services/cashfree.service.js";
 import { completeSessionAndReleaseTable } from "../services/tableSessionService.js";
+import { createAndDispatchNotification } from "../services/notificationService.js";
+import { NOTIFICATION_TYPES, RECIPIENT_TYPES } from "../constants/notificationTypes.js";
 
 export const buildPaymentController = ({ prisma, realtime = null, fetchImpl } = {}) => {
   const resolveRealtime = (req) => req?.server?.realtime || req?.realtime || realtime || null;
@@ -355,6 +357,31 @@ export const buildPaymentController = ({ prisma, realtime = null, fetchImpl } = 
               paymentMode: cfResult.paymentMethod || existingOrder.paymentMode || "ONLINE",
               realtime: resolveRealtime(req),
             });
+
+            if (!existingOrder.tableSessionId && existingOrder.restaurantId) {
+              const amountFormatted = Math.round(Number(cfResult.orderAmount || existingOrder.total || 0));
+              const fulfillmentLabel = existingOrder.fulfillment === "DELIVERY" ? "Delivery" : "Takeaway";
+              await createAndDispatchNotification({
+                prisma,
+                realtime: resolveRealtime(req),
+                recipientType: RECIPIENT_TYPES.RESTAURANT,
+                recipientId: existingOrder.restaurantId,
+                restaurantId: existingOrder.restaurantId,
+                orderId: existingOrder.id,
+                notificationType: NOTIFICATION_TYPES.PAYMENT_SUCCESS,
+                title: "💰 Online Payment Received",
+                message: `Payment of ₹${amountFormatted} received online for ${fulfillmentLabel} Order #${existingOrder.orderNo || existingOrder.id}.`,
+                data: {
+                  restaurantId: existingOrder.restaurantId,
+                  orderId: existingOrder.id,
+                  orderNo: existingOrder.orderNo,
+                  amount: amountFormatted,
+                  fulfillment: existingOrder.fulfillment,
+                  paymentMethod: cfResult.paymentMethod || "ONLINE",
+                },
+                idempotencyKey: `payment_success_online_${existingOrder.restaurantId}_${existingOrder.id}`,
+              }).catch(() => {});
+            }
           } catch (updateErr) {
             console.error("[PaymentController] Order/Payment DB update error:", updateErr.message);
           }
@@ -579,6 +606,31 @@ export const buildPaymentController = ({ prisma, realtime = null, fetchImpl } = 
             paymentMode: paymentDetails.payment_group || "ONLINE",
             realtime: req.server?.realtime || req.realtime || null,
           });
+
+          if (!existingOrder.tableSessionId && existingOrder.restaurantId) {
+            const amountFormatted = Math.round(Number(paymentDetails.payment_amount || existingOrder.total || 0));
+            const fulfillmentLabel = existingOrder.fulfillment === "DELIVERY" ? "Delivery" : "Takeaway";
+            await createAndDispatchNotification({
+              prisma,
+              realtime: req.server?.realtime || req.realtime || null,
+              recipientType: RECIPIENT_TYPES.RESTAURANT,
+              recipientId: existingOrder.restaurantId,
+              restaurantId: existingOrder.restaurantId,
+              orderId: existingOrder.id,
+              notificationType: NOTIFICATION_TYPES.PAYMENT_SUCCESS,
+              title: "💰 Online Payment Received",
+              message: `Payment of ₹${amountFormatted} received online for ${fulfillmentLabel} Order #${existingOrder.orderNo || existingOrder.id}.`,
+              data: {
+                restaurantId: existingOrder.restaurantId,
+                orderId: existingOrder.id,
+                orderNo: existingOrder.orderNo,
+                amount: amountFormatted,
+                fulfillment: existingOrder.fulfillment,
+                paymentMethod: paymentDetails.payment_group || "ONLINE",
+              },
+              idempotencyKey: `payment_success_online_${existingOrder.restaurantId}_${existingOrder.id}`,
+            }).catch(() => {});
+          }
         }
       } else if (eventType === "PAYMENT_FAILED" || eventType === "PAYMENT.FAILED") {
         if (existingOrder && (existingOrder.paymentStatus === "PAID" || existingOrder.status === "PAID")) {

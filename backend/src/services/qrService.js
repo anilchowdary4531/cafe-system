@@ -464,6 +464,72 @@ export const placeQrOrder = async ({
   // 3. Recalculate table session totals
   const updatedSession = await recalculateSessionTotals({ prisma, sessionId: session.id });
 
+  // 4. Dispatch persistent and real-time notification to Restaurant / Owner
+  try {
+    const totalFormatted = order.total ? `₹${Math.round(order.total)}` : "";
+    const tableLabel = table.tableNo ? `Table ${table.tableNo}` : "Table";
+    const summaryText = `New QR order #${order.orderNo || order.id} (${tableLabel})${totalFormatted ? ` for ${totalFormatted}` : ""}.`;
+    const realtimeTargets = io ? { io, staff: typeof io.of === "function" ? io.of("/staff") : null } : null;
+
+    await createAndDispatchNotification({
+      prisma,
+      realtime: realtimeTargets,
+      recipientType: RECIPIENT_TYPES.RESTAURANT,
+      recipientId: restaurantId,
+      restaurantId,
+      orderId: order.id,
+      notificationType: NOTIFICATION_TYPES.NEW_ORDER,
+      title: "🔔 New Order Received!",
+      message: summaryText,
+      data: {
+        restaurantId,
+        orderId: order.id,
+        orderNo: order.orderNo,
+        total: order.total,
+        tableId: table.id,
+        tableNo: table.tableNo,
+        tableSessionId: session.id,
+        source: "QR",
+      },
+      idempotencyKey: `qr_order_rest_${restaurantId}_${order.id}`,
+    }).catch((notifErr) => {
+      console.warn("[qrService] Failed to create owner QR order notification:", notifErr?.message);
+    });
+
+    const responsibleServerId =
+      order.kots?.[0]?.waiterId ||
+      session.waiterId ||
+      table.assignedWaiterId ||
+      null;
+
+    if (responsibleServerId) {
+      await createAndDispatchNotification({
+        prisma,
+        realtime: realtimeTargets,
+        recipientType: RECIPIENT_TYPES.USER,
+        recipientId: Number(responsibleServerId),
+        orderId: order.id,
+        restaurantId,
+        notificationType: NOTIFICATION_TYPES.ORDER_PLACED,
+        title: "Order Sent to Kitchen",
+        message: `Order #${order.orderNo || order.id} sent to kitchen for ${tableLabel}.`,
+        idempotencyKey: `qr_order_sent_${restaurantId}_${order.id}_${responsibleServerId}`,
+        data: {
+          restaurantId,
+          orderId: order.id,
+          orderNo: order.orderNo,
+          tableId: table.id,
+          tableNo: table.tableNo,
+          tableSessionId: session.id,
+          recipientId: Number(responsibleServerId),
+          source: "QR",
+        },
+      }).catch(() => {});
+    }
+  } catch (err) {
+    console.warn("[qrService] QR order notification dispatch warning:", err?.message);
+  }
+
   // Emit WebSocket updates if io is available
   if (io) {
     try {
@@ -788,6 +854,39 @@ export const placePublicMenuOrder = async ({
       paymentMethod,
     },
   });
+
+  // Dispatch persistent and real-time notification to Restaurant / Owner
+  try {
+    const totalFormatted = order.total ? `₹${Math.round(order.total)}` : "";
+    const fulfillmentLabel = safeFulfillment === "DELIVERY" ? "Delivery" : "Takeaway";
+    const summaryText = `New digital menu order #${order.orderNo || order.id} (${fulfillmentLabel})${totalFormatted ? ` for ${totalFormatted}` : ""}.`;
+    const realtimeTargets = io ? { io, staff: typeof io.of === "function" ? io.of("/staff") : null } : null;
+
+    await createAndDispatchNotification({
+      prisma,
+      realtime: realtimeTargets,
+      recipientType: RECIPIENT_TYPES.RESTAURANT,
+      recipientId: restaurantId,
+      restaurantId,
+      orderId: order.id,
+      notificationType: NOTIFICATION_TYPES.NEW_ORDER,
+      title: "🔔 New Order Received!",
+      message: summaryText,
+      data: {
+        restaurantId,
+        orderId: order.id,
+        orderNo: order.orderNo,
+        total: order.total,
+        fulfillment: safeFulfillment,
+        source: "DIGITAL_MENU",
+      },
+      idempotencyKey: `digital_menu_order_rest_${restaurantId}_${order.id}`,
+    }).catch((notifErr) => {
+      console.warn("[qrService] Failed to create owner digital menu order notification:", notifErr?.message);
+    });
+  } catch (err) {
+    console.warn("[qrService] Digital menu order notification dispatch warning:", err?.message);
+  }
 
   if (io) {
     try {

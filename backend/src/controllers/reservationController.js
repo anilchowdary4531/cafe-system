@@ -6,6 +6,8 @@ import {
     updateReservation,
     updateReservationStatus,
 } from "../services/reservationService.js";
+import { createAndDispatchNotification } from "../services/notificationService.js";
+import { NOTIFICATION_TYPES, RECIPIENT_TYPES } from "../constants/notificationTypes.js";
 
 const getActor = (req) => ({
     userId: req.user?.id || req.user?.userId || null,
@@ -139,6 +141,29 @@ export async function createReservationController(req, reply) {
 
         const emit = getSocketEmitter(req);
         emit(result.reservation);
+
+        try {
+            const realtimeTargets = req.server?.realtime || req.realtime || null;
+            await createAndDispatchNotification({
+                prisma,
+                realtime: realtimeTargets,
+                recipientType: RECIPIENT_TYPES.RESTAURANT,
+                recipientId: restaurantId,
+                restaurantId,
+                notificationType: NOTIFICATION_TYPES.RESERVATION_CREATED,
+                title: "📅 New Table Reservation",
+                message: `Reservation #${result.reservation.reservationNo} booked for ${result.reservation.customerName || "Guest"} (${result.reservation.partySize} guests).`,
+                data: {
+                    restaurantId,
+                    reservationId: result.reservation.id,
+                    reservationNo: result.reservation.reservationNo,
+                    partySize: result.reservation.partySize,
+                    tableId: result.reservation.tableId,
+                    tableNo: result.reservation.table?.tableNo,
+                },
+                idempotencyKey: `reservation_created_${restaurantId}_${result.reservation.id}`,
+            }).catch(() => {});
+        } catch (_) {}
 
         return reply.send({
             success: true,
@@ -279,6 +304,27 @@ export async function cancelReservationController(req, reply) {
 
         const emit = getSocketEmitter(req);
         emit(updated);
+
+        try {
+            const realtimeTargets = req.server?.realtime || req.realtime || null;
+            await createAndDispatchNotification({
+                prisma,
+                realtime: realtimeTargets,
+                recipientType: RECIPIENT_TYPES.RESTAURANT,
+                recipientId: restaurantId,
+                restaurantId,
+                notificationType: NOTIFICATION_TYPES.RESERVATION_CANCELLED,
+                title: "⚠️ Reservation Cancelled",
+                message: `Reservation #${updated.reservationNo} for ${updated.customerName || "Guest"} was cancelled.`,
+                data: {
+                    restaurantId,
+                    reservationId: updated.id,
+                    reservationNo: updated.reservationNo,
+                    cancelReason,
+                },
+                idempotencyKey: `reservation_cancelled_${restaurantId}_${updated.id}`,
+            }).catch(() => {});
+        } catch (_) {}
 
         return reply.send({ success: true, message: "Reservation cancelled", reservation: updated });
     } catch (err) {

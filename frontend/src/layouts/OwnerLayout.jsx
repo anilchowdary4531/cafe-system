@@ -837,7 +837,7 @@ export default function OwnerLayout() {
     const restaurantId = useMemo(() => {
         const resolved = resolveAuthoritativeRestaurantId(user);
         if (resolved > 0) return resolved;
-        return 1;
+        return null;
     }, [user]);
 
     const restaurantName = resolveRestaurantName(user, "Restaurant");

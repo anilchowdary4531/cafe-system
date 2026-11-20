@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import {
+    AlertTriangle,
     Bell,
     Check,
     CheckCheck,
@@ -43,6 +44,7 @@ export default function OwnerNotifications() {
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    const [fetchError, setFetchError] = useState("");
     const [filterType, setFilterType] = useState("ALL"); // ALL | UNREAD | ORDERS | TABLES | SUCCESS | INFO
     const [searchQuery, setSearchQuery] = useState("");
     const { socket } = useStaffSocket?.() || {};
@@ -62,6 +64,7 @@ export default function OwnerNotifications() {
             return;
         }
 
+        setFetchError("");
         if (isRefresh) setRefreshing(true);
         else setLoading(true);
 
@@ -87,7 +90,9 @@ export default function OwnerNotifications() {
                 setNotifications(mapped);
             }
         } catch (err) {
-            console.warn("[OwnerNotifications] Backend fetch error:", err?.message);
+            const errMsg = err?.response?.data?.message || err?.message || "Failed to load notifications";
+            console.warn("[OwnerNotifications] Backend fetch error:", errMsg);
+            setFetchError(errMsg);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -290,10 +295,39 @@ export default function OwnerNotifications() {
             </div>
 
             {/* Notifications List - Borderless "Words on Paper" */}
-            {filteredNotifications.length === 0 ? (
+            {loading && notifications.length === 0 ? (
+                <div className="py-16 text-center space-y-3">
+                    <RefreshCw className="h-8 w-8 mx-auto animate-spin text-orange-500" />
+                    <p className="text-xs font-semibold theme-muted">Loading notifications...</p>
+                </div>
+            ) : fetchError && notifications.length === 0 ? (
+                <div className="py-12 text-center space-y-3 p-6 rounded-2xl bg-red-500/10 border border-red-500/20 max-w-md mx-auto">
+                    <AlertTriangle className="h-8 w-8 mx-auto text-red-500" />
+                    <div className="space-y-1">
+                        <p className="text-xs font-bold text-red-600 dark:text-red-400">Failed to load notifications</p>
+                        <p className="text-[11px] theme-muted">{fetchError}</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => fetchBackendNotifications()}
+                        className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-orange-600 transition"
+                    >
+                        Retry
+                    </button>
+                </div>
+            ) : filteredNotifications.length === 0 ? (
                 <div className="py-12 text-center theme-muted space-y-1.5">
                     <Bell className="h-6 w-6 mx-auto opacity-40" />
-                    <p className="font-bold text-xs">No notifications found.</p>
+                    <p className="font-bold text-xs">
+                        {filterType !== "ALL" || searchQuery.trim()
+                            ? "No notifications matching your filter."
+                            : "No notifications found."}
+                    </p>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                        {filterType !== "ALL" || searchQuery.trim()
+                            ? "Try adjusting or clearing your filters."
+                            : "Operational activity alerts and system events will appear here in real-time."}
+                    </p>
                 </div>
             ) : (
                 <div className="space-y-0.5">

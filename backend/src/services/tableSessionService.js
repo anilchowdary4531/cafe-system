@@ -33,7 +33,9 @@ export const getOrCreateActiveSession = async ({
     throw err;
   }
 
-  return prisma.$transaction(async (tx) => {
+  let isNewSession = false;
+
+  const session = await prisma.$transaction(async (tx) => {
     const table = await tx.diningTable.findUnique({
       where: { id: tid },
       select: { id: true, tableNo: true, restaurantId: true, seats: true, assignedWaiterId: true, assignedWaiterName: true, isBlocked: true, blockReason: true, cleaningStatus: true },
@@ -69,6 +71,7 @@ export const getOrCreateActiveSession = async ({
     });
 
     if (!session) {
+      isNewSession = true;
       if (table.cleaningStatus === "DIRTY" && !allowDirty && !force) {
         const err = new Error(`Table ${table.tableNo} is DIRTY and awaiting sanitation. Cannot seat guests until cleaned.`);
         err.code = "table_dirty";
@@ -108,6 +111,30 @@ export const getOrCreateActiveSession = async ({
 
     return session;
   });
+
+  if (isNewSession && session) {
+    try {
+      await createAndDispatchNotification({
+        prisma,
+        recipientType: RECIPIENT_TYPES.RESTAURANT,
+        recipientId: rid,
+        restaurantId: rid,
+        notificationType: NOTIFICATION_TYPES.TABLE_SESSION_OPENED,
+        title: "Table Session Opened",
+        message: `Session #${session.id} opened for Table ${session.tableNo || tid} (${session.guestCount || 1} guests).`,
+        data: {
+          restaurantId: rid,
+          tableId: tid,
+          tableNo: session.tableNo,
+          tableSessionId: session.id,
+          waiterId: session.waiterId,
+        },
+        idempotencyKey: `session_opened_${rid}_${tid}_${session.id}`,
+      }).catch(() => {});
+    } catch (_) {}
+  }
+
+  return session;
 };
 
 export const getActiveSessionForTable = async ({ prisma, tableId, restaurantId } = {}) => {

@@ -463,6 +463,15 @@ export const resolveUserRoleConditions = async ({
       userConditions.push({ recipientType: RECIPIENT_TYPES.RESTAURANT, recipientId: rid });
       userConditions.push({ recipientType: "OWNER", recipientId: rid });
       userConditions.push({ recipientType: "MANAGER", recipientId: rid });
+      userConditions.push({ recipientType: "WAITER", recipientId: rid });
+      userConditions.push({ recipientType: "SERVER", recipientId: rid });
+      userConditions.push({ recipientType: "CHEF", recipientId: rid });
+      userConditions.push({ recipientType: "KITCHEN", recipientId: rid });
+      userConditions.push({ recipientType: "CLEANER", recipientId: rid });
+      userConditions.push({ recipientType: "STEWARD", recipientId: rid });
+      userConditions.push({ recipientType: "CASHIER", recipientId: rid });
+      userConditions.push({ recipientType: "SWIPER", recipientId: rid });
+      userConditions.push({ recipientType: RECIPIENT_TYPES.USER, restaurantId: rid });
     } else if (resolvedRole === "CLEANER") {
       userConditions.push({ recipientType: "CLEANER", recipientId: rid });
     } else if (resolvedRole === "STEWARD") {

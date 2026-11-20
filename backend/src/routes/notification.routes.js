@@ -139,9 +139,11 @@ export default async function notificationRoutes(app, deps) {
             } catch (_) {}
           }
 
-          if (!restaurantId) {
-            const fallbackRid = Number(req.query?.restaurantId || req.headers?.["x-restaurant-id"] || 0);
-            if (fallbackRid && !Number.isNaN(fallbackRid)) restaurantId = fallbackRid;
+          const explicitRid = Number(req.query?.restaurantId || req.headers?.["x-restaurant-id"] || 0);
+          if (explicitRid && !Number.isNaN(explicitRid) && explicitRid > 0) {
+            if (!restaurantId || decoded.role === "SUPER_ADMIN") {
+              restaurantId = explicitRid;
+            }
           }
 
           return {
