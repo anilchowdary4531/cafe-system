@@ -917,7 +917,11 @@ export default async function staffTaskRoutes(app, deps = {}) {
         });
       }
 
-      if (existing.status !== "READY") {
+      const isItemReady =
+        existing.status === "READY" ||
+        existing.kot?.status === "READY" ||
+        existing.kot?.order?.status === "READY";
+      if (!isItemReady) {
         return reply.code(400).send({
           success: false,
           code: "item_not_ready",

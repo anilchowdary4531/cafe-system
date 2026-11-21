@@ -168,14 +168,82 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
           realtime: { io, staff },
         });
         emitOrderUpdated(updated);
-        if (status === "DELIVERED" && Array.isArray(updated.kots)) {
+        if (status === "DELIVERED") {
           const rid = Number(updated.restaurantId || 0);
           if (rid) {
-            for (const k of updated.kots) {
-              staff.to(restaurantRoom(rid)).emit("kot:status_updated", k);
+            if (Array.isArray(updated.kots)) {
+              for (const k of updated.kots) {
+                staff.to(restaurantRoom(rid)).emit("kot:status_updated", k);
+                if (io) {
+                  io.to(`restaurant_${rid}`).emit("kot:status_updated", k);
+                  io.to(`restaurant:${rid}`).emit("kot:status_updated", k);
+                }
+              }
+            }
+            const foodDeliveredPayload = {
+              orderId,
+              orderNo: updated.orderNo,
+              tableId: updated.tableId,
+              id: updated.tableId,
+              tableNo: updated.tableNo,
+              section: updated.tableSession?.table?.section || null,
+              status: "DELIVERED",
+              deliveredBy: actor?.name || actor?.userName || payload?.changedByName || "Staff",
+              order: updated,
+              version: Date.now(),
+            };
+            staff.to(restaurantRoom(rid)).emit("food:delivered", foodDeliveredPayload);
+            if (io) {
+              io.to(`restaurant_${rid}`).emit("food:delivered", foodDeliveredPayload);
+              io.to(`restaurant:${rid}`).emit("food:delivered", foodDeliveredPayload);
+            }
+            if (updated.tableId || updated.tableNo) {
+              const tableUpdatePayload = {
+                restaurantId: rid,
+                tableId: updated.tableId,
+                id: updated.tableId,
+                tableNo: updated.tableNo,
+                section: updated.tableSession?.table?.section || null,
+                status: "DELIVERED",
+                activeOrderStatus: "DELIVERED",
+                isOccupied: true,
+                version: Date.now(),
+              };
+              staff.to(restaurantRoom(rid)).emit("table:updated", tableUpdatePayload);
               if (io) {
-                io.to(`restaurant_${rid}`).emit("kot:status_updated", k);
-                io.to(`restaurant:${rid}`).emit("kot:status_updated", k);
+                io.to(`restaurant_${rid}`).emit("table:updated", tableUpdatePayload);
+                io.to(`restaurant:${rid}`).emit("table:updated", tableUpdatePayload);
+              }
+            }
+          }
+        } else if (status === "READY") {
+          const rid = Number(updated.restaurantId || 0);
+          if (rid) {
+            if (Array.isArray(updated.kots)) {
+              for (const k of updated.kots) {
+                staff.to(restaurantRoom(rid)).emit("kot:status_updated", k);
+                if (io) {
+                  io.to(`restaurant_${rid}`).emit("kot:status_updated", k);
+                  io.to(`restaurant:${rid}`).emit("kot:status_updated", k);
+                }
+              }
+            }
+            if (updated.tableId || updated.tableNo) {
+              const tableReadyPayload = {
+                restaurantId: rid,
+                tableId: updated.tableId,
+                id: updated.tableId,
+                tableNo: updated.tableNo,
+                section: updated.tableSession?.table?.section || null,
+                status: "OCCUPIED",
+                activeOrderStatus: "READY",
+                isOccupied: true,
+                version: Date.now(),
+              };
+              staff.to(restaurantRoom(rid)).emit("table:updated", tableReadyPayload);
+              if (io) {
+                io.to(`restaurant_${rid}`).emit("table:updated", tableReadyPayload);
+                io.to(`restaurant:${rid}`).emit("table:updated", tableReadyPayload);
               }
             }
           }

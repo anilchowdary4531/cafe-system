@@ -160,7 +160,7 @@ export const isTablePaymentPending = (table) => {
         });
         const hasServedOrDelivered = activeOrders.some((o) => {
             const st = String(o?.status || "").toUpperCase();
-            return ["DELIVERED", "SERVED", "READY", "COMPLETED", "PAYMENT_PENDING"].includes(st);
+            return ["DELIVERED", "SERVED", "COMPLETED", "PAYMENT_PENDING"].includes(st);
         });
         if (hasUnpaid && hasServedOrDelivered) return true;
     }
@@ -2040,7 +2040,10 @@ export default function Server() {
                                                         </p>
                                                     )}
                                                     {(() => {
-                                                        const activeStatus = hasPendingPayment ? "PAYMENT_PENDING" : resolveTableActiveOrderStatus(table);
+                                                        const resolvedStatus = resolveTableActiveOrderStatus(table);
+                                                        const activeStatus = (resolvedStatus === "DELIVERED" || resolvedStatus === "READY" || resolvedStatus === "PREPARING" || resolvedStatus === "PLACED" || resolvedStatus === "ACCEPTED")
+                                                            ? resolvedStatus
+                                                            : (hasPendingPayment ? "PAYMENT_PENDING" : resolvedStatus);
                                                         if (!activeStatus) return null;
                                                         const cfg = ORDER_STATUS_CONFIG[activeStatus] || {
                                                             label: activeStatus,

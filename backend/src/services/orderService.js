@@ -680,6 +680,49 @@ export const updateOrderStatus = async ({ prisma, actor, orderId, nextStatus, no
       });
     }
 
+    if (targetStatus === "READY") {
+      // Synchronize associated active KOTs and KOT items to READY when order is READY
+      await tx.kitchenOrderTicket.updateMany({
+        where: { orderId: id, status: { notIn: ["CANCELLED", "SERVED", "DELIVERED"] } },
+        data: { status: "READY" },
+      });
+      await tx.kitchenOrderTicketItem.updateMany({
+        where: { kot: { orderId: id }, status: { notIn: ["CANCELLED", "SERVED", "DELIVERED"] } },
+        data: {
+          status: "READY",
+          readyAt: new Date(),
+          ...(actor ? { preparedByUserId: actor.userId || null, preparedByName: actor.userName || null } : {}),
+        },
+      });
+    }
+
+    if (targetStatus === "PREPARING") {
+      // Advance PENDING KOTs and items to PREPARING when order starts preparing
+      await tx.kitchenOrderTicket.updateMany({
+        where: { orderId: id, status: { in: ["PENDING", "ACCEPTED", "PRINTED"] } },
+        data: { status: "PREPARING" },
+      });
+      await tx.kitchenOrderTicketItem.updateMany({
+        where: { kot: { orderId: id }, status: { in: ["PENDING", "ACCEPTED"] } },
+        data: {
+          status: "PREPARING",
+          startedAt: new Date(),
+        },
+      });
+    }
+
+    if (targetStatus === "CANCELLED") {
+      // Cancel unserved KOTs and items when order is cancelled
+      await tx.kitchenOrderTicket.updateMany({
+        where: { orderId: id, status: { notIn: ["SERVED", "DELIVERED"] } },
+        data: { status: "CANCELLED" },
+      });
+      await tx.kitchenOrderTicketItem.updateMany({
+        where: { kot: { orderId: id }, status: { notIn: ["SERVED", "DELIVERED"] } },
+        data: { status: "CANCELLED" },
+      });
+    }
+
     const updated = await tx.order.update({
       where: { id },
       data: {
@@ -837,6 +880,114 @@ export const updateOrderStatus = async ({ prisma, actor, orderId, nextStatus, no
           idempotencyKey: `order_cancelled_rest_${updated.restaurantId}_${id}`,
         }).catch(() => {});
       } catch (_) {}
+    }
+
+    // Trigger Server and Restaurant Notifications on Order READY
+    if (targetStatus === "READY") {
+      try {
+        const tableLabel = updated.tableNo ? `Table ${updated.tableNo}` : "Takeaway";
+        const orderNum = updated.orderNo || id;
+
+        let responsibleServerId =
+          updated.waiterId ||
+          updated.kots?.[0]?.waiterId ||
+          updated.tableSession?.waiterId ||
+          updated.createdByUserId ||
+          null;
+
+        if (!responsibleServerId && (updated.tableSession?.tableId || updated.tableNo) && updated.restaurantId) {
+          let dTable = null;
+          if (updated.tableSession?.tableId) {
+            dTable = await tx.diningTable.findUnique({
+              where: { id: Number(updated.tableSession.tableId) },
+              select: { assignedWaiterId: true },
+            });
+          } else if (updated.tableNo) {
+            const matching = await tx.diningTable.findMany({
+              where: { restaurantId: updated.restaurantId, tableNo: String(updated.tableNo).trim() },
+              select: { assignedWaiterId: true, section: true },
+            });
+            if (matching.length === 1) {
+              dTable = matching[0];
+            } else if (matching.length > 1 && updated.section) {
+              dTable = matching.find(
+                (m) => String(m.section || "").trim().toLowerCase() === String(updated.section).trim().toLowerCase()
+              );
+            }
+          }
+          if (dTable?.assignedWaiterId) responsibleServerId = dTable.assignedWaiterId;
+        }
+
+        if (responsibleServerId) {
+          await createAndDispatchNotification({
+            prisma,
+            realtime,
+            recipientType: RECIPIENT_TYPES.USER,
+            recipientId: Number(responsibleServerId),
+            orderId: id,
+            restaurantId: updated.restaurantId,
+            notificationType: NOTIFICATION_TYPES.FOOD_READY,
+            title: `Food Ready — ${tableLabel}`,
+            message: `Food ready for ${tableLabel} — Order #${orderNum}.`,
+            idempotencyKey: `order_ready_srv_${updated.restaurantId}_${id}_${responsibleServerId}`,
+            data: {
+              restaurantId: updated.restaurantId,
+              orderId: id,
+              orderNo: updated.orderNo,
+              tableId: updated.tableId ? Number(updated.tableId) : null,
+              tableSessionId: updated.tableSessionId ? Number(updated.tableSessionId) : null,
+              tableNo: updated.tableNo || null,
+              recipientId: Number(responsibleServerId),
+            },
+          }).catch((e) => console.warn("[updateOrderStatus] Server ready notification error:", e?.message));
+        } else if (updated.restaurantId) {
+          await createAndDispatchNotification({
+            prisma,
+            realtime,
+            recipientType: RECIPIENT_TYPES.WAITER,
+            recipientId: updated.restaurantId,
+            orderId: id,
+            restaurantId: updated.restaurantId,
+            notificationType: NOTIFICATION_TYPES.FOOD_READY,
+            title: `Food Ready — ${tableLabel}`,
+            message: `Food ready for ${tableLabel} — Order #${orderNum}.`,
+            idempotencyKey: `order_ready_waiter_${updated.restaurantId}_${id}`,
+            data: {
+              restaurantId: updated.restaurantId,
+              orderId: id,
+              orderNo: updated.orderNo,
+              tableId: updated.tableId ? Number(updated.tableId) : null,
+              tableSessionId: updated.tableSessionId ? Number(updated.tableSessionId) : null,
+              tableNo: updated.tableNo || null,
+            },
+          }).catch((e) => console.warn("[updateOrderStatus] Waiter ready notification error:", e?.message));
+        }
+
+        if (updated.restaurantId) {
+          await createAndDispatchNotification({
+            prisma,
+            realtime,
+            recipientType: RECIPIENT_TYPES.RESTAURANT,
+            recipientId: updated.restaurantId,
+            orderId: id,
+            restaurantId: updated.restaurantId,
+            notificationType: NOTIFICATION_TYPES.FOOD_READY,
+            title: `Food Ready — ${tableLabel}`,
+            message: `Food ready for ${tableLabel} — Order #${orderNum}.`,
+            idempotencyKey: `order_ready_rest_${updated.restaurantId}_${id}`,
+            data: {
+              restaurantId: updated.restaurantId,
+              orderId: id,
+              orderNo: updated.orderNo,
+              tableId: updated.tableId ? Number(updated.tableId) : null,
+              tableSessionId: updated.tableSessionId ? Number(updated.tableSessionId) : null,
+              tableNo: updated.tableNo || null,
+            },
+          }).catch((e) => console.warn("[updateOrderStatus] Restaurant ready notification error:", e?.message));
+        }
+      } catch (err) {
+        console.warn("[updateOrderStatus] Ready notification dispatch warning:", err?.message);
+      }
     }
 
     // Trigger Server and Restaurant Notifications on Order DELIVERED

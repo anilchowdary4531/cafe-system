@@ -3856,14 +3856,78 @@ export default async function ownerRoutes(app, deps = {}) {
 
       realtime?.emitOrderUpdated?.(updated);
 
-      if (req.body?.status === "DELIVERED" && Array.isArray(updated.kots)) {
+      if (req.body?.status === "DELIVERED") {
         const staff = req.server?.staff || realtime?.staff;
         const io = req.server?.io || realtime?.io;
-        for (const k of updated.kots) {
-          staff?.to(`restaurant_${restaurantId}`)?.emit("kot:status_updated", k);
-          staff?.to(`restaurant:${restaurantId}`)?.emit("kot:status_updated", k);
-          io?.to(`restaurant_${restaurantId}`)?.emit("kot:status_updated", k);
-          io?.to(`restaurant:${restaurantId}`)?.emit("kot:status_updated", k);
+        if (Array.isArray(updated.kots)) {
+          for (const k of updated.kots) {
+            staff?.to(`restaurant_${restaurantId}`)?.emit("kot:status_updated", k);
+            staff?.to(`restaurant:${restaurantId}`)?.emit("kot:status_updated", k);
+            io?.to(`restaurant_${restaurantId}`)?.emit("kot:status_updated", k);
+            io?.to(`restaurant:${restaurantId}`)?.emit("kot:status_updated", k);
+          }
+        }
+        const foodDeliveredPayload = {
+          orderId,
+          orderNo: updated.orderNo,
+          tableId: updated.tableId,
+          id: updated.tableId,
+          tableNo: updated.tableNo,
+          section: updated.tableSession?.table?.section || null,
+          status: "DELIVERED",
+          deliveredBy: actor?.name || actor?.userName || "Staff",
+          order: updated,
+          version: Date.now(),
+        };
+        staff?.to(`restaurant_${restaurantId}`)?.emit("food:delivered", foodDeliveredPayload);
+        staff?.to(`restaurant:${restaurantId}`)?.emit("food:delivered", foodDeliveredPayload);
+        io?.to(`restaurant_${restaurantId}`)?.emit("food:delivered", foodDeliveredPayload);
+        io?.to(`restaurant:${restaurantId}`)?.emit("food:delivered", foodDeliveredPayload);
+
+        if (updated.tableId || updated.tableNo) {
+          const tableUpdatePayload = {
+            restaurantId,
+            tableId: updated.tableId,
+            id: updated.tableId,
+            tableNo: updated.tableNo,
+            section: updated.tableSession?.table?.section || null,
+            status: "DELIVERED",
+            activeOrderStatus: "DELIVERED",
+            isOccupied: true,
+            version: Date.now(),
+          };
+          staff?.to(`restaurant_${restaurantId}`)?.emit("table:updated", tableUpdatePayload);
+          staff?.to(`restaurant:${restaurantId}`)?.emit("table:updated", tableUpdatePayload);
+          io?.to(`restaurant_${restaurantId}`)?.emit("table:updated", tableUpdatePayload);
+          io?.to(`restaurant:${restaurantId}`)?.emit("table:updated", tableUpdatePayload);
+        }
+      } else if (req.body?.status === "READY") {
+        const staff = req.server?.staff || realtime?.staff;
+        const io = req.server?.io || realtime?.io;
+        if (Array.isArray(updated.kots)) {
+          for (const k of updated.kots) {
+            staff?.to(`restaurant_${restaurantId}`)?.emit("kot:status_updated", k);
+            staff?.to(`restaurant:${restaurantId}`)?.emit("kot:status_updated", k);
+            io?.to(`restaurant_${restaurantId}`)?.emit("kot:status_updated", k);
+            io?.to(`restaurant:${restaurantId}`)?.emit("kot:status_updated", k);
+          }
+        }
+        if (updated.tableId || updated.tableNo) {
+          const tableReadyPayload = {
+            restaurantId,
+            tableId: updated.tableId,
+            id: updated.tableId,
+            tableNo: updated.tableNo,
+            section: updated.tableSession?.table?.section || null,
+            status: "OCCUPIED",
+            activeOrderStatus: "READY",
+            isOccupied: true,
+            version: Date.now(),
+          };
+          staff?.to(`restaurant_${restaurantId}`)?.emit("table:updated", tableReadyPayload);
+          staff?.to(`restaurant:${restaurantId}`)?.emit("table:updated", tableReadyPayload);
+          io?.to(`restaurant_${restaurantId}`)?.emit("table:updated", tableReadyPayload);
+          io?.to(`restaurant:${restaurantId}`)?.emit("table:updated", tableReadyPayload);
         }
       }
 
