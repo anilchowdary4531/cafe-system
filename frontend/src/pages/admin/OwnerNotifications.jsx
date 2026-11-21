@@ -71,10 +71,7 @@ export default function OwnerNotifications() {
         try {
             const res = await api.get("/api/notifications", {
                 params: { page: 1, limit: 100, ...(restaurantId ? { restaurantId } : {}) },
-                headers: {
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                    ...(restaurantId ? { "x-restaurant-id": String(restaurantId) } : {}),
-                },
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
             });
             const list = res.data?.notifications || res.data?.data || [];
             if (Array.isArray(list)) {
@@ -167,10 +164,14 @@ export default function OwnerNotifications() {
         window.dispatchEvent(new CustomEvent("notifications:updated"));
 
         try {
-            await api.patch("/api/notifications/read-all", {});
+            await api.patch("/api/notifications/read-all", {}, {
+                params: { ...(restaurantId ? { restaurantId } : {}) },
+            });
         } catch {
             try {
-                await api.put("/api/notifications/read-all", {});
+                await api.put("/api/notifications/read-all", {}, {
+                    params: { ...(restaurantId ? { restaurantId } : {}) },
+                });
             } catch (_) {}
         }
     };

@@ -69,11 +69,8 @@ export default function ServerNotificationsView({
 
     const authHeaders = useMemo(() => {
         const effectiveToken = token || getActiveStaffToken() || (typeof window !== "undefined" ? (window.sessionStorage?.getItem("token") || window.localStorage?.getItem("staffToken") || window.localStorage?.getItem("token")) : null);
-        return {
-            ...(effectiveToken ? { Authorization: `Bearer ${effectiveToken}` } : {}),
-            ...(restaurantId ? { "x-restaurant-id": String(restaurantId) } : {}),
-        };
-    }, [token, restaurantId]);
+        return effectiveToken ? { Authorization: `Bearer ${effectiveToken}` } : {};
+    }, [token]);
 
     // Fetch notifications from API
     const fetchNotifications = useCallback(

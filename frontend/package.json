@@ -8,8 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest",
-    "test:run": "vitest run"
+    "test": "CI=true vitest",
+    "test:run": "CI=true vitest run"
   },
   "dependencies": {
     "axios": "^1.15.1",
@@ -42,5 +42,10 @@
     "tailwindcss": "^3.4.4",
     "vite": "^8.0.9",
     "vitest": "^4.1.9"
-  }
+  },
+  "browserslist": [
+    ">0.2%",
+    "not dead",
+    "not op_mini all"
+  ]
 }
