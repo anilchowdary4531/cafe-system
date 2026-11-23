@@ -495,7 +495,7 @@ export const getCanonicalReadyItems = async ({ prisma, restaurantId }) => {
                 restaurantId: rid,
                 status: { notIn: ["CANCELLED", "SERVED", "DELIVERED"] },
                 order: {
-                    status: { notIn: ["CANCELLED"] },
+                    status: { notIn: ["CANCELLED", "DELIVERED", "COMPLETED"] },
                 },
             },
         },

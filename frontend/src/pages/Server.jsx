@@ -70,6 +70,21 @@ export const normalizeTableKey = (val) => {
     return String(val).trim().toLowerCase();
 };
 
+export const isGenuineFoodItem = (obj) => {
+    if (!obj || typeof obj !== "object") return false;
+    // An object cannot be an individual food item if it is an entire Order or KOT or Table
+    if (obj.orderNo && !obj.kotItemId && (Array.isArray(obj.items) || !obj.itemName)) return false;
+    if (obj.kotNo && !obj.kotItemId && (Array.isArray(obj.items) || !obj.itemName)) return false;
+    if (obj.tableNumber || (obj.capacity !== undefined && obj.sectionName !== undefined)) return false;
+    // It must have a valid non-empty item name
+    const name = obj.itemName || obj.name;
+    if (!name || typeof name !== "string" || !name.trim()) return false;
+    // It must have a canonical KOTItem identifier
+    const id = Number(obj.kotItemId || obj.id);
+    if (!id) return false;
+    return true;
+};
+
 export const ORDER_STATUS_CONFIG = {
     PLACED: {
         label: "PLACED",
@@ -463,6 +478,32 @@ export default function Server() {
     const [realtimeAddedReadyItems, setRealtimeAddedReadyItems] = useState([]);
     const [realtimeRemovedItemIds, setRealtimeRemovedItemIds] = useState(new Set());
 
+    // Automatic Reconciliation: When canonical readyRunnerData refreshes from backend API,
+    // reconcile realtimeAddedReadyItems and realtimeRemovedItemIds against database truth.
+    useEffect(() => {
+        if (readyRunnerData?.items && Array.isArray(readyRunnerData.items)) {
+            const canonicalIds = new Set(readyRunnerData.items.map((it) => Number(it.kotItemId || it.id)));
+            // 1. Remove items from realtimeAddedReadyItems that are now canonically in readyRunnerData
+            setRealtimeAddedReadyItems((prev) => {
+                const next = prev.filter((it) => !canonicalIds.has(Number(it.kotItemId || it.id)));
+                return next.length === prev.length ? prev : next;
+            });
+            // 2. Prune realtimeRemovedItemIds for items that the database has confirmed are no longer ready
+            setRealtimeRemovedItemIds((prev) => {
+                if (prev.size === 0) return prev;
+                let changed = false;
+                const next = new Set(prev);
+                prev.forEach((id) => {
+                    if (!canonicalIds.has(id)) {
+                        next.delete(id);
+                        changed = true;
+                    }
+                });
+                return changed ? next : prev;
+            });
+        }
+    }, [readyRunnerData]);
+
     const tables = useMemo(() => {
         const rawTables = canonicalTables.length > 0
             ? canonicalTables
@@ -590,16 +631,29 @@ export default function Server() {
         const list = [];
         const seenItemIds = new Set();
 
-        // 1. Primary Source of Truth: Canonical food runner / ready distribution items
+        // 1. Primary Source of Truth: Canonical food runner / ready distribution items from backend
         const rawRunner = Array.isArray(readyRunnerData?.items) ? readyRunnerData.items : [];
         const runnerItems = rawRunner
             .concat(realtimeAddedReadyItems)
-            .filter((it) => !realtimeRemovedItemIds.has(Number(it.id || it.kotItemId)));
+            .filter((it) => {
+                if (!isGenuineFoodItem(it)) return false;
+                // Tenant isolation: if restaurantId is provided, item must belong to this restaurant
+                if (restaurantId && it.restaurantId && Number(it.restaurantId) !== Number(restaurantId)) {
+                    return false;
+                }
+                const itemId = Number(it.kotItemId || it.id);
+                if (!itemId) return false;
+                if (realtimeRemovedItemIds.has(itemId)) return false;
+                return true;
+            });
 
         runnerItems.forEach((it) => {
-            const itemId = Number(it.id || it.kotItemId);
+            const itemId = Number(it.kotItemId || it.id);
             if (!itemId || seenItemIds.has(itemId)) return;
             seenItemIds.add(itemId);
+
+            const itemName = String(it.itemName || it.name || "").trim();
+            if (!itemName) return; // Strict guard: Never display an item without a product name
 
             list.push({
                 key: `ready-kotitem-${itemId}`,
@@ -617,8 +671,8 @@ export default function Server() {
                 waiterName: it.waiterName || it.kot?.waiterName || it.kot?.order?.assignedWaiterName || it.kot?.order?.customerName || null,
                 stationName: it.stationName || it.kot?.stationName || "Kitchen",
                 readyAt: it.readyAt || it.createdAt,
-                name: it.itemName || it.name,
-                itemName: it.itemName || it.name,
+                name: itemName,
+                itemName: itemName,
                 qty: it.qty || it.quantity || 1,
                 variantName: it.variantName || null,
                 notes: it.notes || null,
@@ -627,28 +681,32 @@ export default function Server() {
                 itemsList: [
                     {
                         id: itemId,
-                        orderItemId: it.orderItemId,
-                        name: it.itemName || it.name,
-                        itemName: it.itemName || it.name,
+                        orderItemId: it.orderItemId || null,
+                        name: itemName,
+                        itemName: itemName,
                         qty: it.qty || it.quantity || 1,
-                        notes: it.notes,
+                        notes: it.notes || null,
                         status: "READY",
                     },
                 ],
             });
         });
 
-        // 2. Compatibility Fallback: If runner items endpoint is empty or in test mocks that only mock readyKotsData
+        // 2. Compatibility Fallback: If runner items endpoint is empty and no realtime items exist
         if (list.length === 0) {
             const rawKots = Array.isArray(readyKotsData?.kots) ? readyKotsData.kots : Array.isArray(readyKotsData) ? readyKotsData : [];
             rawKots.forEach((kot) => {
+                if (restaurantId && kot.restaurantId && Number(kot.restaurantId) !== Number(restaurantId)) {
+                    return;
+                }
                 const kotStatus = String(kot.status || "").toUpperCase();
                 const rawItems = Array.isArray(kot.items) ? kot.items : [];
                 const isKotReady = kotStatus === "READY";
                 const readyItemsInKot = rawItems.filter((it) => String(it.status || "").toUpperCase() === "READY");
                 const itemsToInclude = isKotReady ? (readyItemsInKot.length > 0 ? readyItemsInKot : rawItems) : readyItemsInKot;
 
-                if (isKotReady || readyItemsInKot.length > 0) {
+                const validItems = itemsToInclude.filter((it) => isGenuineFoodItem(it));
+                if (validItems.length > 0) {
                     list.push({
                         key: `ready-kot-${kot.id}`,
                         id: kot.id,
@@ -662,7 +720,7 @@ export default function Server() {
                         waiterName: kot.waiterName || kot.order?.customerName || null,
                         stationName: kot.stationName || "Kitchen",
                         readyAt: kot.updatedAt || kot.createdAt,
-                        itemsList: itemsToInclude.map((it) => ({
+                        itemsList: validItems.map((it) => ({
                             id: it.id,
                             name: it.itemName || it.name,
                             itemName: it.itemName || it.name,
@@ -766,32 +824,117 @@ export default function Server() {
             callbacksRef.current.refreshReadyKots?.({ force: true });
             callbacksRef.current.refreshReadyRunnerData?.({ force: true });
 
-            // Instant Realtime Ready-Item Queue Synchronization
-            const readyItem = data?.item || (data?.status === "READY" ? data : null);
-            if (readyItem && (readyItem.status === "READY" || data?.action === "READY")) {
-                const itemId = Number(readyItem.id || readyItem.kotItemId);
-                if (itemId) {
-                    setRealtimeRemovedItemIds((prev) => {
-                        if (!prev.has(itemId)) return prev;
-                        const next = new Set(prev);
-                        next.delete(itemId);
-                        return next;
+            // Tenant isolation: Ignore events explicitly destined for a different restaurant
+            if (restaurantId && data?.restaurantId && Number(data.restaurantId) !== Number(restaurantId)) {
+                return;
+            }
+
+            // 1. Instant Realtime Ready-Item Queue Synchronization
+            // Extract genuine ready food items (never whole Order, never whole KOT, never Table)
+            const incomingReadyItems = [];
+            if (data?.item && isGenuineFoodItem(data.item) && (data.item.status === "READY" || data.action === "READY")) {
+                incomingReadyItems.push({
+                    ...data.item,
+                    tableNo: data.item.tableNo || data.tableNo || data.kot?.tableNo || data.order?.tableNo,
+                    tableId: data.item.tableId || data.tableId || data.kot?.tableId || data.order?.tableId,
+                    kotNo: data.item.kotNo || data.kot?.kotNo,
+                    orderNo: data.item.orderNo || data.order?.orderNo || data.kot?.order?.orderNo,
+                    restaurantId: data.item.restaurantId || data.restaurantId || restaurantId,
+                });
+            } else if (isGenuineFoodItem(data) && (data.status === "READY" || data.action === "READY")) {
+                incomingReadyItems.push({
+                    ...data,
+                    restaurantId: data.restaurantId || restaurantId,
+                });
+            } else if (data?.kotNo && Array.isArray(data.items) && (data.status === "READY" || data.action === "READY")) {
+                // If whole KOT is marked READY, add its genuine items
+                data.items.forEach((it) => {
+                    if (isGenuineFoodItem(it) && it.status !== "CANCELLED") {
+                        incomingReadyItems.push({
+                            ...it,
+                            tableNo: it.tableNo || data.tableNo,
+                            tableId: it.tableId || data.tableId,
+                            kotNo: it.kotNo || data.kotNo,
+                            kotId: it.kotId || data.id,
+                            restaurantId: it.restaurantId || data.restaurantId || restaurantId,
+                            status: "READY",
+                        });
+                    }
+                });
+            }
+
+            if (incomingReadyItems.length > 0) {
+                setRealtimeRemovedItemIds((prev) => {
+                    const next = new Set(prev);
+                    let changed = false;
+                    incomingReadyItems.forEach((it) => {
+                        const id = Number(it.kotItemId || it.id);
+                        if (next.has(id)) {
+                            next.delete(id);
+                            changed = true;
+                        }
                     });
-                    setRealtimeAddedReadyItems((prev) => {
-                        if (prev.some((it) => Number(it.id || it.kotItemId) === itemId)) return prev;
-                        return [...prev, readyItem];
+                    return changed ? next : prev;
+                });
+
+                setRealtimeAddedReadyItems((prev) => {
+                    const existingIds = new Set(prev.map((it) => Number(it.kotItemId || it.id)));
+                    const toAdd = incomingReadyItems.filter((it) => {
+                        const id = Number(it.kotItemId || it.id);
+                        return id && !existingIds.has(id);
                     });
+                    if (toAdd.length === 0) return prev;
+                    return [...prev, ...toAdd];
+                });
+            }
+
+            // 2. Instant Realtime Delivery / Served Queue Pruning
+            const isDeliveredEvent =
+                data?.status === "SERVED" ||
+                data?.status === "DELIVERED" ||
+                data?.action === "SERVED" ||
+                data?.action === "DELIVERED" ||
+                data?.item?.status === "SERVED" ||
+                data?.item?.status === "DELIVERED" ||
+                Boolean(data?.deliveredBy);
+
+            const deliveredItemIds = new Set();
+            if (isDeliveredEvent) {
+                if (data?.itemId) deliveredItemIds.add(Number(data.itemId));
+                if (data?.kotItemId) deliveredItemIds.add(Number(data.kotItemId));
+                if (data?.item && isGenuineFoodItem(data.item)) {
+                    deliveredItemIds.add(Number(data.item.kotItemId || data.item.id));
+                }
+                if (isGenuineFoodItem(data)) {
+                    deliveredItemIds.add(Number(data.kotItemId || data.id));
                 }
             }
 
-            const deliveredItemId = Number(data?.itemId || data?.kotItemId || (data?.status === "SERVED" || data?.status === "DELIVERED" ? data?.id : 0));
-            if (deliveredItemId) {
+            // Whole KOT served/delivered: remove all items of this KOT
+            if ((data?.kotNo || data?.kotId) && (data.status === "SERVED" || data.status === "DELIVERED")) {
+                const targetKotId = Number(data.id || data.kotId);
+                if (Array.isArray(data.items)) {
+                    data.items.forEach((it) => {
+                        const id = Number(it.kotItemId || it.id);
+                        if (id) deliveredItemIds.add(id);
+                    });
+                }
+                setRealtimeAddedReadyItems((prev) => prev.filter((it) => Number(it.kotId || it.kot?.id) !== targetKotId));
+            }
+
+            // Whole Order delivered: remove all items of this Order
+            if (data?.orderNo && (data.status === "SERVED" || data.status === "DELIVERED")) {
+                const targetOrderId = Number(data.id || data.orderId);
+                setRealtimeAddedReadyItems((prev) => prev.filter((it) => Number(it.orderId || it.kot?.orderId) !== targetOrderId));
+            }
+
+            if (deliveredItemIds.size > 0) {
                 setRealtimeRemovedItemIds((prev) => {
                     const next = new Set(prev);
-                    next.add(deliveredItemId);
+                    deliveredItemIds.forEach((id) => next.add(id));
                     return next;
                 });
-                setRealtimeAddedReadyItems((prev) => prev.filter((it) => Number(it.id || it.kotItemId) !== deliveredItemId));
+                setRealtimeAddedReadyItems((prev) => prev.filter((it) => !deliveredItemIds.has(Number(it.kotItemId || it.id))));
             }
 
             if (data?.tableId) {
@@ -1131,7 +1274,7 @@ export default function Server() {
                 next.add(itemId);
                 return next;
             });
-            setRealtimeAddedReadyItems((prev) => prev.filter((existing) => Number(existing.id || existing.kotItemId) !== itemId));
+            setRealtimeAddedReadyItems((prev) => prev.filter((existing) => Number(existing.kotItemId || existing.id) !== itemId));
         }
         try {
             if (item.type === "ORDER") {
