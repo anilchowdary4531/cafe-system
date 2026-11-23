@@ -61,7 +61,7 @@ const sectionClass = "space-y-2 pb-2.5 border-b border-orange-200/60";
 const fieldLabelClass =
     "mb-0.5 block text-[10px] font-extrabold uppercase tracking-wider text-stone-500";
 const inputClass =
-    "w-full bg-transparent border-b border-stone-300 py-0.5 text-xs sm:text-sm font-bold text-stone-900 placeholder:text-stone-400 outline-none focus:border-stone-800 transition";
+    "w-full bg-transparent border-0 border-none py-0.5 text-xs sm:text-sm font-bold text-stone-900 placeholder:text-stone-400 outline-none focus:outline-none focus:ring-0 focus:border-none shadow-none transition";
 
 const buildLogoPreviewSources = (rawLogo) => {
     const value = String(rawLogo || "").trim();
