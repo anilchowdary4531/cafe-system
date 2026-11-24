@@ -597,6 +597,15 @@ export default function RestaurantMenu() {
                             </div>
                         </div>
 
+                        {isTobaccoText(search) && (
+                            <div className="mt-3">
+                                <TobaccoBanner
+                                    onViewItems={handleOpenTobacco}
+                                    className="mb-2"
+                                />
+                            </div>
+                        )}
+
                         <div className="flex flex-nowrap items-center gap-3 sm:gap-4 overflow-x-auto pb-2 pt-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                             {navigationSections.map((section) => {
                                 const isAll = section.key === "all";

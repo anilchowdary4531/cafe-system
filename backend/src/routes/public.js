@@ -442,7 +442,7 @@ export default async function publicRoutes(app, deps = {}) {
     try {
       const search = normalizeQuery(req.query?.q || req.query?.query || req.query?.search);
       const isTobaccoTerm = (s = "") => {
-        return /\b(cigarette|cigarettes|tobacco|cigar|cigars|marlboro|gold flake|goldflake|classic|bidi|bidis|beedi|beedis|hookah|nicotine|vape)\b/i.test(String(s || ""));
+        return /\b(cigarette|cigarettes|tobacco|cigar|cigars|cig|cigs|marlboro|gold flake|goldflake|classic|advance|bidi|bidis|beedi|beedis|hookah|nicotine|vape)\b/i.test(String(s || ""));
       };
 
       let rawTobaccoMap = {};
