@@ -370,12 +370,16 @@ describe("Notification Sound & Vibration Independence, Patterns, and Controls", 
       expect(screen.getByText(/Customize Sound Tone \(Bright Bell\)/i)).toBeDefined();
     });
 
-    it("OwnerSettings page integrates collapsed sound customization by default", () => {
+    it("OwnerSettings page integrates collapsed sound customization by default", async () => {
       render(
         <BrowserRouter>
           <OwnerSettings />
         </BrowserRouter>
       );
+
+      // Navigate to Operations & Preferences section where Sound & Vibration lives
+      const prefTab = await screen.findByRole("button", { name: /Operations & Preferences/i });
+      fireEvent.click(prefTab);
 
       // Header is visible in Settings
       expect(screen.getByText("Notification Sound")).toBeDefined();
@@ -485,12 +489,16 @@ describe("Notification Sound & Vibration Independence, Patterns, and Controls", 
       expect(screen.queryByTestId("notification-vibration-customization-content")).toBeNull();
     });
 
-    it("6. OwnerSettings page integrates both collapsed Sound and Vibration sections by default", () => {
+    it("6. OwnerSettings page integrates both collapsed Sound and Vibration sections by default", async () => {
       render(
         <BrowserRouter>
           <OwnerSettings />
         </BrowserRouter>
       );
+
+      // Navigate to Operations & Preferences section where Sound & Vibration lives
+      const prefTab = await screen.findByRole("button", { name: /Operations & Preferences/i });
+      fireEvent.click(prefTab);
 
       // Both headers exist under Settings
       expect(screen.getByText("Notification Sound")).toBeDefined();
