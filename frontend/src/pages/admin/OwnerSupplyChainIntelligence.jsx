@@ -6,45 +6,29 @@ import OwnerMenuButton from "../../components/OwnerMenuButton";
 import SupplyChainSubNav from "../../components/SupplyChainSubNav";
 import {
     AlertCircle,
-    AlertTriangle,
     ArrowDownRight,
+    ArrowUpDown,
     ArrowUpRight,
     BarChart3,
-    Boxes,
     Building2,
-    Calendar,
     CheckCircle2,
-    ChevronRight,
     Clock,
-    DollarSign,
-    Download,
-    FileSpreadsheet,
-    FileText,
     Filter,
-    Flame,
-    Handshake,
-    History,
-    Layers,
-    LoaderCircle,
+    Globe,
+    Info,
     Package,
-    Plus,
     RefreshCcw,
-    Search,
-    ShieldAlert,
-    ShoppingCart,
+    ShieldCheck,
+    SlidersHorizontal,
     Sparkles,
-    Thermometer,
-    TrendingUp,
     Truck,
-    Users,
     Warehouse,
     X,
 } from "lucide-react";
 import {
-    Area,
-    AreaChart,
     Bar,
     BarChart,
+    CartesianGrid,
     Cell,
     Pie,
     PieChart,
@@ -62,11 +46,94 @@ const DATE_PRESETS = [
     { id: "custom", label: "Custom" },
 ];
 
-const REFRESH_MS = 15000;
+const PAGE_TABS = [
+    { id: "overview", label: "Overview" },
+    { id: "supplier", label: "Supplier" },
+    { id: "controls", label: "Controls" },
+];
 
-const formatMoney = (val) => `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const formatCompactMoney = (val) => `₹${Number(val || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+const TOP_SUPPLIER_METRICS = [
+    { id: "spend", label: "Spend" },
+    { id: "savingsPct", label: "Savings %" },
+    { id: "leadTimeDays", label: "Lead Time" },
+    { id: "esgScore", label: "ESG Score" },
+];
+
+const REFRESH_MS = 30000;
+const SCORECARD_PAGE_SIZE = 5;
+const REGION_COLORS = ["#f97316", "#0ea5e9", "#10b981", "#8b5cf6", "#f59e0b", "#64748b"];
+
+const formatMoney = (val) =>
+    `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const formatCompactMoney = (val) =>
+    `₹${Number(val || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 const formatPct = (val) => `${Number(val || 0).toFixed(1)}%`;
+
+function getSupplierDisplayName(supplier, fallbackId) {
+    if (!supplier) return fallbackId ? `Supplier #${fallbackId}` : "Unknown Supplier";
+    return (
+        supplier.profile?.businessName ||
+        supplier.profile?.companyName ||
+        supplier.name ||
+        (supplier.id ? `Supplier #${supplier.id}` : "Unknown Supplier")
+    );
+}
+
+function getDeliveredTimestamp(order) {
+    const events = Array.isArray(order?.statusEvents) ? order.statusEvents : [];
+    const deliveredEvent = events.find((ev) => {
+        const st = String(ev?.status || "").toUpperCase();
+        return st === "DELIVERED" || st === "COMPLETED" || st === "RECEIVED";
+    });
+    if (deliveredEvent?.createdAt) return new Date(deliveredEvent.createdAt);
+    const orderStatus = String(order?.status || "").toUpperCase();
+    if ((orderStatus === "DELIVERED" || orderStatus === "COMPLETED") && order?.updatedAt) {
+        return new Date(order.updatedAt);
+    }
+    return null;
+}
+
+function isOrderCancelled(order) {
+    const st = String(order?.status || "").toUpperCase();
+    return st === "CANCELLED" || st === "REJECTED";
+}
+
+function getPeriodBounds(range, customStartDate, customEndDate) {
+    const now = new Date();
+    let cStart = new Date(now);
+    let cEnd = new Date(now);
+    let pStart = new Date(now);
+    let pEnd = new Date(now);
+
+    if (range === "today") {
+        cStart.setHours(0, 0, 0, 0);
+        pStart = new Date(cStart.getTime() - 24 * 60 * 60 * 1000);
+        pEnd = new Date(cStart.getTime() - 1);
+    } else if (range === "yesterday") {
+        cStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        cStart.setHours(0, 0, 0, 0);
+        cEnd = new Date(cStart);
+        cEnd.setHours(23, 59, 59, 999);
+        pStart = new Date(cStart.getTime() - 24 * 60 * 60 * 1000);
+        pEnd = new Date(cStart.getTime() - 1);
+    } else if (range === "30d") {
+        cStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        pStart = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+        pEnd = new Date(cStart.getTime() - 1);
+    } else if (range === "custom" && customStartDate && customEndDate) {
+        cStart = new Date(`${customStartDate}T00:00:00`);
+        cEnd = new Date(`${customEndDate}T23:59:59.999`);
+        const duration = Math.max(86400000, cEnd.getTime() - cStart.getTime());
+        pEnd = new Date(cStart.getTime() - 1);
+        pStart = new Date(pEnd.getTime() - duration);
+    } else {
+        cStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        pStart = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+        pEnd = new Date(cStart.getTime() - 1);
+    }
+
+    return { cStart, cEnd, pStart, pEnd };
+}
 
 export default function OwnerSupplyChainIntelligence() {
     const navigate = useNavigate();
@@ -83,19 +150,24 @@ export default function OwnerSupplyChainIntelligence() {
         }
     }, []);
 
-    const restaurantId = user?.restaurantId || 1;
+    const restaurantId = user?.restaurantId ? Number(user.restaurantId) : null;
 
-    // Loading & Refresh State
+    // UI & Navigation State
+    const [activeSectionTab, setActiveSectionTab] = useState("overview");
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [autoRefresh, setAutoRefresh] = useState(true);
+    const [autoRefresh, setAutoRefresh] = useState(false);
     const [error, setError] = useState("");
-    const [chartMetric, setChartMetric] = useState("grossSales"); // grossSales | ordersCount | avgOrderValue | quotationsCount
+    const [partialWarnings, setPartialWarnings] = useState([]);
+
+    // Chart View Toggles
+    const [topSupplierMetric, setTopSupplierMetric] = useState("spend");
+    const [deliveryView, setDeliveryView] = useState("delivery"); // delivery | financial
+    const [scorecardSort, setScorecardSort] = useState({ key: "totalSpend", dir: "desc" });
+    const [scorecardPage, setScorecardPage] = useState(1);
 
     // Data States
     const [materials, setMaterials] = useState([]);
-    const [ledger, setLedger] = useState([]);
-    const [report, setReport] = useState(null);
     const [supplyOrders, setSupplyOrders] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
     const [negotiations, setNegotiations] = useState([]);
@@ -103,12 +175,13 @@ export default function OwnerSupplyChainIntelligence() {
     const [warehouses, setWarehouses] = useState([]);
 
     // Filter Bar States
-    const [customStartDate, setCustomStartDate] = useState(startDateParam || "");
-    const [customEndDate, setCustomEndDate] = useState(endDateParam || "");
-    const [selectedWarehouse, setSelectedWarehouse] = useState("ALL");
+    const [customStartDate, setCustomStartDate] = useState(startDateParam);
+    const [customEndDate, setCustomEndDate] = useState(endDateParam);
+    const [selectedSupplier, setSelectedSupplier] = useState("ALL");
+    const [selectedProduct, setSelectedProduct] = useState("ALL");
     const [selectedCategory, setSelectedCategory] = useState("ALL");
-    const [selectedCustomer, setSelectedCustomer] = useState("ALL");
-    const [selectedSalesSource, setSelectedSalesSource] = useState("ALL"); // ALL | DIRECT_CATALOG | BARGAIN_QUOTE
+    const [selectedWarehouse, setSelectedWarehouse] = useState("ALL");
+    const [selectedChannel, setSelectedChannel] = useState("ALL"); // ALL | DIRECT_CATALOG | BARGAIN_QUOTE
 
     // Quick Action Modals
     const [showPOModal, setShowPOModal] = useState(false);
@@ -118,45 +191,67 @@ export default function OwnerSupplyChainIntelligence() {
     const [receiveForm, setReceiveForm] = useState({ materialId: "", qty: "", supplier: "", notes: "" });
     const [adjustForm, setAdjustForm] = useState({ materialId: "", qty: "", reason: "COUNT_CORRECTION", notes: "" });
 
-    // Fetch Dashboard Analytics Data
     const fetchDashboardData = useCallback(async ({ silent = false } = {}) => {
         if (!silent) setLoading(true);
         else setRefreshing(true);
 
-        try {
-            const [matRes, ledgerRes, reportRes, ordersRes, suppliersRes, negRes, payRes, whRes] = await Promise.all([
-                api.get(`/owner/${restaurantId}/inventory/materials`).catch(() => null),
-                api.get(`/owner/${restaurantId}/inventory/ledger`).catch(() => null),
-                api.get(`/owner/${restaurantId}/inventory/reports`).catch(() => null),
-                api.get("/supply-orders").catch(() => null),
-                api.get("/super-admin/supply/suppliers").catch(() => null),
-                api.get("/api/supply/negotiations").catch(() => null),
-                api.get("/api/supply/payments").catch(() => null),
-                api.get("/owner/storage-locations").catch(() => null),
-            ]);
+        const requests = [
+            { key: "orders", label: "Supply Orders", promise: api.get("/supply-orders") },
+            { key: "suppliers", label: "Suppliers", promise: api.get("/owner/suppliers") },
+            { key: "negotiations", label: "Negotiations", promise: api.get("/owner/negotiations") },
+            { key: "payments", label: "Payments", promise: api.get("/owner/supply-payments") },
+            { key: "warehouses", label: "Warehouses", promise: api.get("/owner/storage-locations") },
+        ];
 
-            if (matRes?.data) setMaterials(Array.isArray(matRes.data) ? matRes.data : matRes.data.materials || []);
-            if (ledgerRes?.data) setLedger(Array.isArray(ledgerRes.data) ? ledgerRes.data : []);
-            if (reportRes?.data) setReport(reportRes.data);
-            if (ordersRes?.data?.orders) setSupplyOrders(ordersRes.data.orders);
-            if (suppliersRes?.data?.suppliers) setSuppliers(suppliersRes.data.suppliers);
-            if (negRes?.data?.negotiations) setNegotiations(negRes.data.negotiations);
-            if (payRes?.data) setPaymentsSummary(payRes.data);
-            if (whRes?.data?.locations) setWarehouses(whRes.data.locations);
-
-            setError("");
-        } catch (err) {
-            console.error("Error fetching supply chain sales intelligence:", err);
-            setError("Failed to sync supply chain sales data from server.");
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
+        if (restaurantId) {
+            requests.push({
+                key: "materials",
+                label: "Raw Materials",
+                promise: api.get(`/owner/${restaurantId}/inventory/materials`),
+            });
         }
+
+        const results = await Promise.allSettled(requests.map((r) => r.promise));
+        const warnings = [];
+        let successCount = 0;
+
+        results.forEach((result, idx) => {
+            const reqMeta = requests[idx];
+            if (result.status === "fulfilled" && result.value) {
+                successCount += 1;
+                const data = result.value.data;
+                if (reqMeta.key === "orders") {
+                    setSupplyOrders(Array.isArray(data?.orders) ? data.orders : []);
+                } else if (reqMeta.key === "suppliers") {
+                    setSuppliers(Array.isArray(data?.suppliers) ? data.suppliers : []);
+                } else if (reqMeta.key === "negotiations") {
+                    setNegotiations(Array.isArray(data?.negotiations) ? data.negotiations : []);
+                } else if (reqMeta.key === "payments") {
+                    setPaymentsSummary(data || null);
+                } else if (reqMeta.key === "warehouses") {
+                    setWarehouses(Array.isArray(data?.locations) ? data.locations : []);
+                } else if (reqMeta.key === "materials") {
+                    setMaterials(Array.isArray(data) ? data : data?.materials || []);
+                }
+            } else {
+                warnings.push(reqMeta.label);
+            }
+        });
+
+        setPartialWarnings(warnings);
+        if (successCount === 0) {
+            setError("Failed to load procurement & supplier analytics from the server.");
+        } else {
+            setError("");
+        }
+
+        setLoading(false);
+        setRefreshing(false);
     }, [restaurantId]);
 
     useEffect(() => {
         fetchDashboardData();
-    }, [fetchDashboardData, range]);
+    }, [fetchDashboardData]);
 
     useEffect(() => {
         if (!autoRefresh) return undefined;
@@ -166,294 +261,403 @@ export default function OwnerSupplyChainIntelligence() {
         return () => clearInterval(timer);
     }, [autoRefresh, fetchDashboardData]);
 
-    // Unique Categories & Customers for Filters
+    // Lookup maps from verified supplier & material data
+    const supplierById = useMemo(() => {
+        const map = new Map();
+        suppliers.forEach((s) => map.set(String(s.id), s));
+        return map;
+    }, [suppliers]);
+
+    const productCategoryById = useMemo(() => {
+        const map = new Map();
+        suppliers.forEach((s) => {
+            (s.products || []).forEach((p) => {
+                const cat = p.category?.name || p.categoryName;
+                if (p.id && cat) map.set(String(p.id), cat);
+            });
+        });
+        return map;
+    }, [suppliers]);
+
+    const productsList = useMemo(() => {
+        const set = new Set();
+        supplyOrders.forEach((o) => {
+            (o.items || []).forEach((item) => {
+                const name = item.productName || item.name || item.materialName;
+                if (name) set.add(name);
+            });
+        });
+        materials.forEach((m) => {
+            if (m.name) set.add(m.name);
+        });
+        return ["ALL", ...Array.from(set).sort()];
+    }, [supplyOrders, materials]);
+
     const categoriesList = useMemo(() => {
-        const set = new Set(materials.map((m) => m.category).filter(Boolean));
-        return ["ALL", ...Array.from(set)];
-    }, [materials]);
+        const set = new Set();
+        materials.forEach((m) => {
+            if (m.category) set.add(m.category);
+        });
+        productCategoryById.forEach((cat) => set.add(cat));
+        return ["ALL", ...Array.from(set).sort()];
+    }, [materials, productCategoryById]);
 
-    const customersList = useMemo(() => {
-        const set = new Set(supplyOrders.map((o) => o.restaurant?.name || o.restaurantName || "Tiffzy Cafe").filter(Boolean));
-        return ["ALL", ...Array.from(set)];
-    }, [supplyOrders]);
+    const periodBounds = useMemo(
+        () => getPeriodBounds(range, customStartDate, customEndDate),
+        [range, customStartDate, customEndDate]
+    );
 
-    // Filtered B2B Orders based on toolbar filters
-    const filteredOrders = useMemo(() => {
+    const negotiatedOrderIds = useMemo(() => {
+        const ids = new Set();
+        negotiations.forEach((n) => {
+            if (n.purchaseOrderId) ids.add(String(n.purchaseOrderId));
+        });
+        return ids;
+    }, [negotiations]);
+
+    // Apply supported procurement filters to orders
+    const attributeFilteredOrders = useMemo(() => {
         return supplyOrders.filter((order) => {
-            // Category filter
+            if (selectedSupplier !== "ALL" && String(order.supplierId) !== String(selectedSupplier)) {
+                return false;
+            }
+            if (selectedProduct !== "ALL") {
+                const hasProduct = (order.items || []).some(
+                    (item) => (item.productName || item.name || item.materialName) === selectedProduct
+                );
+                if (!hasProduct) return false;
+            }
             if (selectedCategory !== "ALL") {
-                const hasCategory = (order.items || []).some((item) => item.category === selectedCategory);
+                const hasCategory = (order.items || []).some((item) => {
+                    const itemCat = item.category || productCategoryById.get(String(item.productId));
+                    return itemCat === selectedCategory;
+                });
                 if (!hasCategory) return false;
             }
-            // Customer filter
-            if (selectedCustomer !== "ALL") {
-                const cName = order.restaurant?.name || order.restaurantName || "Tiffzy Cafe";
-                if (cName !== selectedCustomer) return false;
-            }
-            // Sales Source filter
-            if (selectedSalesSource === "DIRECT_CATALOG") {
-                if (order.notes && order.notes.toLowerCase().includes("negotiation")) return false;
-            } else if (selectedSalesSource === "BARGAIN_QUOTE") {
-                if (!order.notes || !order.notes.toLowerCase().includes("negotiation")) return false;
+            if (selectedChannel !== "ALL") {
+                const isNegotiated =
+                    negotiatedOrderIds.has(String(order.id)) ||
+                    Boolean(order.notes && order.notes.toLowerCase().includes("negotiation"));
+                if (selectedChannel === "BARGAIN_QUOTE" && !isNegotiated) return false;
+                if (selectedChannel === "DIRECT_CATALOG" && isNegotiated) return false;
             }
             return true;
         });
-    }, [supplyOrders, selectedCategory, selectedCustomer, selectedSalesSource]);
+    }, [
+        supplyOrders,
+        selectedSupplier,
+        selectedProduct,
+        selectedCategory,
+        selectedChannel,
+        productCategoryById,
+        negotiatedOrderIds,
+    ]);
 
-    // Dynamic Time-Series Date Boundaries & Previous-Period Comparison Logic
-    const periodDataMetrics = useMemo(() => {
-        const now = new Date();
-        let cStart = new Date();
-        let cEnd = new Date(now);
-        let pStart = new Date();
-        let pEnd = new Date();
+    const currentPeriodOrders = useMemo(() => {
+        const { cStart, cEnd } = periodBounds;
+        return attributeFilteredOrders.filter((o) => {
+            if (!o.createdAt) return false;
+            const d = new Date(o.createdAt);
+            return d >= cStart && d <= cEnd;
+        });
+    }, [attributeFilteredOrders, periodBounds]);
 
-        if (range === "today") {
-            cStart.setHours(0, 0, 0, 0);
-            pStart = new Date(cStart.getTime() - 24 * 60 * 60 * 1000);
-            pEnd = new Date(cStart.getTime() - 1);
-        } else if (range === "yesterday") {
-            cStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-            cStart.setHours(0, 0, 0, 0);
-            cEnd = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-            cEnd.setHours(23, 59, 59, 999);
-            pStart = new Date(cStart.getTime() - 24 * 60 * 60 * 1000);
-            pEnd = new Date(cStart.getTime() - 1);
-        } else if (range === "7d") {
-            cStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            pStart = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-            pEnd = new Date(cStart.getTime() - 1);
-        } else if (range === "30d") {
-            cStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            pStart = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
-            pEnd = new Date(cStart.getTime() - 1);
-        } else if (range === "custom" && customStartDate && customEndDate) {
-            cStart = new Date(customStartDate);
-            cEnd = new Date(customEndDate);
-            const duration = Math.max(86400000, cEnd.getTime() - cStart.getTime());
-            pEnd = new Date(cStart.getTime() - 1);
-            pStart = new Date(pEnd.getTime() - duration);
-        } else {
-            cStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            pStart = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-            pEnd = new Date(cStart.getTime() - 1);
+    const prevPeriodOrders = useMemo(() => {
+        const { pStart, pEnd } = periodBounds;
+        return attributeFilteredOrders.filter((o) => {
+            if (!o.createdAt) return false;
+            const d = new Date(o.createdAt);
+            return d >= pStart && d <= pEnd;
+        });
+    }, [attributeFilteredOrders, periodBounds]);
+
+    // Core verified KPIs
+    const kpiMetrics = useMemo(() => {
+        const validCurrent = currentPeriodOrders.filter((o) => !isOrderCancelled(o));
+        const validPrev = prevPeriodOrders.filter((o) => !isOrderCancelled(o));
+
+        const totalSpend = validCurrent.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
+        const prevSpend = validPrev.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
+        const totalSavings = validCurrent.reduce((sum, o) => sum + Number(o.discountAmount || 0), 0);
+
+        let spendTrend = null;
+        if (prevSpend > 0) {
+            const pct = ((totalSpend - prevSpend) / prevSpend) * 100;
+            spendTrend = {
+                text: `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}% vs prior period`,
+                isUp: pct >= 0,
+            };
         }
 
-        // Current Period Orders
-        const currentPeriodOrders = filteredOrders.filter((o) => {
-            const d = new Date(o.createdAt);
-            return d >= cStart && d <= cEnd;
-        });
-
-        // Previous Period Orders
-        const prevPeriodOrders = filteredOrders.filter((o) => {
-            const d = new Date(o.createdAt);
-            return d >= pStart && d <= pEnd;
-        });
-
-        // Current Period Negotiations
-        const currentPeriodQuotes = negotiations.filter((n) => {
-            const d = new Date(n.createdAt);
-            return d >= cStart && d <= cEnd;
-        });
-
-        const prevPeriodQuotes = negotiations.filter((n) => {
-            const d = new Date(n.createdAt);
-            return d >= pStart && d <= pEnd;
-        });
-
-        // Sum calculations
-        const currRev = currentPeriodOrders.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
-        const prevRev = prevPeriodOrders.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
-
-        const currOrdersCount = currentPeriodOrders.length;
-        const prevOrdersCount = prevPeriodOrders.length;
-
-        const currAOV = currOrdersCount > 0 ? currRev / currOrdersCount : 0;
-        const prevAOV = prevOrdersCount > 0 ? prevRev / prevOrdersCount : 0;
-
-        const currQuotesCount = currentPeriodQuotes.length;
-        const prevQuotesCount = prevPeriodQuotes.length;
-
-        // Dynamic Trend % Helper
-        const calcTrend = (curr, prev) => {
-            if (!prev || prev === 0) {
-                if (!curr || curr === 0) {
-                    return { text: "No prior period data", isUp: true, isZero: true };
+        // Average Lead Time (only from orders with actual delivery/completion timestamp)
+        let leadTimeSumDays = 0;
+        let leadTimeCount = 0;
+        validCurrent.forEach((o) => {
+            const deliveredAt = getDeliveredTimestamp(o);
+            if (deliveredAt && o.createdAt) {
+                const diffDays = (deliveredAt.getTime() - new Date(o.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+                if (diffDays >= 0) {
+                    leadTimeSumDays += diffDays;
+                    leadTimeCount += 1;
                 }
-                return { text: "↑ 100.0% vs prev period", isUp: true, isZero: false };
             }
-            const diff = ((curr - prev) / prev) * 100;
-            const isUp = diff >= 0;
-            return {
-                text: `${isUp ? "↑" : "↓"} ${Math.abs(diff).toFixed(1)}% vs prev period`,
-                isUp,
-                isZero: false,
-            };
-        };
+        });
+
+        const avgLeadTimeDays = leadTimeCount > 0 ? leadTimeSumDays / leadTimeCount : null;
 
         return {
-            quotationsCount: currQuotesCount || negotiations.length || 8,
-            quotationsTrend: calcTrend(currQuotesCount, prevQuotesCount),
-            b2bOrdersCount: currOrdersCount || filteredOrders.length || 14,
-            b2bOrdersTrend: calcTrend(currOrdersCount, prevOrdersCount),
-            grossSales: currRev || (filteredOrders.reduce((s, o) => s + Number(o.totalAmount || 0), 0) || 148500),
-            grossSalesTrend: calcTrend(currRev, prevRev),
-            aov: currAOV || (filteredOrders.length > 0 ? (filteredOrders.reduce((s, o) => s + Number(o.totalAmount || 0), 0) / filteredOrders.length) : 10607),
-            aovTrend: calcTrend(currAOV, prevAOV),
-            netPayout: (currRev || 148500) * 0.95, // 5% B2B platform commission
+            totalSpend,
+            totalOrders: validCurrent.length,
+            totalSavings,
+            spendTrend,
+            avgLeadTimeDays,
+            leadTimeSampleCount: leadTimeCount,
         };
-    }, [filteredOrders, negotiations, range, customStartDate, customEndDate]);
+    }, [currentPeriodOrders, prevPeriodOrders]);
 
-    // Order Lifecycle Stage Pipeline Counts
-    const pipelineStages = useMemo(() => {
-        const quoteRequests = negotiations.filter((n) => n.status === "ACTIVE" || n.status === "PENDING");
-        const counteredQuotes = negotiations.filter((n) => n.status === "COUNTERED" || n.status === "OFFER_MADE");
-        const acceptedQuotes = negotiations.filter((n) => n.status === "ACCEPTED");
+    // Aggregate per-supplier performance from verified orders
+    const supplierScorecardRows = useMemo(() => {
+        const map = new Map();
 
-        const placedOrders = supplyOrders.filter((o) => o.status === "PLACED" || o.status === "PENDING");
-        const dispatchedOrders = supplyOrders.filter((o) => o.status === "DISPATCHED");
-        const receivedOrders = supplyOrders.filter((o) => o.status === "RECEIVED" || o.status === "DELIVERED");
-        const completedOrders = supplyOrders.filter((o) => o.status === "COMPLETED" || o.status === "PAID");
+        currentPeriodOrders.forEach((order) => {
+            if (isOrderCancelled(order)) return;
+            const sid = String(order.supplierId || "unknown");
+            const supObj = order.supplier || supplierById.get(sid);
+            const name = getSupplierDisplayName(supObj, order.supplierId);
 
-        return [
-            { id: "quote-req", label: "QUOTE REQUEST", count: quoteRequests.length || 4, path: "/owner/supply-chain/negotiations", color: "#6366f1" },
-            { id: "countered", label: "ACTIVE / COUNTERED", count: counteredQuotes.length || 2, path: "/owner/supply-chain/negotiations", color: "#8b5cf6" },
-            { id: "accepted", label: "ACCEPTED", count: acceptedQuotes.length || 3, path: "/owner/supply-chain/negotiations", color: "#3b82f6" },
-            { id: "placed", label: "PLACED", count: placedOrders.length || 5, path: "/owner/supply-chain/purchase-orders", color: "#f59e0b" },
-            { id: "dispatched", label: "DISPATCHED", count: dispatchedOrders.length || 3, path: "/owner/supply-chain/receiving", color: "#06b6d4" },
-            { id: "received", label: "RECEIVED", count: receivedOrders.length || 4, path: "/owner/supply-chain/receiving", color: "#10b981" },
-            { id: "completed", label: "COMPLETED / PAID", count: completedOrders.length || 18, path: "/owner/supply-chain/payments", color: "#059669" },
-        ];
-    }, [negotiations, supplyOrders]);
+            if (!map.has(sid)) {
+                map.set(sid, {
+                    supplierId: sid,
+                    name,
+                    orders: 0,
+                    totalSpend: 0,
+                    subtotal: 0,
+                    savings: 0,
+                    leadTimeSumDays: 0,
+                    leadTimeCount: 0,
+                    slaEvaluatedCount: 0,
+                    onTimeCount: 0,
+                    lateDaysSum: 0,
+                });
+            }
 
-    // Sales Trend Chart Time-Series Data
-    const salesTrendTimeseries = useMemo(() => {
-        const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-        const totalRev = periodDataMetrics.grossSales;
-        const baseVal = totalRev > 0 ? totalRev / 7 : 18000;
+            const entry = map.get(sid);
+            const orderTotal = Number(order.totalAmount || 0);
+            const orderSubtotal = Number(order.subtotal || orderTotal);
+            const discount = Number(order.discountAmount || 0);
 
-        return days.map((day, idx) => {
-            const factor = 1 + (idx % 3 === 0 ? 0.35 : idx % 2 === 0 ? -0.15 : 0.1);
-            const grossSales = Math.round(baseVal * factor);
-            const ordersCount = Math.max(1, Math.round(grossSales / (periodDataMetrics.aov || 10000)));
+            entry.orders += 1;
+            entry.totalSpend += orderTotal;
+            entry.subtotal += orderSubtotal;
+            entry.savings += discount;
+
+            const deliveredAt = getDeliveredTimestamp(order);
+            if (deliveredAt && order.createdAt) {
+                const leadDays = (deliveredAt.getTime() - new Date(order.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+                if (leadDays >= 0) {
+                    entry.leadTimeSumDays += leadDays;
+                    entry.leadTimeCount += 1;
+                }
+                if (order.expectedDeliveryDate) {
+                    const expectedAt = new Date(order.expectedDeliveryDate);
+                    entry.slaEvaluatedCount += 1;
+                    const lateDays = Math.max(0, (deliveredAt.getTime() - expectedAt.getTime()) / (1000 * 60 * 60 * 24));
+                    if (lateDays === 0) entry.onTimeCount += 1;
+                    entry.lateDaysSum += lateDays;
+                }
+            }
+        });
+
+        return Array.from(map.values()).map((row) => {
+            const denominator = row.subtotal + row.savings;
+            const savingsPct = denominator > 0 ? (row.savings / denominator) * 100 : 0;
+            const leadTimeDays = row.leadTimeCount > 0 ? row.leadTimeSumDays / row.leadTimeCount : null;
+            const daysLate = row.slaEvaluatedCount > 0 ? row.lateDaysSum / row.slaEvaluatedCount : null;
+            const onTimeRate = row.slaEvaluatedCount > 0 ? (row.onTimeCount / row.slaEvaluatedCount) * 100 : null;
+
             return {
-                name: day,
-                grossSales,
-                ordersCount,
-                avgOrderValue: ordersCount > 0 ? Math.round(grossSales / ordersCount) : 0,
-                quotationsCount: Math.max(1, Math.round(ordersCount * 0.4)),
+                ...row,
+                savingsPct,
+                leadTimeDays,
+                daysLate,
+                onTimeRate,
+                esgScore: null,
+                esgRating: null,
             };
         });
-    }, [periodDataMetrics]);
+    }, [currentPeriodOrders, supplierById]);
 
-    // Top Restaurant Customers Ranking
-    const topRestaurantCustomers = useMemo(() => {
-        const customerMap = {};
-        supplyOrders.forEach((order) => {
-            const name = order.restaurant?.name || order.restaurantName || "Tiffzy Cafe";
-            if (!customerMap[name]) {
-                customerMap[name] = { name, orders: 0, sales: 0 };
-            }
-            customerMap[name].orders += 1;
-            customerMap[name].sales += Number(order.totalAmount || 0);
-        });
+    const topSuppliersChartData = useMemo(() => {
+        if (topSupplierMetric === "esgScore") return [];
+        const sorted = [...supplierScorecardRows]
+            .filter((row) => (topSupplierMetric === "leadTimeDays" ? row.leadTimeDays !== null : true))
+            .sort((a, b) => {
+                if (topSupplierMetric === "leadTimeDays") return (a.leadTimeDays || 0) - (b.leadTimeDays || 0);
+                if (topSupplierMetric === "savingsPct") return b.savingsPct - a.savingsPct;
+                return b.totalSpend - a.totalSpend;
+            })
+            .slice(0, 5);
 
-        const list = Object.values(customerMap).map((c) => ({
-            ...c,
-            avgOrder: c.orders > 0 ? c.sales / c.orders : 0,
+        return sorted.map((row) => ({
+            name: row.name.length > 20 ? `${row.name.slice(0, 18)}…` : row.name,
+            fullName: row.name,
+            spend: Math.round(row.totalSpend),
+            savingsPct: Number(row.savingsPct.toFixed(1)),
+            leadTimeDays: row.leadTimeDays !== null ? Number(row.leadTimeDays.toFixed(1)) : 0,
         }));
+    }, [supplierScorecardRows, topSupplierMetric]);
 
-        list.sort((a, b) => b.sales - a.sales);
+    const deliveryAnalysis = useMemo(() => {
+        let onTime = 0;
+        let late = 0;
+        let evaluated = 0;
+        let pending = 0;
+        let delivered = 0;
+        let cancelled = 0;
 
-        if (list.length > 0) return list.slice(0, 5);
-
-        return [
-            { name: "Tiffzy Cafe & Bistro (HSR Layout)", orders: 14, sales: 86400, avgOrder: 6171 },
-            { name: "Tiffzy Cloud Kitchen (Indiranagar)", orders: 9, sales: 52100, avgOrder: 5788 },
-            { name: "Tiffzy Express (Koramangala)", orders: 6, sales: 34500, avgOrder: 5750 },
-            { name: "Tiffzy Central Kitchen (Whitefield)", orders: 4, sales: 28900, avgOrder: 7225 },
-        ];
-    }, [supplyOrders]);
-
-    // Top Selling Products Ranking
-    const topSellingProducts = useMemo(() => {
-        const prodMap = {};
-        supplyOrders.forEach((order) => {
-            (order.items || []).forEach((item) => {
-                const name = item.name || item.materialName || "Supply Ingredient";
-                const cat = item.category || "Produce";
-                const qty = Number(item.quantity || item.qty || 1);
-                const price = Number(item.price || item.unitPrice || item.total || 100);
-
-                if (!prodMap[name]) {
-                    prodMap[name] = { name, category: cat, qtySold: 0, orders: 0, revenue: 0 };
+        currentPeriodOrders.forEach((o) => {
+            if (isOrderCancelled(o)) {
+                cancelled += 1;
+                return;
+            }
+            const deliveredAt = getDeliveredTimestamp(o);
+            if (deliveredAt) {
+                delivered += 1;
+                if (o.expectedDeliveryDate) {
+                    evaluated += 1;
+                    if (deliveredAt <= new Date(o.expectedDeliveryDate)) onTime += 1;
+                    else late += 1;
                 }
-                prodMap[name].qtySold += qty;
-                prodMap[name].orders += 1;
-                prodMap[name].revenue += price * qty;
-            });
+            } else {
+                pending += 1;
+            }
         });
 
-        const list = Object.values(prodMap).sort((a, b) => b.revenue - a.revenue);
+        const onTimeRate = evaluated > 0 ? (onTime / evaluated) * 100 : null;
+        return {
+            total: currentPeriodOrders.length,
+            delivered,
+            pending,
+            cancelled,
+            evaluated,
+            onTime,
+            late,
+            onTimeRate,
+            chartData: [
+                { stage: "Delivered", count: delivered, fill: "#10b981" },
+                { stage: "In Transit / Open", count: pending, fill: "#f59e0b" },
+                { stage: "Cancelled", count: cancelled, fill: "#ef4444" },
+            ],
+        };
+    }, [currentPeriodOrders]);
 
-        if (list.length > 0) return list.slice(0, 5);
+    // Regional distribution from verified SupplierAddress records for suppliers in filtered orders
+    const regionalDistribution = useMemo(() => {
+        const activeSupplierIds = new Set(supplierScorecardRows.map((r) => String(r.supplierId)));
+        const sourceSuppliers =
+            activeSupplierIds.size > 0
+                ? suppliers.filter((s) => activeSupplierIds.has(String(s.id)))
+                : [];
 
-        return [
-            { name: "Pure Red Chilli Powder (1kg Pack)", category: "Spices & Condiments", qtySold: 120, orders: 18, revenue: 34800 },
-            { name: "Fresh Malai Paneer (Block - 1kg)", category: "Dairy & Frozen", qtySold: 85, orders: 14, revenue: 27200 },
-            { name: "Refined Sunflower Cooking Oil (15L Tin)", category: "Oils & Ghee", qtySold: 12, orders: 8, revenue: 23760 },
-            { name: "Farm Fresh Tomatoes (A-Grade Red)", category: "Fresh Produce", qtySold: 350, orders: 22, revenue: 12250 },
-            { name: "Takeaway Food Containers (3-Comp)", category: "Packaging Supplies", qtySold: 40, orders: 10, revenue: 26000 },
-        ];
-    }, [supplyOrders]);
+        const regionMap = new Map();
+        sourceSuppliers.forEach((s) => {
+            const addr = (s.addresses || []).find((a) => a.isPrimary) || s.addresses?.[0];
+            const region = addr?.state || addr?.city || "Unspecified";
+            regionMap.set(region, (regionMap.get(region) || 0) + 1);
+        });
 
-    // Top Bargain Quotations List
-    const topQuotationsList = useMemo(() => {
-        if (negotiations.length > 0) {
-            return negotiations.slice(0, 5).map((n) => ({
-                ref: n.negotiationNo || `QUOTE-${n.id}`,
-                restaurant: n.restaurant?.name || "Tiffzy Cafe",
-                product: n.productName || "Bulk Ingredient",
-                currentOffer: n.currentOffer || 500,
-                finalPrice: n.finalPrice || n.counterOffer || n.currentOffer || 480,
-                status: n.status || "ACTIVE",
-            }));
+        const total = sourceSuppliers.length;
+        return Array.from(regionMap.entries())
+            .map(([region, count], idx) => ({
+                region,
+                count,
+                pct: total > 0 ? (count / total) * 100 : 0,
+                color: REGION_COLORS[idx % REGION_COLORS.length],
+            }))
+            .sort((a, b) => b.count - a.count);
+    }, [suppliers, supplierScorecardRows]);
+
+    // Sorted & paginated scorecard
+    const sortedScorecardRows = useMemo(() => {
+        const list = [...supplierScorecardRows];
+        const { key, dir } = scorecardSort;
+        list.sort((a, b) => {
+            const av = a[key];
+            const bv = b[key];
+            if (av === null && bv === null) return 0;
+            if (av === null) return 1;
+            if (bv === null) return -1;
+            if (typeof av === "string") {
+                return dir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+            }
+            return dir === "asc" ? av - bv : bv - av;
+        });
+        return list;
+    }, [supplierScorecardRows, scorecardSort]);
+
+    const totalScorecardPages = Math.max(1, Math.ceil(sortedScorecardRows.length / SCORECARD_PAGE_SIZE));
+    const pagedScorecardRows = useMemo(() => {
+        const safePage = Math.min(scorecardPage, totalScorecardPages);
+        const start = (safePage - 1) * SCORECARD_PAGE_SIZE;
+        return sortedScorecardRows.slice(start, start + SCORECARD_PAGE_SIZE);
+    }, [sortedScorecardRows, scorecardPage, totalScorecardPages]);
+
+    // Warehouse inventory summary (only shown in Controls tab where selectedWarehouse applies)
+    const warehouseInventorySummary = useMemo(() => {
+        if (selectedWarehouse === "ALL") {
+            return {
+                label: "All Storage Locations",
+                skuCount: materials.length,
+                totalValue: materials.reduce((sum, m) => sum + Number(m.currentStock || 0) * Number(m.costPerBaseUnit || m.costPerUnit || 0), 0),
+                lowStockCount: materials.filter((m) => Number(m.currentStock || 0) <= Number(m.minimumStock || 0)).length,
+            };
         }
+        const loc = warehouses.find((w) => String(w.id) === String(selectedWarehouse));
+        const items = Array.isArray(loc?.items) ? loc.items : [];
+        return {
+            label: loc?.name || `Location #${selectedWarehouse}`,
+            skuCount: items.length,
+            totalValue: items.reduce((sum, i) => sum + Number(i.quantity || 0) * Number(i.rawMaterial?.costPerBaseUnit || 0), 0),
+            lowStockCount: items.filter((i) => Number(i.quantity || 0) <= Number(i.minStock || 0)).length,
+        };
+    }, [selectedWarehouse, warehouses, materials]);
 
-        return [
-            { ref: "QUOTE-8492", restaurant: "Tiffzy Cafe & Bistro", product: "Refined Sunflower Oil (15L)", currentOffer: 1950, finalPrice: 1880, status: "ACCEPTED" },
-            { ref: "QUOTE-8488", restaurant: "Tiffzy Cloud Kitchen", product: "Pure Red Chilli Powder (1kg)", currentOffer: 280, finalPrice: 265, status: "ACTIVE" },
-            { ref: "QUOTE-8475", restaurant: "Tiffzy Express", product: "Fresh Malai Paneer (1kg)", currentOffer: 310, finalPrice: 295, status: "COUNTERED" },
-            { ref: "QUOTE-8461", restaurant: "Tiffzy Central Kitchen", product: "Takeaway Containers 100pcs", currentOffer: 620, finalPrice: 600, status: "PO_GENERATED" },
-        ];
-    }, [negotiations]);
+    const handleResetFilters = () => {
+        setSelectedSupplier("ALL");
+        setSelectedProduct("ALL");
+        setSelectedCategory("ALL");
+        setSelectedWarehouse("ALL");
+        setSelectedChannel("ALL");
+        setCustomStartDate("");
+        setCustomEndDate("");
+        setTopSupplierMetric("spend");
+        setDeliveryView("delivery");
+        setScorecardSort({ key: "totalSpend", dir: "desc" });
+        setScorecardPage(1);
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.set("range", "7d");
+            next.delete("startDate");
+            next.delete("endDate");
+            return next;
+        });
+    };
 
-    // Top B2B Sales Orders List
-    const topSalesOrdersList = useMemo(() => {
-        const sorted = [...supplyOrders].sort((a, b) => Number(b.totalAmount || 0) - Number(a.totalAmount || 0));
-        if (sorted.length > 0) {
-            return sorted.slice(0, 5).map((o) => ({
-                id: o.id,
-                orderNo: o.orderNo || `PO-2026-${o.id}`,
-                restaurant: o.restaurant?.name || o.restaurantName || "Tiffzy Cafe",
-                amount: Number(o.totalAmount || 0),
-                status: o.status || "PLACED",
-                date: new Date(o.createdAt || Date.now()).toLocaleDateString("en-IN", { month: "short", day: "numeric" }),
-            }));
-        }
+    const handleSortColumn = (key) => {
+        setScorecardPage(1);
+        setScorecardSort((prev) => ({
+            key,
+            dir: prev.key === key && prev.dir === "desc" ? "asc" : "desc",
+        }));
+    };
 
-        return [
-            { id: 101, orderNo: "PO-2026-9042", restaurant: "Tiffzy Cafe & Bistro", amount: 48500, status: "COMPLETED", date: "Oct 6" },
-            { id: 102, orderNo: "PO-2026-9038", restaurant: "Tiffzy Cloud Kitchen", amount: 36200, status: "DISPATCHED", date: "Oct 6" },
-            { id: 103, orderNo: "PO-2026-9029", restaurant: "Tiffzy Central Kitchen", amount: 28400, status: "ACCEPTED", date: "Oct 5" },
-            { id: 104, orderNo: "PO-2026-9015", restaurant: "Tiffzy Express", amount: 19800, status: "PLACED", date: "Oct 4" },
-        ];
-    }, [supplyOrders]);
-
-    // Quick Action Handlers
+    // Quick Action Handlers (guarded by authenticated restaurantId)
     const handleCreatePO = async (e) => {
         e.preventDefault();
+        if (!restaurantId) {
+            showToast("Authenticated restaurant context is required", { type: "error" });
+            return;
+        }
         try {
             await api.post(`/owner/${restaurantId}/inventory/stock-in`, {
                 rawMaterialId: poForm.materialId,
@@ -463,6 +667,7 @@ export default function OwnerSupplyChainIntelligence() {
             });
             showToast("Purchase Order created successfully!");
             setShowPOModal(false);
+            setPoForm({ materialId: "", qty: "", supplier: "", notes: "" });
             fetchDashboardData({ silent: true });
         } catch {
             showToast("Failed to create purchase order", { type: "error" });
@@ -471,6 +676,10 @@ export default function OwnerSupplyChainIntelligence() {
 
     const handleReceiveStock = async (e) => {
         e.preventDefault();
+        if (!restaurantId) {
+            showToast("Authenticated restaurant context is required", { type: "error" });
+            return;
+        }
         try {
             await api.post(`/owner/${restaurantId}/inventory/stock-in`, {
                 rawMaterialId: receiveForm.materialId,
@@ -480,6 +689,7 @@ export default function OwnerSupplyChainIntelligence() {
             });
             showToast("Goods Receipt Note (GRN) logged successfully!");
             setShowReceiveModal(false);
+            setReceiveForm({ materialId: "", qty: "", supplier: "", notes: "" });
             fetchDashboardData({ silent: true });
         } catch {
             showToast("Failed to log goods receipt", { type: "error" });
@@ -488,8 +698,12 @@ export default function OwnerSupplyChainIntelligence() {
 
     const handleAdjustStock = async (e) => {
         e.preventDefault();
+        if (!restaurantId) {
+            showToast("Authenticated restaurant context is required", { type: "error" });
+            return;
+        }
         try {
-            await api.post(`/owner/${restaurantId}/inventory/adjust`, {
+            await api.post(`/owner/${restaurantId}/inventory/adjustments`, {
                 rawMaterialId: adjustForm.materialId,
                 quantity: adjustForm.qty,
                 reason: adjustForm.reason,
@@ -497,6 +711,7 @@ export default function OwnerSupplyChainIntelligence() {
             });
             showToast("Stock adjustment logged successfully!");
             setShowAdjustModal(false);
+            setAdjustForm({ materialId: "", qty: "", reason: "COUNT_CORRECTION", notes: "" });
             fetchDashboardData({ silent: true });
         } catch {
             showToast("Failed to log stock adjustment", { type: "error" });
@@ -505,29 +720,52 @@ export default function OwnerSupplyChainIntelligence() {
 
     return (
         <section className="space-y-4 font-sans text-sm text-[color:var(--app-text,#1e293b)] pb-12">
-            {/* HEADER CONSOLE BAR — VISUALLY MATCHES OWNER ANALYTICS */}
+            {/* HEADER */}
             <header className="pb-3 border-b border-slate-200/80 dark:border-slate-800">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div>
                         <div className="flex items-center gap-3">
                             <OwnerMenuButton />
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                                 <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-2xl">
-                                    Supplier Performance & Revenue Analytics
+                                    Supplier Performance & Procurement Analytics
                                 </h1>
                                 <span className="inline-flex items-center rounded bg-orange-500/10 px-2 py-0.5 text-[11px] font-semibold text-orange-600 dark:text-orange-400">
-                                    ENTERPRISE CONSOLE
+                                    RESTAURANT PROCUREMENT
                                 </span>
                             </div>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                            Wholesale fulfillment metrics, buyer retention, supplier performance and revenue intelligence.
+                            Restaurant-scoped supplier spend, delivery reliability, negotiation savings, and procurement insights.
                         </p>
                     </div>
 
                     {/* TOP RIGHT CONTROLS */}
                     <div className="flex flex-wrap items-center gap-2">
-                        {/* Preset Date Selector Pills */}
+                        {/* In-page Section Tabs */}
+                        <div role="tablist" aria-label="Analytics sections" className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-800 p-0.5 bg-slate-50 dark:bg-slate-900">
+                            {PAGE_TABS.map((tab) => {
+                                const isActive = activeSectionTab === tab.id;
+                                return (
+                                    <button
+                                        key={tab.id}
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={isActive}
+                                        onClick={() => setActiveSectionTab(tab.id)}
+                                        className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                                            isActive
+                                                ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-xs"
+                                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                                        }`}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* Date Preset Selector */}
                         <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-800 p-0.5 bg-slate-50 dark:bg-slate-900">
                             {DATE_PRESETS.map((preset) => {
                                 const isActive = range === preset.id;
@@ -536,6 +774,7 @@ export default function OwnerSupplyChainIntelligence() {
                                         key={preset.id}
                                         type="button"
                                         onClick={() => {
+                                            setScorecardPage(1);
                                             setSearchParams((prev) => {
                                                 const next = new URLSearchParams(prev);
                                                 next.set("range", preset.id);
@@ -554,7 +793,15 @@ export default function OwnerSupplyChainIntelligence() {
                             })}
                         </div>
 
-                        {/* LIVE Status Indicator */}
+                        {/* Currency Display (Restaurant Base Currency) */}
+                        <span
+                            className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300"
+                            title="Display currency is fixed to INR in current API contracts"
+                        >
+                            INR (₹)
+                        </span>
+
+                        {/* Live Toggle */}
                         <button
                             type="button"
                             onClick={() => setAutoRefresh((prev) => !prev)}
@@ -568,7 +815,7 @@ export default function OwnerSupplyChainIntelligence() {
                             {autoRefresh ? "Live ON" : "Live OFF"}
                         </button>
 
-                        {/* Refresh Button */}
+                        {/* Manual Refresh */}
                         <button
                             type="button"
                             onClick={() => fetchDashboardData({ silent: true })}
@@ -582,9 +829,12 @@ export default function OwnerSupplyChainIntelligence() {
                 </div>
             </header>
 
-            {/* ERROR BANNER */}
+            {/* SHARED SUPPLY CHAIN NAVIGATION */}
+            <SupplyChainSubNav />
+
+            {/* ERROR & PARTIAL WARNING BANNERS */}
             {error && (
-                <div className="flex items-center justify-between gap-3 rounded-lg border border-rose-500/30 bg-rose-500/10 p-2.5 text-xs text-rose-600 dark:text-rose-400">
+                <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-rose-500/30 bg-rose-500/10 p-2.5 text-xs text-rose-600 dark:text-rose-400">
                     <div className="flex items-center gap-2">
                         <AlertCircle size={15} className="shrink-0" />
                         <span>{error}</span>
@@ -592,7 +842,7 @@ export default function OwnerSupplyChainIntelligence() {
                     <button
                         type="button"
                         onClick={() => fetchDashboardData({ silent: false })}
-                        className="inline-flex items-center gap-1 rounded border border-rose-500/40 bg-rose-500/20 px-2.5 py-1 font-semibold text-rose-700 hover:bg-rose-500/30 dark:text-rose-300 transition-colors"
+                        className="inline-flex items-center gap-1 rounded border border-rose-500/40 bg-rose-500/20 px-2.5 py-1 font-semibold text-rose-700 hover:bg-rose-500/30 dark:text-rose-300 transition-colors cursor-pointer"
                     >
                         <RefreshCcw size={12} className={loading || refreshing ? "animate-spin" : ""} />
                         Retry
@@ -600,619 +850,718 @@ export default function OwnerSupplyChainIntelligence() {
                 </div>
             )}
 
-            {/* HORIZONTAL SUB-NAVIGATION BAR */}
-            <SupplyChainSubNav />
+            {!error && partialWarnings.length > 0 && (
+                <div role="status" className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-300">
+                    <div className="flex items-center gap-2">
+                        <Info size={14} className="shrink-0" />
+                        <span>Partial data unavailable: {partialWarnings.join(", ")}. Affected widgets show empty or unavailable states.</span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => fetchDashboardData({ silent: true })}
+                        className="rounded border border-amber-500/40 px-2 py-0.5 font-semibold hover:bg-amber-500/20 cursor-pointer"
+                    >
+                        Retry
+                    </button>
+                </div>
+            )}
 
-            {/* COMPACT SINGLE-ROW FILTER TOOLBAR */}
-            <div className="py-2.5 px-3 border-b border-slate-200/80 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+            {/* FILTER TOOLBAR */}
+            <div className="py-2.5 px-3 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-wrap items-center justify-between gap-2.5 text-xs">
                 <div className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300">
                     <Filter size={14} className="text-orange-500" />
                     <span>FILTERS:</span>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                    {/* Custom Date Inputs */}
+                    {range === "custom" && (
+                        <div className="flex items-center gap-1.5">
+                            <input
+                                type="date"
+                                aria-label="Custom start date"
+                                value={customStartDate}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setCustomStartDate(val);
+                                    setScorecardPage(1);
+                                    setSearchParams((prev) => {
+                                        const next = new URLSearchParams(prev);
+                                        if (val) next.set("startDate", val);
+                                        else next.delete("startDate");
+                                        return next;
+                                    });
+                                }}
+                                className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-xs outline-none text-slate-800 dark:text-slate-200"
+                            />
+                            <span className="text-slate-400">to</span>
+                            <input
+                                type="date"
+                                aria-label="Custom end date"
+                                value={customEndDate}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setCustomEndDate(val);
+                                    setScorecardPage(1);
+                                    setSearchParams((prev) => {
+                                        const next = new URLSearchParams(prev);
+                                        if (val) next.set("endDate", val);
+                                        else next.delete("endDate");
+                                        return next;
+                                    });
+                                }}
+                                className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-xs outline-none text-slate-800 dark:text-slate-200"
+                            />
+                        </div>
+                    )}
+
                     {/* Supplier Filter */}
                     <select
-                        value={selectedWarehouse}
-                        onChange={(e) => setSelectedWarehouse(e.target.value)}
+                        aria-label="Filter by supplier"
+                        value={selectedSupplier}
+                        onChange={(e) => {
+                            setSelectedSupplier(e.target.value);
+                            setScorecardPage(1);
+                        }}
                         className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-xs outline-none text-slate-800 dark:text-slate-200 font-medium cursor-pointer"
                     >
                         <option value="ALL">All Suppliers</option>
                         {suppliers.map((s) => (
-                            <option key={s.id} value={s.id}>{s.profile?.companyName || s.name || `Supplier #${s.id}`}</option>
+                            <option key={s.id} value={String(s.id)}>
+                                {getSupplierDisplayName(s, s.id)}
+                            </option>
                         ))}
                     </select>
 
                     {/* Product Filter */}
                     <select
-                        value={poForm.materialId || "ALL"}
-                        onChange={(e) => setPoForm({ ...poForm, materialId: e.target.value === "ALL" ? "" : e.target.value })}
+                        aria-label="Filter by product"
+                        value={selectedProduct}
+                        onChange={(e) => {
+                            setSelectedProduct(e.target.value);
+                            setScorecardPage(1);
+                        }}
                         className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-xs outline-none text-slate-800 dark:text-slate-200 font-medium cursor-pointer"
                     >
-                        <option value="ALL">All Products</option>
-                        {materials.map((m) => (
-                            <option key={m.id} value={m.id}>{m.name}</option>
+                        {productsList.map((prod) => (
+                            <option key={prod} value={prod}>
+                                {prod === "ALL" ? "All Products" : prod}
+                            </option>
                         ))}
                     </select>
 
                     {/* Category Filter */}
                     <select
+                        aria-label="Filter by category"
                         value={selectedCategory}
-                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        onChange={(e) => {
+                            setSelectedCategory(e.target.value);
+                            setScorecardPage(1);
+                        }}
                         className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-xs outline-none text-slate-800 dark:text-slate-200 font-medium cursor-pointer"
                     >
                         {categoriesList.map((cat) => (
-                            <option key={cat} value={cat}>{cat === "ALL" ? "All Categories" : cat}</option>
+                            <option key={cat} value={cat}>
+                                {cat === "ALL" ? "All Categories" : cat}
+                            </option>
                         ))}
                     </select>
 
-                    {/* Warehouse Filter */}
+                    {/* Warehouse Filter (applies to Controls / Inventory summary only) */}
                     <select
+                        aria-label="Filter by warehouse"
                         value={selectedWarehouse}
                         onChange={(e) => setSelectedWarehouse(e.target.value)}
+                        title="Warehouse filter applies to Inventory Stock Summary in Controls tab (B2B orders do not store warehouse IDs)"
                         className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-xs outline-none text-slate-800 dark:text-slate-200 font-medium cursor-pointer"
                     >
-                        <option value="ALL">All Warehouses</option>
+                        <option value="ALL">All Warehouses (Stock Only)</option>
                         {warehouses.map((w) => (
-                            <option key={w.id} value={w.id}>{w.name}</option>
+                            <option key={w.id} value={String(w.id)}>
+                                {w.name}
+                            </option>
                         ))}
                     </select>
 
-                    {/* Buyer / Restaurant Filter */}
+                    {/* Procurement Channel Filter */}
                     <select
-                        value={selectedCustomer}
-                        onChange={(e) => setSelectedCustomer(e.target.value)}
+                        aria-label="Filter by procurement channel"
+                        value={selectedChannel}
+                        onChange={(e) => {
+                            setSelectedChannel(e.target.value);
+                            setScorecardPage(1);
+                        }}
                         className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-xs outline-none text-slate-800 dark:text-slate-200 font-medium cursor-pointer"
                     >
-                        {customersList.map((c) => (
-                            <option key={c} value={c}>{c === "ALL" ? "All Buyers / Restaurants" : c}</option>
-                        ))}
-                    </select>
-
-                    {/* Sales Source Filter */}
-                    <select
-                        value={selectedSalesSource}
-                        onChange={(e) => setSelectedSalesSource(e.target.value)}
-                        className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-xs outline-none text-slate-800 dark:text-slate-200 font-medium cursor-pointer"
-                    >
-                        <option value="ALL">All Sales Sources</option>
-                        <option value="DIRECT_CATALOG">Direct Catalog Order</option>
-                        <option value="BARGAIN_QUOTE">Bargain Quote Conversion</option>
+                        <option value="ALL">All Procurement Channels</option>
+                        <option value="DIRECT_CATALOG">Direct Catalog PO</option>
+                        <option value="BARGAIN_QUOTE">Negotiated Quote</option>
                     </select>
 
                     {/* Reset Button */}
                     <button
                         type="button"
-                        onClick={() => {
-                            setSelectedCategory("ALL");
-                            setSelectedCustomer("ALL");
-                            setSelectedSalesSource("ALL");
-                            setSelectedWarehouse("ALL");
-                        }}
-                        className="px-2 py-1 rounded-md text-xs font-semibold theme-button-secondary text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition cursor-pointer"
+                        onClick={handleResetFilters}
+                        className="px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
                     >
                         Reset
                     </button>
-
-                    {/* Export Report Button */}
-                    <button
-                        type="button"
-                        onClick={() => navigate("/owner/supply-chain/reports")}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition cursor-pointer"
-                    >
-                        <Download size={12} />
-                        Export
-                    </button>
                 </div>
             </div>
 
-            {/* SECTION 1: SUPPLIER PERFORMANCE OVERVIEW (COMPACT PRIMARY KPI ROW) */}
-            <div className="pb-4 border-b border-slate-200/80 dark:border-slate-800 space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
-                    <span>SUPPLIER PERFORMANCE OVERVIEW</span>
-                    <span className="text-slate-500 font-semibold">{range.toUpperCase()} (DYNAMIC PRIOR-PERIOD COMPARISON)</span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-1">
-                    {/* FULFILLED ORDERS */}
-                    <div className="space-y-0.5">
-                        <div className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">FULFILLED ORDERS</div>
-                        <div className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
-                            {periodDataMetrics.b2bOrdersCount}
-                        </div>
-                        <div className={`flex items-center gap-1 text-[11px] font-semibold ${periodDataMetrics.b2bOrdersTrend.isUp ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600"}`}>
-                            {periodDataMetrics.b2bOrdersTrend.isUp ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
-                            <span>{periodDataMetrics.b2bOrdersTrend.text}</span>
-                        </div>
+            {/* LOADING SKELETON */}
+            {loading ? (
+                <div data-testid="supply-analytics-loading" className="grid grid-cols-1 lg:grid-cols-12 gap-4 animate-pulse">
+                    <div className="lg:col-span-3 space-y-3">
+                        {[1, 2, 3, 4, 5].map((n) => (
+                            <div key={n} className="h-24 rounded-xl bg-slate-200/70 dark:bg-slate-800/70" />
+                        ))}
                     </div>
-
-                    {/* AVERAGE ORDER VALUE */}
-                    <div className="space-y-0.5">
-                        <div className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">AVERAGE ORDER VALUE</div>
-                        <div className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
-                            {formatCompactMoney(periodDataMetrics.aov)}
+                    <div className="lg:col-span-9 space-y-4">
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                            <div className="h-64 rounded-xl bg-slate-200/70 dark:bg-slate-800/70" />
+                            <div className="h-64 rounded-xl bg-slate-200/70 dark:bg-slate-800/70" />
                         </div>
-                        <div className={`flex items-center gap-1 text-[11px] font-semibold ${periodDataMetrics.aovTrend.isUp ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600"}`}>
-                            {periodDataMetrics.aovTrend.isUp ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
-                            <span>{periodDataMetrics.aovTrend.text}</span>
-                        </div>
-                    </div>
-
-                    {/* ACTIVE BUYERS */}
-                    <div className="space-y-0.5">
-                        <div className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">ACTIVE BUYERS</div>
-                        <div className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
-                            {topRestaurantCustomers.length}
-                        </div>
-                        <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                            <ArrowUpRight size={13} />
-                            <span>↑ 14.1% vs prev period</span>
-                        </div>
-                    </div>
-
-                    {/* FULFILLMENT SLA */}
-                    <div className="space-y-0.5">
-                        <div className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">FULFILLMENT SLA</div>
-                        <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
-                            {report?.supplierPerformance?.[0]?.onTimeDelivery ? `${report.supplierPerformance[0].onTimeDelivery}%` : "96.4%"}
-                        </div>
-                        <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                            <ArrowUpRight size={13} />
-                            <span>↑ 1.8% vs prev period</span>
-                        </div>
+                        <div className="h-72 rounded-xl bg-slate-200/70 dark:bg-slate-800/70" />
                     </div>
                 </div>
-            </div>
+            ) : (
+                <>
+                    {/* OVERVIEW & SUPPLIER SECTIONS */}
+                    {activeSectionTab !== "controls" && (
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                            {/* LEFT KPI COLUMN (Reference Column) */}
+                            {activeSectionTab === "overview" && (
+                                <div className="lg:col-span-3 space-y-3">
+                                    {/* Verified Total Spend */}
+                                    <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-1">
+                                        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                            Total Procurement Spend
+                                        </div>
+                                        <div className="text-2xl font-black text-slate-900 dark:text-slate-100">
+                                            {formatCompactMoney(kpiMetrics.totalSpend)}
+                                        </div>
+                                        <div className="text-[11px] text-slate-500 flex items-center gap-1">
+                                            {kpiMetrics.spendTrend ? (
+                                                <span className={kpiMetrics.spendTrend.isUp ? "text-emerald-600 font-semibold" : "text-rose-600 font-semibold"}>
+                                                    {kpiMetrics.spendTrend.text}
+                                                </span>
+                                            ) : (
+                                                <span>{kpiMetrics.totalOrders} orders in period</span>
+                                            )}
+                                        </div>
+                                    </div>
 
-            {/* SECTION 2: SECONDARY INTELLIGENCE METRICS STRIP */}
-            <div className="py-2.5 px-3 rounded-lg bg-slate-100/70 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-4 text-xs font-medium">
-                <div>
-                    <span className="text-slate-500 font-bold uppercase tracking-wider">Supplier Revenue:</span>{" "}
-                    <strong className="text-slate-900 dark:text-slate-100 font-extrabold">{formatMoney(periodDataMetrics.grossSales)}</strong>
-                </div>
-                <div>
-                    <span className="text-slate-500 font-bold uppercase tracking-wider">Total B2B Orders:</span>{" "}
-                    <strong className="text-slate-900 dark:text-slate-100 font-extrabold">{supplyOrders.length || 24} orders</strong>
-                </div>
-                <div>
-                    <span className="text-slate-500 font-bold uppercase tracking-wider">Delayed Orders:</span>{" "}
-                    <strong className="text-amber-600 dark:text-amber-400 font-extrabold">2 orders (1.2%)</strong>
-                </div>
-                <div>
-                    <span className="text-slate-500 font-bold uppercase tracking-wider">Average Fulfillment Time:</span>{" "}
-                    <strong className="text-slate-900 dark:text-slate-100 font-extrabold">4.2 hours</strong>
-                </div>
-            </div>
+                                    {/* Preferred Supplier Spend % */}
+                                    <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-1">
+                                        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                            Preferred Supplier Spend %
+                                        </div>
+                                        <div className="text-xl font-bold text-slate-400 dark:text-slate-500">—</div>
+                                        <div className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                                            Requires setup (preferred supplier flag)
+                                        </div>
+                                    </div>
 
-            {/* SECTION 3: REVENUE & ORDER PERFORMANCE + SUPPLIER SUMMARY */}
-            <div className="grid gap-6 lg:grid-cols-3 pb-4 border-b border-slate-200/80 dark:border-slate-800">
-                {/* LEFT 2 COLUMNS: REVENUE & ORDER PERFORMANCE CHART */}
-                <div className="lg:col-span-2 space-y-2.5">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="font-bold text-slate-900 dark:text-slate-100 text-xs uppercase tracking-wider">
-                            REVENUE & ORDER PERFORMANCE
-                        </span>
+                                    {/* Single-Source Spend % */}
+                                    <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-1">
+                                        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                            Single-Source Spend %
+                                        </div>
+                                        <div className="text-xl font-bold text-slate-400 dark:text-slate-500">—</div>
+                                        <div className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                                            Requires setup (SKU-to-supplier mapping)
+                                        </div>
+                                    </div>
 
-                        <div className="flex items-center gap-2">
-                            {/* Chart Metric Toggle */}
-                            <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-800 p-0.5 text-xs bg-slate-50 dark:bg-slate-900">
-                                {[
-                                    { id: "grossSales", label: "Revenue" },
-                                    { id: "ordersCount", label: "Orders" },
-                                    { id: "quotationsCount", label: "Buyers" },
-                                    { id: "avgOrderValue", label: "AOV" },
-                                ].map((m) => (
-                                    <button
-                                        key={m.id}
-                                        type="button"
-                                        onClick={() => setChartMetric(m.id)}
-                                        className={`px-2 py-0.5 rounded text-[11px] font-semibold transition cursor-pointer ${
-                                            chartMetric === m.id
-                                                ? "bg-orange-500 text-white shadow-xs"
-                                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
-                                        }`}
-                                    >
-                                        {m.label}
-                                    </button>
-                                ))}
+                                    {/* Low-Risk Supplier Spend % */}
+                                    <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-1">
+                                        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                            Low-Risk Supplier Spend %
+                                        </div>
+                                        <div className="text-xl font-bold text-slate-400 dark:text-slate-500">—</div>
+                                        <div className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                                            Requires setup (supplier risk scoring)
+                                        </div>
+                                    </div>
+
+                                    {/* Weighted Average ESG Score */}
+                                    <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-1">
+                                        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                            Weighted Average ESG Score
+                                        </div>
+                                        <div className="text-xl font-bold text-slate-400 dark:text-slate-500">—</div>
+                                        <div className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                                            Requires setup (ESG data)
+                                        </div>
+                                    </div>
+
+                                    {/* Average Lead Time */}
+                                    <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-1">
+                                        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                            Average Lead Time
+                                        </div>
+                                        <div className="text-2xl font-black text-slate-900 dark:text-slate-100">
+                                            {kpiMetrics.avgLeadTimeDays !== null
+                                                ? `${kpiMetrics.avgLeadTimeDays.toFixed(1)} days`
+                                                : "—"}
+                                        </div>
+                                        <div className="text-[11px] text-slate-500">
+                                            {kpiMetrics.leadTimeSampleCount > 0
+                                                ? `Based on ${kpiMetrics.leadTimeSampleCount} delivered orders`
+                                                : "No delivered order timestamps in period"}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* RIGHT MAIN GRID */}
+                            <div className={`${activeSectionTab === "overview" ? "lg:col-span-9" : "lg:col-span-12"} space-y-4`}>
+                                {/* TOP ROW: TOP 5 SUPPLIERS + DELIVERY ANALYSIS */}
+                                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                    {/* TOP 5 SUPPLIERS BY SPEND */}
+                                    <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div>
+                                                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
+                                                    Top 5 Suppliers by Spend
+                                                </h2>
+                                                <p className="text-[11px] text-slate-500">Scoped to your restaurant orders in period</p>
+                                            </div>
+                                            <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-800 p-0.5 bg-slate-50 dark:bg-slate-950">
+                                                {TOP_SUPPLIER_METRICS.map((m) => (
+                                                    <button
+                                                        key={m.id}
+                                                        type="button"
+                                                        aria-pressed={topSupplierMetric === m.id}
+                                                        onClick={() => setTopSupplierMetric(m.id)}
+                                                        className={`px-2 py-0.5 rounded text-[11px] font-semibold transition cursor-pointer ${
+                                                            topSupplierMetric === m.id
+                                                                ? "bg-orange-500 text-white"
+                                                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+                                                        }`}
+                                                    >
+                                                        {m.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {topSupplierMetric === "esgScore" ? (
+                                            <div className="h-[220px] flex flex-col items-center justify-center text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-lg p-4 text-slate-500">
+                                                <ShieldCheck size={28} className="text-slate-400 mb-2" />
+                                                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">ESG Score Unavailable</p>
+                                                <p className="text-[11px] mt-0.5">Supplier ESG ratings require schema and data setup.</p>
+                                            </div>
+                                        ) : topSuppliersChartData.length === 0 ? (
+                                            <div className="h-[220px] flex flex-col items-center justify-center text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-lg p-4 text-slate-500">
+                                                <BarChart3 size={28} className="text-slate-400 mb-2" />
+                                                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">No supplier data for this period</p>
+                                                <p className="text-[11px] mt-0.5">Adjust date range or filters to view supplier performance.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="h-[220px] w-full">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <BarChart data={topSuppliersChartData} layout="vertical" margin={{ top: 5, right: 16, left: 8, bottom: 5 }}>
+                                                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
+                                                        <XAxis
+                                                            type="number"
+                                                            tick={{ fontSize: 11, fill: "#64748b" }}
+                                                            tickFormatter={(v) =>
+                                                                topSupplierMetric === "spend"
+                                                                    ? `₹${Math.round(v / 1000)}k`
+                                                                    : topSupplierMetric === "savingsPct"
+                                                                    ? `${v}%`
+                                                                    : `${v}d`
+                                                            }
+                                                        />
+                                                        <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11, fill: "#475569" }} />
+                                                        <Tooltip
+                                                            formatter={(val) => {
+                                                                if (topSupplierMetric === "spend") return [formatMoney(val), "Spend"];
+                                                                if (topSupplierMetric === "savingsPct") return [`${val}%`, "Savings %"];
+                                                                return [`${val} days`, "Avg Lead Time"];
+                                                            }}
+                                                        />
+                                                        <Bar dataKey={topSupplierMetric} fill="#f97316" radius={[0, 4, 4, 0]} />
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* SUPPLIER DELIVERY PERFORMANCE ANALYSIS */}
+                                    <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div>
+                                                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
+                                                    Supplier Delivery Performance Analysis
+                                                </h2>
+                                                <p className="text-[11px] text-slate-500">Order fulfillment & financial overview</p>
+                                            </div>
+                                            <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-800 p-0.5 bg-slate-50 dark:bg-slate-950">
+                                                <button
+                                                    type="button"
+                                                    aria-pressed={deliveryView === "delivery"}
+                                                    onClick={() => setDeliveryView("delivery")}
+                                                    className={`px-2 py-0.5 rounded text-[11px] font-semibold transition cursor-pointer ${
+                                                        deliveryView === "delivery"
+                                                            ? "bg-orange-500 text-white"
+                                                            : "text-slate-600 dark:text-slate-400"
+                                                    }`}
+                                                >
+                                                    Delivery
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    aria-pressed={deliveryView === "financial"}
+                                                    onClick={() => setDeliveryView("financial")}
+                                                    className={`px-2 py-0.5 rounded text-[11px] font-semibold transition cursor-pointer ${
+                                                        deliveryView === "financial"
+                                                            ? "bg-orange-500 text-white"
+                                                            : "text-slate-600 dark:text-slate-400"
+                                                    }`}
+                                                >
+                                                    Financial
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {deliveryView === "delivery" ? (
+                                            deliveryAnalysis.total === 0 ? (
+                                                <div className="h-[220px] flex flex-col items-center justify-center text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-lg p-4 text-slate-500">
+                                                    <Truck size={28} className="text-slate-400 mb-2" />
+                                                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">No delivery records in period</p>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-3">
+                                                    <div className="grid grid-cols-3 gap-2 text-center">
+                                                        <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-2">
+                                                            <div className="text-[10px] uppercase font-bold text-slate-500">On-Time Rate</div>
+                                                            <div className="text-base font-black text-emerald-600">
+                                                                {deliveryAnalysis.onTimeRate !== null ? formatPct(deliveryAnalysis.onTimeRate) : "—"}
+                                                            </div>
+                                                        </div>
+                                                        <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-2">
+                                                            <div className="text-[10px] uppercase font-bold text-slate-500">Delivered</div>
+                                                            <div className="text-base font-black text-slate-900 dark:text-slate-100">
+                                                                {deliveryAnalysis.delivered}
+                                                            </div>
+                                                        </div>
+                                                        <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-2">
+                                                            <div className="text-[10px] uppercase font-bold text-slate-500">Late (SLA)</div>
+                                                            <div className="text-base font-black text-amber-600">
+                                                                {deliveryAnalysis.evaluated > 0 ? deliveryAnalysis.late : "—"}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="h-[150px] w-full">
+                                                        <ResponsiveContainer width="100%" height="100%">
+                                                            <BarChart data={deliveryAnalysis.chartData} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
+                                                                <XAxis dataKey="stage" tick={{ fontSize: 11, fill: "#64748b" }} />
+                                                                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#64748b" }} />
+                                                                <Tooltip />
+                                                                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                                                                    {deliveryAnalysis.chartData.map((entry, idx) => (
+                                                                        <Cell key={idx} fill={entry.fill} />
+                                                                    ))}
+                                                                </Bar>
+                                                            </BarChart>
+                                                        </ResponsiveContainer>
+                                                    </div>
+                                                </div>
+                                            )
+                                        ) : (
+                                            <div className="grid grid-cols-2 gap-3 pt-1">
+                                                <div className="rounded-lg border border-slate-200/80 dark:border-slate-800 p-3">
+                                                    <div className="text-[11px] font-bold uppercase text-slate-500">Period Order Spend</div>
+                                                    <div className="text-lg font-black text-slate-900 dark:text-slate-100 mt-0.5">
+                                                        {formatMoney(kpiMetrics.totalSpend)}
+                                                    </div>
+                                                </div>
+                                                <div className="rounded-lg border border-slate-200/80 dark:border-slate-800 p-3">
+                                                    <div className="text-[11px] font-bold uppercase text-slate-500">Order Discount Savings</div>
+                                                    <div className="text-lg font-black text-emerald-600 mt-0.5">
+                                                        {formatMoney(kpiMetrics.totalSavings)}
+                                                    </div>
+                                                </div>
+                                                <div className="rounded-lg border border-slate-200/80 dark:border-slate-800 p-3">
+                                                    <div className="text-[11px] font-bold uppercase text-slate-500">Invoices Paid (All-Time)</div>
+                                                    <div className="text-lg font-black text-slate-900 dark:text-slate-100 mt-0.5">
+                                                        {paymentsSummary?.summary ? formatMoney(paymentsSummary.summary.paidAmount) : "—"}
+                                                    </div>
+                                                </div>
+                                                <div className="rounded-lg border border-slate-200/80 dark:border-slate-800 p-3">
+                                                    <div className="text-[11px] font-bold uppercase text-slate-500">Pending / Overdue</div>
+                                                    <div className="text-lg font-black text-amber-600 mt-0.5">
+                                                        {paymentsSummary?.summary
+                                                            ? formatMoney(
+                                                                  Number(paymentsSummary.summary.pendingAmount || 0) +
+                                                                      Number(paymentsSummary.summary.overdueAmount || 0)
+                                                              )
+                                                            : "—"}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* BOTTOM ROW: REGIONAL DISTRIBUTION + SUPPLIER SCORECARD */}
+                                <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+                                    {/* SUPPLIER DISTRIBUTION BY REGION */}
+                                    <div className="xl:col-span-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
+                                        <div>
+                                            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
+                                                Supplier Distribution by Region
+                                            </h2>
+                                            <p className="text-[11px] text-slate-500">Active suppliers in selected period</p>
+                                        </div>
+
+                                        {regionalDistribution.length === 0 ? (
+                                            <div className="h-[210px] flex flex-col items-center justify-center text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-lg p-4 text-slate-500">
+                                                <Globe size={28} className="text-slate-400 mb-2" />
+                                                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">No regional supplier data</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                <div className="h-[140px] w-full">
+                                                    <ResponsiveContainer width="100%" height="100%">
+                                                        <PieChart>
+                                                            <Pie
+                                                                data={regionalDistribution}
+                                                                dataKey="count"
+                                                                nameKey="region"
+                                                                innerRadius={38}
+                                                                outerRadius={58}
+                                                                paddingAngle={2}
+                                                            >
+                                                                {regionalDistribution.map((entry, idx) => (
+                                                                    <Cell key={idx} fill={entry.color} />
+                                                                ))}
+                                                            </Pie>
+                                                            <Tooltip formatter={(val) => [`${val} suppliers`, "Count"]} />
+                                                        </PieChart>
+                                                    </ResponsiveContainer>
+                                                </div>
+                                                <ul className="space-y-1 text-xs">
+                                                    {regionalDistribution.map((r) => (
+                                                        <li key={r.region} className="flex items-center justify-between">
+                                                            <span className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+                                                                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: r.color }} />
+                                                                {r.region}
+                                                            </span>
+                                                            <span className="font-bold text-slate-900 dark:text-slate-100">
+                                                                {r.count} ({formatPct(r.pct)})
+                                                            </span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* SUPPLIER PERFORMANCE SCORECARD TABLE */}
+                                    <div className="xl:col-span-8 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div>
+                                                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
+                                                    Supplier Performance Scorecard
+                                                </h2>
+                                                <p className="text-[11px] text-slate-500">
+                                                    ESG columns show unavailable until backend scoring is configured
+                                                </p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => navigate("/owner/supply-chain/suppliers")}
+                                                className="text-xs font-bold text-orange-500 hover:underline cursor-pointer"
+                                            >
+                                                View Full Directory ({suppliers.length}) →
+                                            </button>
+                                        </div>
+
+                                        <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+                                            <table className="w-full text-left text-xs">
+                                                <thead className="bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wider">
+                                                    <tr>
+                                                        {[
+                                                            { key: "name", label: "Supplier" },
+                                                            { key: "orders", label: "Orders" },
+                                                            { key: "totalSpend", label: "Total Spend" },
+                                                            { key: "savings", label: "Savings" },
+                                                            { key: "daysLate", label: "Days Late" },
+                                                            { key: "onTimeRate", label: "On-Time %" },
+                                                        ].map((col) => (
+                                                            <th
+                                                                key={col.key}
+                                                                aria-sort={
+                                                                    scorecardSort.key === col.key
+                                                                        ? scorecardSort.dir === "asc"
+                                                                            ? "ascending"
+                                                                            : "descending"
+                                                                        : "none"
+                                                                }
+                                                                className="p-2.5 whitespace-nowrap"
+                                                            >
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleSortColumn(col.key)}
+                                                                    className="inline-flex items-center gap-1 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+                                                                >
+                                                                    {col.label}
+                                                                    <ArrowUpDown size={11} />
+                                                                </button>
+                                                            </th>
+                                                        ))}
+                                                        <th className="p-2.5 whitespace-nowrap">Weighted ESG</th>
+                                                        <th className="p-2.5 whitespace-nowrap text-right">ESG Rating</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                                                    {pagedScorecardRows.map((sup) => (
+                                                        <tr
+                                                            key={sup.supplierId}
+                                                            onClick={() => navigate("/owner/supply-chain/suppliers")}
+                                                            className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors cursor-pointer"
+                                                        >
+                                                            <td className="p-2.5 font-bold text-slate-900 dark:text-slate-100">{sup.name}</td>
+                                                            <td className="p-2.5 font-semibold text-slate-700 dark:text-slate-300">{sup.orders}</td>
+                                                            <td className="p-2.5 font-bold text-orange-500">{formatMoney(sup.totalSpend)}</td>
+                                                            <td className="p-2.5 font-semibold text-emerald-600">{formatMoney(sup.savings)}</td>
+                                                            <td className="p-2.5 text-slate-600 dark:text-slate-400">
+                                                                {sup.daysLate !== null ? sup.daysLate.toFixed(1) : "—"}
+                                                            </td>
+                                                            <td className="p-2.5 font-bold text-emerald-600">
+                                                                {sup.onTimeRate !== null ? formatPct(sup.onTimeRate) : "—"}
+                                                            </td>
+                                                            <td className="p-2.5 text-slate-400">—</td>
+                                                            <td className="p-2.5 text-right text-slate-400">Requires setup</td>
+                                                        </tr>
+                                                    ))}
+                                                    {pagedScorecardRows.length === 0 && (
+                                                        <tr>
+                                                            <td colSpan={8} className="p-8 text-center text-slate-500">
+                                                                No supplier orders match the current date range and filters.
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        {totalScorecardPages > 1 && (
+                                            <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+                                                <span>
+                                                    Page {scorecardPage} of {totalScorecardPages} ({sortedScorecardRows.length} suppliers)
+                                                </span>
+                                                <div className="flex items-center gap-1.5">
+                                                    <button
+                                                        type="button"
+                                                        disabled={scorecardPage <= 1}
+                                                        onClick={() => setScorecardPage((p) => Math.max(1, p - 1))}
+                                                        className="px-2 py-1 rounded border border-slate-200 dark:border-slate-700 disabled:opacity-40 cursor-pointer"
+                                                    >
+                                                        Prev
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        disabled={scorecardPage >= totalScorecardPages}
+                                                        onClick={() => setScorecardPage((p) => Math.min(totalScorecardPages, p + 1))}
+                                                        className="px-2 py-1 rounded border border-slate-200 dark:border-slate-700 disabled:opacity-40 cursor-pointer"
+                                                    >
+                                                        Next
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
 
-                    {salesTrendTimeseries.length === 0 || periodDataMetrics.grossSales === 0 ? (
-                        <div className="h-[210px] w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col items-center justify-center p-6 text-center text-slate-500 space-y-1">
-                            <BarChart3 size={32} className="text-slate-400" />
-                            <p className="font-bold text-sm text-slate-700 dark:text-slate-300">No supplier activity recorded for this period.</p>
-                            <p className="text-xs">Adjust filters or select another date range to view supplier analytics.</p>
-                        </div>
-                    ) : (
-                        <div className="h-[210px] w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={salesTrendTimeseries} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                                    <defs>
-                                        <linearGradient id="supRevGrad" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#ff5500" stopOpacity={0.35} />
-                                            <stop offset="95%" stopColor="#ff5500" stopOpacity={0.0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#64748b" }} stroke="transparent" />
-                                    <YAxis
-                                        tick={{ fontSize: 11, fill: "#64748b" }}
-                                        stroke="transparent"
-                                        tickFormatter={(v) => (chartMetric === "ordersCount" || chartMetric === "quotationsCount" ? v : `₹${v / 1000}k`)}
-                                    />
-                                    <Tooltip
-                                        formatter={(val) => [
-                                            chartMetric === "ordersCount" || chartMetric === "quotationsCount" ? `${val} count` : formatMoney(val),
-                                            chartMetric.toUpperCase(),
-                                        ]}
-                                        contentStyle={{
-                                            backgroundColor: "#0f172a",
-                                            borderColor: "#1e293b",
-                                            borderRadius: "8px",
-                                            color: "#fff",
-                                            fontSize: "12px",
-                                        }}
-                                    />
-                                    <Area type="monotone" dataKey={chartMetric} stroke="#ff5500" strokeWidth={2.5} fillOpacity={1} fill="url(#supRevGrad)" />
-                                </AreaChart>
-                            </ResponsiveContainer>
+                    {/* CONTROLS TAB (QUICK ACTIONS & WAREHOUSE STOCK HEALTH) */}
+                    {activeSectionTab === "controls" && (
+                        <div className="space-y-4">
+                            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <Warehouse size={16} className="text-orange-500" />
+                                        <h2 className="font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-slate-100">
+                                            Warehouse Stock Snapshot — {warehouseInventorySummary.label}
+                                        </h2>
+                                    </div>
+                                    <span className="text-[11px] text-slate-500">Filtered by Warehouse selector</span>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3">
+                                        <div className="text-[11px] font-bold uppercase text-slate-500">Tracked SKUs</div>
+                                        <div className="text-xl font-black text-slate-900 dark:text-slate-100">{warehouseInventorySummary.skuCount}</div>
+                                    </div>
+                                    <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3">
+                                        <div className="text-[11px] font-bold uppercase text-slate-500">Stock Valuation</div>
+                                        <div className="text-xl font-black text-slate-900 dark:text-slate-100">{formatMoney(warehouseInventorySummary.totalValue)}</div>
+                                    </div>
+                                    <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3">
+                                        <div className="text-[11px] font-bold uppercase text-slate-500">Low Stock Items</div>
+                                        <div className="text-xl font-black text-amber-600">{warehouseInventorySummary.lowStockCount}</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     )}
-                </div>
 
-                {/* RIGHT COLUMN: SUPPLIER PERFORMANCE SUMMARY */}
-                <div className="space-y-2.5">
-                    <span className="font-bold text-slate-900 dark:text-slate-100 text-xs uppercase tracking-wider block">
-                        SUPPLIER PERFORMANCE SUMMARY
-                    </span>
-
-                    <div className="divide-y divide-slate-200/80 dark:divide-slate-800 text-xs space-y-1">
-                        <div className="py-1.5 flex items-center justify-between">
-                            <span className="text-slate-500">Top Overall Supplier:</span>
-                            <strong className="text-slate-900 dark:text-slate-100 font-bold">FarmFresh Vegetables Co.</strong>
+                    {/* QUICK ACTIONS TOOLBAR */}
+                    <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                            <Sparkles size={16} className="text-orange-500" />
+                            <span className="font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-slate-100">
+                                Procurement & Inventory Actions
+                            </span>
                         </div>
-                        <div className="py-1.5 flex items-center justify-between">
-                            <span className="text-slate-500">Highest Revenue Supplier:</span>
-                            <strong className="text-orange-500 font-bold">Royal Spices & Condiments (₹86.4k)</strong>
-                        </div>
-                        <div className="py-1.5 flex items-center justify-between">
-                            <span className="text-slate-500">Best SLA Compliance:</span>
-                            <strong className="text-emerald-600 dark:text-emerald-400 font-bold">Golden Dairy Farms (98.4%)</strong>
-                        </div>
-                        <div className="py-1.5 flex items-center justify-between">
-                            <span className="text-slate-500">Most Orders Fulfilled:</span>
-                            <strong className="text-slate-900 dark:text-slate-100 font-bold">Supreme Packaging Ltd (28 Orders)</strong>
-                        </div>
-                        <div className="py-1.5 flex items-center justify-between">
-                            <span className="text-slate-500">Lowest Performing Supplier:</span>
-                            <strong className="text-amber-600 font-bold">Coastal Cold Storage (88.2% SLA)</strong>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* SECTION 4: SUPPLIER PERFORMANCE TABLE */}
-            <div className="space-y-2 pb-4 border-b border-slate-200/80 dark:border-slate-800">
-                <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-slate-100">
-                        SUPPLIER PERFORMANCE
-                    </span>
-                    <button
-                        type="button"
-                        onClick={() => navigate("/owner/supply-chain/suppliers")}
-                        className="text-xs font-bold text-orange-500 hover:underline cursor-pointer"
-                    >
-                        View Full Directory ({suppliers.length || 6}) →
-                    </button>
-                </div>
-
-                <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-                    <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wider">
-                            <tr>
-                                <th className="p-2.5">Supplier</th>
-                                <th className="p-2.5">Orders</th>
-                                <th className="p-2.5">Revenue</th>
-                                <th className="p-2.5">Avg Order Value</th>
-                                <th className="p-2.5">Fulfillment %</th>
-                                <th className="p-2.5">On-Time %</th>
-                                <th className="p-2.5">Delayed</th>
-                                <th className="p-2.5 text-right">Overall Score</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                            {[
-                                { name: "FarmFresh Vegetables Co.", orders: 42, revenue: 86400, aov: 2057, fulfillment: "98.5%", onTime: "97.2%", delayed: 1, score: "97.8%" },
-                                { name: "Royal Spices & Condiments", orders: 36, revenue: 72100, aov: 2002, fulfillment: "97.0%", onTime: "96.4%", delayed: 1, score: "96.7%" },
-                                { name: "Golden Dairy Farms", orders: 28, revenue: 54300, aov: 1939, fulfillment: "99.0%", onTime: "98.4%", delayed: 0, score: "98.7%" },
-                                { name: "Supreme Packaging Ltd", orders: 24, revenue: 38200, aov: 1591, fulfillment: "96.5%", onTime: "95.0%", delayed: 2, score: "95.8%" },
-                                { name: "Coastal Cold Storage", orders: 18, revenue: 29500, aov: 1638, fulfillment: "92.0%", onTime: "88.2%", delayed: 3, score: "90.1%" },
-                            ].map((sup, idx) => (
-                                <tr
-                                    key={idx}
-                                    onClick={() => navigate("/owner/supply-chain/suppliers")}
-                                    className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors cursor-pointer"
-                                >
-                                    <td className="p-2.5 font-bold text-slate-900 dark:text-slate-100">{sup.name}</td>
-                                    <td className="p-2.5 font-semibold text-slate-700 dark:text-slate-300">{sup.orders}</td>
-                                    <td className="p-2.5 font-bold text-orange-500">{formatMoney(sup.revenue)}</td>
-                                    <td className="p-2.5 font-semibold text-slate-700 dark:text-slate-300">{formatMoney(sup.aov)}</td>
-                                    <td className="p-2.5 text-emerald-600 font-bold">{sup.fulfillment}</td>
-                                    <td className="p-2.5 text-emerald-600 font-bold">{sup.onTime}</td>
-                                    <td className="p-2.5 text-amber-600 font-semibold">{sup.delayed}</td>
-                                    <td className="p-2.5 text-right font-black text-slate-900 dark:text-slate-100">{sup.score}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {/* SECTION 5: TOP PRODUCTS & CATEGORY PERFORMANCE */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-4 border-b border-slate-200/80 dark:border-slate-800">
-                {/* LEFT: TOP PRODUCTS */}
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-900 dark:text-slate-100 text-xs uppercase tracking-wider">
-                            TOP PRODUCTS
-                        </span>
-                        <button
-                            type="button"
-                            onClick={() => navigate("/owner/supply-chain/marketplace")}
-                            className="text-xs font-bold text-orange-500 hover:underline cursor-pointer"
-                        >
-                            View Marketplace →
-                        </button>
-                    </div>
-
-                    <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-                        <table className="w-full text-left text-xs">
-                            <thead className="bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wider">
-                                <tr>
-                                    <th className="p-2.5">Product</th>
-                                    <th className="p-2.5">Quantity</th>
-                                    <th className="p-2.5">Orders</th>
-                                    <th className="p-2.5 text-right">Revenue</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                                {topSellingProducts.map((p, idx) => (
-                                    <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                                        <td className="p-2.5 font-bold text-slate-900 dark:text-slate-100">{p.name}</td>
-                                        <td className="p-2.5 text-slate-600 dark:text-slate-400 font-semibold">{p.qtySold} units</td>
-                                        <td className="p-2.5 text-slate-600 dark:text-slate-400">{p.orders}</td>
-                                        <td className="p-2.5 text-right font-bold text-emerald-600">{formatMoney(p.revenue)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                {/* RIGHT: CATEGORY PERFORMANCE */}
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-900 dark:text-slate-100 text-xs uppercase tracking-wider">
-                            CATEGORY PERFORMANCE
-                        </span>
-                    </div>
-
-                    <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-                        <table className="w-full text-left text-xs">
-                            <thead className="bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wider">
-                                <tr>
-                                    <th className="p-2.5">Category</th>
-                                    <th className="p-2.5">Orders</th>
-                                    <th className="p-2.5">Revenue</th>
-                                    <th className="p-2.5 text-right">Revenue %</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                                {[
-                                    { category: "Fresh Produce & Vegetables", orders: 48, revenue: 86400, pct: "34.2%" },
-                                    { category: "Spices & Condiments", orders: 36, revenue: 64200, pct: "25.4%" },
-                                    { category: "Dairy & Frozen Products", orders: 28, revenue: 52100, pct: "20.6%" },
-                                    { category: "Oils & Ghee", orders: 18, revenue: 32400, pct: "12.8%" },
-                                    { category: "Packaging & Supplies", orders: 14, revenue: 17500, pct: "7.0%" },
-                                ].map((cat, idx) => (
-                                    <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                                        <td className="p-2.5 font-bold text-slate-900 dark:text-slate-100">{cat.category}</td>
-                                        <td className="p-2.5 text-slate-600 dark:text-slate-400 font-semibold">{cat.orders}</td>
-                                        <td className="p-2.5 font-bold text-slate-900 dark:text-slate-100">{formatMoney(cat.revenue)}</td>
-                                        <td className="p-2.5 text-right font-bold text-orange-500">{cat.pct}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            {/* SECTION 6: BUYER / RESTAURANT PERFORMANCE */}
-            <div className="space-y-2 pb-4 border-b border-slate-200/80 dark:border-slate-800">
-                <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-slate-100">
-                        BUYER / RESTAURANT PERFORMANCE
-                    </span>
-                </div>
-
-                <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-                    <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wider">
-                            <tr>
-                                <th className="p-2.5">Buyer / Restaurant</th>
-                                <th className="p-2.5">Orders</th>
-                                <th className="p-2.5">Total Spend</th>
-                                <th className="p-2.5">AOV</th>
-                                <th className="p-2.5">Last Order</th>
-                                <th className="p-2.5 text-right">Repeat Rate</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                            {topRestaurantCustomers.map((c, idx) => (
-                                <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                                    <td className="p-2.5 font-bold text-slate-900 dark:text-slate-100">{c.name}</td>
-                                    <td className="p-2.5 text-slate-600 dark:text-slate-400 font-semibold">{c.orders} orders</td>
-                                    <td className="p-2.5 font-bold text-orange-500">{formatMoney(c.sales)}</td>
-                                    <td className="p-2.5 font-semibold text-slate-700 dark:text-slate-300">{formatMoney(c.avgOrder)}</td>
-                                    <td className="p-2.5 text-slate-500">Oct 6, 2026</td>
-                                    <td className="p-2.5 text-right font-bold text-emerald-600">100% (Repeat)</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {/* SECTION 7: FULFILLMENT & DELIVERY INTELLIGENCE (KITCHEN-FLOW STYLE) */}
-            <div className="pb-4 border-b border-slate-200/80 dark:border-slate-800 space-y-3">
-                <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                        <Truck size={14} className="text-orange-500" />
-                        FULFILLMENT & DELIVERY INTELLIGENCE
-                    </span>
-                    <span className="text-xs text-slate-500 font-semibold">Stage Flow</span>
-                </div>
-
-                {/* STAGE FLOW PIPELINE */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-center">
-                        <span className="text-[10px] font-bold uppercase text-slate-500 block">1. PLACED</span>
-                        <strong className="text-xl font-black text-amber-500">5 orders</strong>
-                    </div>
-                    <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-center">
-                        <span className="text-[10px] font-bold uppercase text-slate-500 block">2. DISPATCHED</span>
-                        <strong className="text-xl font-black text-cyan-500">3 orders</strong>
-                    </div>
-                    <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-center">
-                        <span className="text-[10px] font-bold uppercase text-slate-500 block">3. RECEIVED</span>
-                        <strong className="text-xl font-black text-blue-500">4 orders</strong>
-                    </div>
-                    <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-center">
-                        <span className="text-[10px] font-bold uppercase text-slate-500 block">4. COMPLETED</span>
-                        <strong className="text-xl font-black text-emerald-600">18 orders</strong>
-                    </div>
-                </div>
-
-                {/* STATUS BLOCKS BELOW */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1 text-xs">
-                    <div className="p-2.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold flex items-center justify-between">
-                        <span>On Time Delivery:</span>
-                        <strong className="font-extrabold text-sm">98.2%</strong>
-                    </div>
-                    <div className="p-2.5 rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400 font-semibold flex items-center justify-between">
-                        <span>Delayed Orders:</span>
-                        <strong className="font-extrabold text-sm">1.1%</strong>
-                    </div>
-                    <div className="p-2.5 rounded-lg border border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-400 font-semibold flex items-center justify-between">
-                        <span>Partially Fulfilled:</span>
-                        <strong className="font-extrabold text-sm">0.5%</strong>
-                    </div>
-                    <div className="p-2.5 rounded-lg border border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-400 font-semibold flex items-center justify-between">
-                        <span>Cancelled Orders:</span>
-                        <strong className="font-extrabold text-sm">0.2%</strong>
-                    </div>
-                </div>
-            </div>
-
-            {/* SECTION 8: SUPPLIER HEALTH METRICS */}
-            <div className="pb-4 space-y-2">
-                <span className="font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-slate-100 block">
-                    SUPPLIER HEALTH
-                </span>
-
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
-                    <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-1">
-                        <span className="text-[11px] text-slate-500 font-bold uppercase block">Supplier Reliability</span>
-                        <strong className="text-emerald-600 dark:text-emerald-400 text-sm font-black">97.4%</strong>
-                        <div className="h-1 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: "97.4%" }} />
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => navigate("/owner/supply-chain/marketplace")}
+                                className="px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-xs cursor-pointer"
+                            >
+                                + B2B Marketplace
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => navigate("/owner/supply-chain/negotiations")}
+                                className="px-3 py-1.5 rounded-lg border border-indigo-500/40 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-xs font-bold hover:bg-indigo-500/20 cursor-pointer"
+                            >
+                                + Price Quotes
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setShowPOModal(true)}
+                                disabled={!restaurantId}
+                                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 cursor-pointer"
+                            >
+                                + Issue PO
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setShowReceiveModal(true)}
+                                disabled={!restaurantId}
+                                className="px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 disabled:opacity-50 cursor-pointer"
+                            >
+                                + Receive Stock (GRN)
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => navigate("/owner/supply-chain/payments")}
+                                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                            >
+                                + Settlement Payouts
+                            </button>
                         </div>
                     </div>
-
-                    <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-1">
-                        <span className="text-[11px] text-slate-500 font-bold uppercase block">SLA Compliance</span>
-                        <strong className="text-emerald-600 dark:text-emerald-400 text-sm font-black">96.8%</strong>
-                        <div className="h-1 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: "96.8%" }} />
-                        </div>
-                    </div>
-
-                    <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-1">
-                        <span className="text-[11px] text-slate-500 font-bold uppercase block">Delivery Performance</span>
-                        <strong className="text-emerald-600 dark:text-emerald-400 text-sm font-black">98.2%</strong>
-                        <div className="h-1 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: "98.2%" }} />
-                        </div>
-                    </div>
-
-                    <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-1">
-                        <span className="text-[11px] text-slate-500 font-bold uppercase block">Order Completion</span>
-                        <strong className="text-emerald-600 dark:text-emerald-400 text-sm font-black">99.1%</strong>
-                        <div className="h-1 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: "99.1%" }} />
-                        </div>
-                    </div>
-
-                    <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-1">
-                        <span className="text-[11px] text-slate-500 font-bold uppercase block">Delayed Orders</span>
-                        <strong className="text-amber-600 text-sm font-black">1.1%</strong>
-                        <div className="h-1 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-amber-500 rounded-full" style={{ width: "11%" }} />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* SECTION 9: QUICK ACTIONS TOOLBAR */}
-            <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                    <Sparkles size={16} className="text-orange-500" />
-                    <span className="font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-slate-100">
-                        Supply Chain Sales & Operational Actions
-                    </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={() => navigate("/owner/supply-chain/marketplace")}
-                        className="px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-xs cursor-pointer"
-                    >
-                        + B2B Marketplace
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => navigate("/owner/supply-chain/negotiations")}
-                        className="px-3 py-1.5 rounded-lg border border-indigo-500/40 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-xs font-bold hover:bg-indigo-500/20 cursor-pointer"
-                    >
-                        + Price Quotes
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setShowPOModal(true)}
-                        className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                    >
-                        + Issue PO
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setShowReceiveModal(true)}
-                        className="px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 cursor-pointer"
-                    >
-                        + Receive Stock (GRN)
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => navigate("/owner/supply-chain/payments")}
-                        className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                    >
-                        + Settlement Payouts
-                    </button>
-                </div>
-            </div>
-
-            {/* QUICK ACTION MODALS */}
+                </>
+            )}
 
             {/* 1. CREATE PO MODAL */}
             {showPOModal && (
@@ -1257,7 +1606,7 @@ export default function OwnerSupplyChainIntelligence() {
                                 <label className="font-bold uppercase text-slate-500">Supplier Name</label>
                                 <input
                                     type="text"
-                                    placeholder="FarmFresh Vegetables Co."
+                                    placeholder="Supplier name"
                                     value={poForm.supplier}
                                     onChange={(e) => setPoForm({ ...poForm, supplier: e.target.value })}
                                     className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-xs mt-1 outline-none text-slate-900 dark:text-slate-100"
