@@ -423,7 +423,7 @@ app.addHook("onRequest", async (req) => {
 
 app.addHook("onRoute", (routeOptions) => {
   const url = String(routeOptions?.url || "");
-  if (!url.startsWith("/owner/") && !url.startsWith("/api/owner/")) return;
+  if (!url.startsWith("/owner/") && !url.startsWith("/api/owner/") && !url.startsWith("/api/v1/owner/")) return;
   const existing = routeOptions.preHandler ? (Array.isArray(routeOptions.preHandler) ? routeOptions.preHandler : [routeOptions.preHandler]) : [];
   routeOptions.preHandler = [...existing, requireOwnerRouteAuth];
 });

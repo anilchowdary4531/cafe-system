@@ -21,6 +21,8 @@ test("Tiffzy Supply Chain Application — Full End-to-End System Audit", async (
     let orderId = null;
 
     let testRestaurantId = null;
+    let ownerUserId = null;
+    let ownerToken = null;
 
     t.before(async () => {
         const suffix = `${Date.now()}_${Math.floor(Math.random() * 100000)}`;
@@ -31,6 +33,27 @@ test("Tiffzy Supply Chain Application — Full End-to-End System Audit", async (
             },
         });
         testRestaurantId = newRest.id;
+
+        const ownerUser = await prisma.user.create({
+            data: {
+                name: "Audit Test Owner",
+                email: `audit_owner_${suffix}@tiffzytest.com`,
+                password: "AuditOwnerPass123!",
+                role: "OWNER",
+                restaurantId: testRestaurantId,
+                isActive: true,
+                sessionVersion: 1,
+                mustChangePassword: false,
+            },
+        });
+        ownerUserId = ownerUser.id;
+        ownerToken = app.jwt.sign({
+            id: ownerUser.id,
+            userId: ownerUser.id,
+            role: "OWNER",
+            restaurantId: testRestaurantId,
+            sessionVersion: ownerUser.sessionVersion,
+        });
     });
 
     t.after(async () => {
@@ -50,6 +73,9 @@ test("Tiffzy Supply Chain Application — Full End-to-End System Audit", async (
             await prisma.supplierProfile.deleteMany({ where: { supplierId } }).catch(() => {});
             await prisma.supplierAddress.deleteMany({ where: { supplierId } }).catch(() => {});
             await prisma.supplier.delete({ where: { id: supplierId } }).catch(() => {});
+        }
+        if (ownerUserId) {
+            await prisma.user.delete({ where: { id: ownerUserId } }).catch(() => {});
         }
         if (testRestaurantId) {
             await prisma.restaurant.delete({ where: { id: testRestaurantId } }).catch(() => {});
@@ -165,7 +191,7 @@ test("Tiffzy Supply Chain Application — Full End-to-End System Audit", async (
         const cartRes = await app.inject({
             method: "POST",
             url: "/supply-cart/items",
-            headers: { authorization: `Bearer ${supplierToken}` },
+            headers: { authorization: `Bearer ${ownerToken}` },
             payload: {
                 productId,
                 quantity: 10,
@@ -183,7 +209,7 @@ test("Tiffzy Supply Chain Application — Full End-to-End System Audit", async (
         const orderRes = await app.inject({
             method: "POST",
             url: "/supply-orders",
-            headers: { authorization: `Bearer ${supplierToken}` },
+            headers: { authorization: `Bearer ${ownerToken}` },
             payload: {
                 restaurantId: testRestaurantId,
                 deliveryAddress: "Restaurant Central Kitchen",

@@ -10,18 +10,18 @@ import prisma from "../prisma.js";
 import { upsertRecipe } from "../services/recipeService.js";
 import { recordWastage } from "../services/inventoryService.js";
 import { createAndDispatchNotification } from "../services/notificationService.js";
+import {
+    requireSupplyActor,
+    requireMarketplaceBrowseActor,
+} from "../middleware/supplyAuth.js";
 
 export default async function supplyMarketplaceRoutes(app) {
-    const authUser = authorizeRoles("OWNER", "MANAGER", "SUPER_ADMIN", "SUPPLIER", "ADMIN", "STAFF", "USER", "CUSTOMER");
-    const authSupplier = authorizeRoles("SUPPLIER", "SUPER_ADMIN", "OWNER", "MANAGER", "ADMIN", "STAFF", "USER");
+    const authUser = requireSupplyActor({ requiredModules: ["supply"] });
+    const authSupplier = authorizeRoles("SUPPLIER", "SUPER_ADMIN");
 
     const getRestaurantId = (req) => {
-        const fromParams = req.params?.restaurantId ? Number(req.params.restaurantId) : null;
-        const fromQuery = req.query?.restaurantId ? Number(req.query.restaurantId) : null;
-        const fromBody = req.body?.restaurantId ? Number(req.body.restaurantId) : null;
-        const fromUser = req.user?.restaurantId ? Number(req.user.restaurantId) : null;
-        const fromStaff = req.staffActor?.restaurantId ? Number(req.staffActor.restaurantId) : null;
-        return fromParams || fromQuery || fromBody || fromUser || fromStaff || 1;
+        if (req.supplyRestaurantId) return Number(req.supplyRestaurantId);
+        throw Object.assign(new Error("Authenticated restaurant scope required"), { statusCode: 403 });
     };
 
     const browseProductsHandler = async (req, reply) => {
@@ -35,7 +35,7 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const getCartHandler = async (req, reply) => {
         try {
-            const restaurantId = req.user?.restaurantId || req.query?.restaurantId || 1;
+            const restaurantId = getRestaurantId(req);
             const cart = await getSupplyCart(restaurantId);
             return reply.code(200).send(cart);
         } catch (err) {
@@ -45,7 +45,7 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const updateCartItemHandler = async (req, reply) => {
         try {
-            const restaurantId = req.user?.restaurantId || req.body?.restaurantId || 1;
+            const restaurantId = getRestaurantId(req);
             const targetId = req.params?.id || req.body?.productId || req.body?.id;
             const quantity = req.body?.quantity !== undefined ? req.body.quantity : 1;
             const cart = await updateSupplyCartItem(restaurantId, targetId, quantity);
@@ -57,7 +57,7 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const removeCartItemHandler = async (req, reply) => {
         try {
-            const restaurantId = req.user?.restaurantId || req.body?.restaurantId || req.query?.restaurantId || 1;
+            const restaurantId = getRestaurantId(req);
             const targetId = req.params?.id || req.body?.productId || req.body?.id;
             const cart = await updateSupplyCartItem(restaurantId, targetId, 0);
             return reply.code(200).send(cart);
@@ -68,7 +68,7 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const placeOrderHandler = async (req, reply) => {
         try {
-            const restaurantId = req.user?.restaurantId || req.body?.restaurantId || 1;
+            const restaurantId = getRestaurantId(req);
             const result = await placeSupplyOrder(restaurantId, req.body || {});
             return reply.code(201).send(result);
         } catch (err) {
@@ -78,7 +78,7 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const listRestaurantOrdersHandler = async (req, reply) => {
         try {
-            const restaurantId = req.user?.restaurantId || req.query?.restaurantId || 1;
+            const restaurantId = getRestaurantId(req);
             const orders = await prisma.supplyOrder.findMany({
                 where: { restaurantId: Number(restaurantId) },
                 include: {
@@ -97,18 +97,27 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const listSuppliersForOwnerHandler = async (req, reply) => {
         try {
+            const restaurantId = getRestaurantId(req);
             const suppliers = await prisma.supplier.findMany({
                 include: {
                     profile: true,
                     addresses: true,
                     products: { where: { availability: true } },
-                    orders: { include: { items: true } },
-                    _count: { select: { products: true, orders: true } },
+                    orders: { where: { restaurantId: Number(restaurantId) }, include: { items: true } },
+                    _count: { select: { products: true } },
                 },
                 orderBy: { createdAt: "desc" },
             });
 
-            return reply.code(200).send({ suppliers });
+            return reply.code(200).send({
+                suppliers: suppliers.map((s) => ({
+                    ...s,
+                    _count: {
+                        products: s._count?.products ?? (s.products?.length || 0),
+                        orders: Array.isArray(s.orders) ? s.orders.length : 0,
+                    },
+                })),
+            });
         } catch (err) {
             return reply.code(500).send({ error: "Failed to fetch suppliers" });
         }
@@ -147,7 +156,7 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const listPurchaseRequestsHandler = async (req, reply) => {
         try {
-            const restaurantId = req.user?.restaurantId || req.query?.restaurantId || 1;
+            const restaurantId = getRestaurantId(req);
             const requests = await prisma.purchaseRequest.findMany({
                 where: { restaurantId: Number(restaurantId) },
                 include: {
@@ -176,7 +185,7 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const createPurchaseRequestHandler = async (req, reply) => {
         try {
-            const restaurantId = req.user?.restaurantId || req.body?.restaurantId || 1;
+            const restaurantId = getRestaurantId(req);
             const requestedById = req.user?.id || req.body?.requestedById || null;
 
             const count = await prisma.purchaseRequest.count({ where: { restaurantId: Number(restaurantId) } });
@@ -232,14 +241,18 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const updatePurchaseRequestStatusHandler = async (req, reply) => {
         try {
+            const restaurantId = getRestaurantId(req);
             const requestId = Number(req.params.id);
             const { status, rejectionReason, notes } = req.body || {};
-            const userRole = String(req.user?.role || "OWNER").toUpperCase();
-            const userId = req.user?.id || null;
+            const userRole = String(req.staffActor?.role || req.user?.role || "").toUpperCase();
+            const userId = req.staffActor?.userId || req.user?.id || null;
 
             const existing = await prisma.purchaseRequest.findUnique({ where: { id: requestId } });
             if (!existing) {
                 return reply.code(404).send({ error: "Purchase request not found" });
+            }
+            if (Number(existing.restaurantId) !== Number(restaurantId)) {
+                return reply.code(403).send({ error: "Forbidden", message: "Restaurant access denied" });
             }
 
             const targetStatus = String(status).toUpperCase();
@@ -282,8 +295,9 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const convertPurchaseRequestToPOHandler = async (req, reply) => {
         try {
+            const restaurantId = getRestaurantId(req);
             const requestId = Number(req.params.id);
-            const userRole = String(req.user?.role || "OWNER").toUpperCase();
+            const userRole = String(req.staffActor?.role || req.user?.role || "").toUpperCase();
 
             const isAuthorized = ["OWNER", "MANAGER", "SUPER_ADMIN", "ADMIN"].includes(userRole);
             if (!isAuthorized) {
@@ -293,6 +307,9 @@ export default async function supplyMarketplaceRoutes(app) {
             const pr = await prisma.purchaseRequest.findUnique({ where: { id: requestId } });
             if (!pr) {
                 return reply.code(404).send({ error: "Purchase request not found" });
+            }
+            if (Number(pr.restaurantId) !== Number(restaurantId)) {
+                return reply.code(403).send({ error: "Forbidden", message: "Restaurant access denied" });
             }
 
             let createdOrder = null;
@@ -353,7 +370,7 @@ export default async function supplyMarketplaceRoutes(app) {
     // PURCHASE ORDER MANAGEMENT HANDLERS
     const listPurchaseOrdersHandler = async (req, reply) => {
         try {
-            const restaurantId = req.user?.restaurantId || req.query?.restaurantId || 1;
+            const restaurantId = getRestaurantId(req);
             const orders = await prisma.supplyOrder.findMany({
                 where: { restaurantId: Number(restaurantId) },
                 include: {
@@ -386,7 +403,7 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const createPurchaseOrderHandler = async (req, reply) => {
         try {
-            const restaurantId = req.user?.restaurantId || req.body?.restaurantId || 1;
+            const restaurantId = getRestaurantId(req);
             const { supplierId, deliveryAddress, expectedDeliveryDate, items = [], notes, status = "DRAFT" } = req.body || {};
 
             if (!supplierId || !items.length) {
@@ -473,12 +490,16 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const updatePOStatusHandler = async (req, reply) => {
         try {
+            const restaurantId = getRestaurantId(req);
             const orderId = Number(req.params.id);
             const { status, notes } = req.body || {};
 
             const existing = await prisma.supplyOrder.findUnique({ where: { id: orderId } });
             if (!existing) {
                 return reply.code(404).send({ error: "Purchase Order not found" });
+            }
+            if (Number(existing.restaurantId) !== Number(restaurantId)) {
+                return reply.code(403).send({ error: "Forbidden", message: "Restaurant access denied" });
             }
 
             const targetStatus = String(status).toUpperCase();
@@ -511,6 +532,7 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const receivePOItemsHandler = async (req, reply) => {
         try {
+            const restaurantId = getRestaurantId(req);
             const orderId = Number(req.params.id);
             const { receivingStatus = "FULLY_RECEIVED", notes } = req.body || {};
 
@@ -520,6 +542,9 @@ export default async function supplyMarketplaceRoutes(app) {
             });
             if (!existing) {
                 return reply.code(404).send({ error: "Purchase Order not found" });
+            }
+            if (Number(existing.restaurantId) !== Number(restaurantId)) {
+                return reply.code(403).send({ error: "Forbidden", message: "Restaurant access denied" });
             }
 
             const targetReceivingStatus = String(receivingStatus).toUpperCase();
@@ -581,7 +606,7 @@ export default async function supplyMarketplaceRoutes(app) {
     // GOODS RECEIPT NOTE (GRN) HANDLERS
     const listGoodsReceiptsHandler = async (req, reply) => {
         try {
-            const restaurantId = req.user?.restaurantId || req.query?.restaurantId || 1;
+            const restaurantId = getRestaurantId(req);
             const grns = await prisma.goodsReceiptNote.findMany({
                 where: { restaurantId: Number(restaurantId) },
                 include: {
@@ -611,7 +636,7 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const createGoodsReceiptHandler = async (req, reply) => {
         try {
-            const restaurantId = req.user?.restaurantId || req.body?.restaurantId || 1;
+            const restaurantId = getRestaurantId(req);
             const receivedById = req.user?.id || req.body?.receivedById || null;
 
             const {
@@ -806,7 +831,7 @@ export default async function supplyMarketplaceRoutes(app) {
     // PURCHASE RETURNS HANDLERS
     const listPurchaseReturnsHandler = async (req, reply) => {
         try {
-            const restaurantId = req.user?.restaurantId || req.query?.restaurantId || 1;
+            const restaurantId = getRestaurantId(req);
             const returns = await prisma.purchaseReturn.findMany({
                 where: { restaurantId: Number(restaurantId) },
                 include: {
@@ -840,7 +865,7 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const createPurchaseReturnHandler = async (req, reply) => {
         try {
-            const restaurantId = req.user?.restaurantId || req.body?.restaurantId || 1;
+            const restaurantId = getRestaurantId(req);
             const createdById = req.user?.id || req.body?.createdById || null;
 
             const {
@@ -934,6 +959,7 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const updatePurchaseReturnStatusHandler = async (req, reply) => {
         try {
+            const restaurantId = getRestaurantId(req);
             const returnId = Number(req.params.id);
             const { status, notes } = req.body || {};
 
@@ -943,6 +969,9 @@ export default async function supplyMarketplaceRoutes(app) {
             });
             if (!existing) {
                 return reply.code(404).send({ error: "Purchase Return record not found" });
+            }
+            if (Number(existing.restaurantId) !== Number(restaurantId)) {
+                return reply.code(403).send({ error: "Forbidden", message: "Restaurant access denied" });
             }
 
             const targetStatus = String(status).toUpperCase();
@@ -1199,6 +1228,9 @@ export default async function supplyMarketplaceRoutes(app) {
 
             if (!existingInv) {
                 return reply.code(404).send({ error: "Purchase Invoice not found" });
+            }
+            if (Number(existingInv.restaurantId) !== Number(restaurantId)) {
+                return reply.code(403).send({ error: "Forbidden", message: "Restaurant access denied" });
             }
 
             const payAmount = Number(amount || 0);
@@ -1461,8 +1493,17 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const updateStorageLocationHandler = async (req, reply) => {
         try {
+            const restaurantId = getRestaurantId(req);
             const locId = Number(req.params.id);
             const { name, type, description, temperature, capacityValue, managerId } = req.body || {};
+
+            const existingLoc = await prisma.storageLocation.findUnique({ where: { id: locId } });
+            if (!existingLoc) {
+                return reply.code(404).send({ error: "Storage location not found" });
+            }
+            if (Number(existingLoc.restaurantId) !== Number(restaurantId)) {
+                return reply.code(403).send({ error: "Forbidden", message: "Restaurant access denied" });
+            }
 
             const updatedLoc = await prisma.storageLocation.update({
                 where: { id: locId },
@@ -1636,6 +1677,9 @@ export default async function supplyMarketplaceRoutes(app) {
 
             if (!transfer) {
                 return reply.code(404).send({ error: "Stock transfer record not found" });
+            }
+            if (Number(transfer.restaurantId) !== Number(restaurantId)) {
+                return reply.code(403).send({ error: "Forbidden", message: "Restaurant access denied" });
             }
 
             const newStatus = String(status || transfer.status).toUpperCase();
@@ -1946,6 +1990,7 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const updatePhysicalStockCountItemsHandler = async (req, reply) => {
         try {
+            const restaurantId = getRestaurantId(req);
             const countId = Number(req.params.id);
             const { items = [], status = "REVIEW", notes } = req.body || {};
 
@@ -1956,6 +2001,9 @@ export default async function supplyMarketplaceRoutes(app) {
 
             if (!count) {
                 return reply.code(404).send({ error: "Stock count session not found" });
+            }
+            if (Number(count.restaurantId) !== Number(restaurantId)) {
+                return reply.code(403).send({ error: "Forbidden", message: "Restaurant access denied" });
             }
 
             for (const itemInput of items) {
@@ -2033,6 +2081,9 @@ export default async function supplyMarketplaceRoutes(app) {
 
             if (!count) {
                 return reply.code(404).send({ error: "Physical stock count session not found" });
+            }
+            if (Number(count.restaurantId) !== Number(restaurantId)) {
+                return reply.code(403).send({ error: "Forbidden", message: "Restaurant access denied" });
             }
 
             const targetStatus = String(status).toUpperCase();
@@ -2117,7 +2168,7 @@ export default async function supplyMarketplaceRoutes(app) {
     // RECIPES & INGREDIENT MAPPING HANDLERS
     const listRecipesHandler = async (req, reply) => {
         try {
-            const restaurantId = req.user?.restaurantId || req.query?.restaurantId || 1;
+            const restaurantId = getRestaurantId(req);
             const menuItems = await prisma.menuItem.findMany({
                 where: { restaurantId: Number(restaurantId) },
                 include: {
@@ -2223,7 +2274,7 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const saveRecipeHandler = async (req, reply) => {
         try {
-            const restaurantId = req.user?.restaurantId || req.body?.restaurantId || 1;
+            const restaurantId = getRestaurantId(req);
             const { menuItemId, items, name } = req.body;
 
             if (!menuItemId) {
@@ -2248,7 +2299,7 @@ export default async function supplyMarketplaceRoutes(app) {
     // INGREDIENT CONSUMPTION INTELLIGENCE HANDLER
     const listIngredientConsumptionHandler = async (req, reply) => {
         try {
-            const restaurantId = req.user?.restaurantId || req.query?.restaurantId || 1;
+            const restaurantId = getRestaurantId(req);
             const { period = "THIS_WEEK", startDate, endDate } = req.query || {};
 
             const now = new Date();
@@ -2386,7 +2437,7 @@ export default async function supplyMarketplaceRoutes(app) {
     // WASTAGE MANAGEMENT HANDLERS
     const listWastageLogsHandler = async (req, reply) => {
         try {
-            const restaurantId = req.user?.restaurantId || req.query?.restaurantId || 1;
+            const restaurantId = getRestaurantId(req);
             
             const rawMaterials = await prisma.rawMaterial.findMany({
                 where: { restaurantId: Number(restaurantId), isActive: true },
@@ -2524,7 +2575,7 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const createWastageLogHandler = async (req, reply) => {
         try {
-            const restaurantId = req.user?.restaurantId || req.body?.restaurantId || 1;
+            const restaurantId = getRestaurantId(req);
             const { rawMaterialId, quantity, unit, category = "Preparation Waste", locationId, notes } = req.body;
 
             if (!rawMaterialId || !quantity || Number(quantity) <= 0) {
@@ -2567,7 +2618,7 @@ export default async function supplyMarketplaceRoutes(app) {
     // B2B PRICE NEGOTIATION HANDLERS
     const listNegotiationsHandler = async (req, reply) => {
         try {
-            const restaurantId = req.user?.restaurantId || req.query?.restaurantId || 1;
+            const restaurantId = getRestaurantId(req);
             const negotiations = await prisma.supplierNegotiation.findMany({
                 where: { restaurantId: Number(restaurantId) },
                 include: {
@@ -2598,7 +2649,7 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const createNegotiationHandler = async (req, reply) => {
         try {
-            const restaurantId = req.user?.restaurantId || req.body?.restaurantId || 1;
+            const restaurantId = getRestaurantId(req);
             const { supplierId, productId, productName, quantity, unit, catalogPrice, targetPrice, notes } = req.body;
 
             if (!supplierId || !quantity || !targetPrice) {
@@ -2648,6 +2699,7 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const addNegotiationMessageHandler = async (req, reply) => {
         try {
+            const restaurantId = getRestaurantId(req);
             const negotiationId = Number(req.params.id);
             const { message, proposedPrice, action } = req.body || {};
 
@@ -2656,6 +2708,9 @@ export default async function supplyMarketplaceRoutes(app) {
             });
             if (!existing) {
                 return reply.code(404).send({ error: "Negotiation not found" });
+            }
+            if (Number(existing.restaurantId) !== Number(restaurantId)) {
+                return reply.code(403).send({ error: "Forbidden", message: "Restaurant access denied" });
             }
 
             let newStatus = existing.status;
@@ -2708,6 +2763,7 @@ export default async function supplyMarketplaceRoutes(app) {
 
     const generatePOFromNegotiationHandler = async (req, reply) => {
         try {
+            const restaurantId = getRestaurantId(req);
             const negotiationId = Number(req.params.id);
             const negotiation = await prisma.supplierNegotiation.findUnique({
                 where: { id: negotiationId },
@@ -2716,6 +2772,9 @@ export default async function supplyMarketplaceRoutes(app) {
 
             if (!negotiation) {
                 return reply.code(404).send({ error: "Negotiation not found" });
+            }
+            if (Number(negotiation.restaurantId) !== Number(restaurantId)) {
+                return reply.code(403).send({ error: "Forbidden", message: "Restaurant access denied" });
             }
 
             const finalPrice = negotiation.finalPrice || negotiation.currentOffer;
@@ -3181,9 +3240,9 @@ export default async function supplyMarketplaceRoutes(app) {
         }
     };
 
-    app.get("/marketplace/products", { preHandler: [authUser] }, browseProductsHandler);
-    app.get("/api/marketplace/products", { preHandler: [authUser] }, browseProductsHandler);
-    app.get("/api/v1/marketplace/products", { preHandler: [authUser] }, browseProductsHandler);
+    app.get("/marketplace/products", { preHandler: [requireMarketplaceBrowseActor] }, browseProductsHandler);
+    app.get("/api/marketplace/products", { preHandler: [requireMarketplaceBrowseActor] }, browseProductsHandler);
+    app.get("/api/v1/marketplace/products", { preHandler: [requireMarketplaceBrowseActor] }, browseProductsHandler);
 
     app.get("/supply-cart", { preHandler: [authUser] }, getCartHandler);
     app.get("/api/supply-cart", { preHandler: [authUser] }, getCartHandler);

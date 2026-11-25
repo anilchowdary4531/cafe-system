@@ -96,25 +96,73 @@ function seedInitialThreads(supplierId = 1) {
 }
 
 export async function getSupplierChatThreads(supplierId) {
-    const sId = Number(supplierId) || 1;
+    const sId = Number(supplierId);
+    if (!sId) return [];
     seedInitialThreads(sId);
 
     const threads = Array.from(chatThreadsStore.values()).filter(
-        (t) => t.supplierId === sId || t.supplierId === 1
+        (t) => t.supplierId === sId
     );
 
     return threads.sort((a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated));
 }
 
-export async function getThreadMessages(threadId) {
-    if (!chatMessagesStore.has(threadId)) {
-        seedInitialThreads(1);
+export async function getRestaurantChatThreads(restaurantId) {
+    const rId = Number(restaurantId);
+    if (!rId) return [];
+
+    const threads = Array.from(chatThreadsStore.values()).filter(
+        (t) => t.clientType === "RESTAURANT" && Number(t.clientId) === rId
+    );
+
+    return threads.sort((a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated));
+}
+
+export function canAccessChatThread(threadId, actor) {
+    if (!threadId || !actor) return false;
+    const thread = chatThreadsStore.get(threadId);
+    if (thread) {
+        if (actor.type === "SUPPLIER") {
+            return Number(thread.supplierId) === Number(actor.supplierId);
+        }
+        if (actor.type === "RESTAURANT") {
+            return thread.clientType === "RESTAURANT" && Number(thread.clientId) === Number(actor.restaurantId);
+        }
+        return false;
     }
+
+    const match = /^thread_supp_(\d+)_rest_(\d+)$/.exec(String(threadId));
+    if (!match) return false;
+    const suppId = Number(match[1]);
+    const restId = Number(match[2]);
+    if (actor.type === "SUPPLIER") return suppId === Number(actor.supplierId);
+    if (actor.type === "RESTAURANT") return restId === Number(actor.restaurantId);
+    return false;
+}
+
+export async function getThreadMessages(threadId) {
     return chatMessagesStore.get(threadId) || [];
 }
 
-export async function sendMessageOrOffer({ threadId, supplierId, sender, senderName, text, type, offer }) {
-    const tId = threadId || `thread_supp_${supplierId}_rest_1`;
+export async function sendMessageOrOffer({ threadId, supplierId, restaurantId, sender, senderName, text, type, offer }) {
+    const tId = threadId || (supplierId && restaurantId ? `thread_supp_${supplierId}_rest_${restaurantId}` : null);
+    if (!tId) {
+        const err = new Error("threadId is required");
+        err.statusCode = 400;
+        throw err;
+    }
+    if (!chatThreadsStore.has(tId) && supplierId && restaurantId) {
+        chatThreadsStore.set(tId, {
+            id: tId,
+            supplierId: Number(supplierId),
+            clientName: `Restaurant #${restaurantId}`,
+            clientType: "RESTAURANT",
+            clientId: Number(restaurantId),
+            lastMessage: "",
+            lastUpdated: new Date().toISOString(),
+            unreadCount: 0,
+        });
+    }
     if (!chatMessagesStore.has(tId)) {
         chatMessagesStore.set(tId, []);
     }
