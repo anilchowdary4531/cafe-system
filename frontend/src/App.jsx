@@ -93,30 +93,8 @@ import SupplierLogin from "./pages/supplier/SupplierLogin";
 import SupplierDashboard from "./pages/supplier/SupplierDashboard";
 import OwnerSupplyMarketplace from "./pages/admin/OwnerSupplyMarketplace";
 import OwnerSupplyChainIntelligence from "./pages/admin/OwnerSupplyChainIntelligence";
-import OwnerSupplyChainInventory from "./pages/admin/OwnerSupplyChainInventory";
-import OwnerSupplyChainInventoryDetail from "./pages/admin/OwnerSupplyChainInventoryDetail";
-import OwnerSupplyChainLowStock from "./pages/admin/OwnerSupplyChainLowStock";
-import OwnerSupplyChainExpiry from "./pages/admin/OwnerSupplyChainExpiry";
-import OwnerSupplyChainMovements from "./pages/admin/OwnerSupplyChainMovements";
-import OwnerSupplyChainAdjustments from "./pages/admin/OwnerSupplyChainAdjustments";
-import OwnerSupplyChainValuation from "./pages/admin/OwnerSupplyChainValuation";
-import OwnerSupplyChainSuppliers from "./pages/admin/OwnerSupplyChainSuppliers";
-import OwnerSupplyChainPurchaseRequests from "./pages/admin/OwnerSupplyChainPurchaseRequests";
-import OwnerSupplyChainPurchaseOrders from "./pages/admin/OwnerSupplyChainPurchaseOrders";
-import OwnerSupplyChainReceiving from "./pages/admin/OwnerSupplyChainReceiving";
-import OwnerSupplyChainPurchaseReturns from "./pages/admin/OwnerSupplyChainPurchaseReturns";
-import OwnerSupplyChainInvoices from "./pages/admin/OwnerSupplyChainInvoices";
-import OwnerSupplyChainWarehouse from "./pages/admin/OwnerSupplyChainWarehouse";
-import OwnerSupplyChainTransfers from "./pages/admin/OwnerSupplyChainTransfers";
-import OwnerSupplyChainStockCounts from "./pages/admin/OwnerSupplyChainStockCounts";
 import OwnerSupplyChainRecipes from "./pages/admin/OwnerSupplyChainRecipes";
-import OwnerSupplyChainConsumption from "./pages/admin/OwnerSupplyChainConsumption";
-import OwnerSupplyChainWastage from "./pages/admin/OwnerSupplyChainWastage";
 import OwnerSupplyChainMarketplace from "./pages/admin/OwnerSupplyChainMarketplace";
-import OwnerSupplyChainNegotiations from "./pages/admin/OwnerSupplyChainNegotiations";
-import OwnerSupplyChainPayments from "./pages/admin/OwnerSupplyChainPayments";
-import OwnerSupplyChainReports from "./pages/admin/OwnerSupplyChainReports";
-import OwnerSupplyChainSettings from "./pages/admin/OwnerSupplyChainSettings";
 import SuperAdminSupplyChain from "./pages/super-admin/SuperAdminSupplyChain";
 import NewOrder from "./pages/admin/NewOrder.jsx";
 import PaymentSuccess from "./pages/admin/PaymentSuccess.jsx";
@@ -789,32 +767,9 @@ export default function App() {
                         <Route path="notifications" element={<OwnerNotifications />} />
                         <Route path="supply" element={<OwnerSupplyChainMarketplace />} />
                         <Route path="supply-chain" element={<OwnerSupplyChainIntelligence />} />
-                        <Route path="supply-chain/marketplace" element={<OwnerSupplyChainMarketplace />} />
-                        <Route path="supply-chain/inventory" element={<OwnerSupplyChainInventory />} />
-                        <Route path="supply-chain/inventory/low-stock" element={<OwnerSupplyChainLowStock />} />
-                        <Route path="supply-chain/inventory/expiry" element={<OwnerSupplyChainExpiry />} />
-                        <Route path="supply-chain/inventory/movements" element={<OwnerSupplyChainMovements />} />
-                        <Route path="supply-chain/inventory/adjustments" element={<OwnerSupplyChainAdjustments />} />
-                        <Route path="supply-chain/inventory/valuation" element={<OwnerSupplyChainValuation />} />
-                        <Route path="supply-chain/suppliers" element={<OwnerSupplyChainSuppliers />} />
-                        <Route path="supply-chain/purchase-requests" element={<OwnerSupplyChainPurchaseRequests />} />
-                        <Route path="supply-chain/purchase-orders" element={<OwnerSupplyChainPurchaseOrders />} />
-                        <Route path="supply-chain/receiving" element={<OwnerSupplyChainReceiving />} />
-                        <Route path="supply-chain/purchase-returns" element={<OwnerSupplyChainPurchaseReturns />} />
-                        <Route path="supply-chain/invoices" element={<OwnerSupplyChainInvoices />} />
-                        <Route path="supply-chain/warehouse" element={<OwnerSupplyChainWarehouse />} />
-                        <Route path="supply-chain/transfers" element={<OwnerSupplyChainTransfers />} />
-                        <Route path="supply-chain/stock-counts" element={<OwnerSupplyChainStockCounts />} />
+                        <Route path="supply-chain/*" element={<OwnerSupplyChainIntelligence />} />
                         <Route path="recipes" element={<OwnerSupplyChainRecipes />} />
                         <Route path="inventory/recipes" element={<OwnerSupplyChainRecipes />} />
-                        <Route path="supply-chain/recipes" element={<OwnerSupplyChainRecipes />} />
-                        <Route path="supply-chain/consumption" element={<OwnerSupplyChainConsumption />} />
-                        <Route path="supply-chain/wastage" element={<OwnerSupplyChainWastage />} />
-                        <Route path="supply-chain/negotiations" element={<OwnerSupplyChainNegotiations />} />
-                        <Route path="supply-chain/payments" element={<OwnerSupplyChainPayments />} />
-                        <Route path="supply-chain/reports" element={<OwnerSupplyChainReports />} />
-                        <Route path="supply-chain/settings" element={<OwnerSupplyChainSettings />} />
-                        <Route path="supply-chain/inventory/:itemId" element={<OwnerSupplyChainInventoryDetail />} />
                         <Route path="delivery" element={<OwnerDeliveryManager />} />
                         <Route path="delivery-partners" element={<OwnerDeliveryPartners />} />
                         <Route path="driver-portal" element={<DriverDeliveryStudio />} />

@@ -1,3 +1,4 @@
+import { createContext, useContext } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
     LayoutDashboard,
@@ -24,6 +25,8 @@ import {
     ArrowLeftRight,
     ClipboardCheck
 } from "lucide-react";
+
+export const SupplyChainShellContext = createContext(null);
 
 export const SUPPLY_CHAIN_MAIN_NAV = [
     { id: "overview", label: "Overview", path: "/owner/supply-chain", icon: LayoutDashboard },
@@ -69,24 +72,46 @@ export const RECIPES_SUB_NAV = [
     { id: "consumption", label: "Consumption", path: "/owner/supply-chain/consumption", icon: Activity },
 ];
 
+const SUB_NAV_BY_MODULE = {
+    inventory: INVENTORY_SUB_NAV,
+    purchasing: PURCHASING_SUB_NAV,
+    warehouse: WAREHOUSE_SUB_NAV,
+    recipes: RECIPES_SUB_NAV,
+};
+
 // Backwards compatibility export
 export const SUPPLY_CHAIN_NAV_ITEMS = SUPPLY_CHAIN_MAIN_NAV;
 
-export default function SupplyChainSubNav() {
+export default function SupplyChainSubNav({ isShellNav = false } = {}) {
     const navigate = useNavigate();
     const location = useLocation();
+    const shellContext = useContext(SupplyChainShellContext);
 
-    // Determine current sub-nav items based on active route
-    const currentPath = location.pathname;
-
-    const isDashboard = currentPath === "/owner/supply-chain" || currentPath === "/owner/supply-chain/" || currentPath === "/supply-chain" || currentPath === "/supply-chain/";
-    if (!isDashboard) {
+    // When embedded inside the shared Supply Chain page shell, suppress duplicate navs in child modules
+    if (shellContext && !isShellNav) {
         return null;
     }
 
+    const currentPath = location.pathname;
+
+    if (!isShellNav) {
+        const isDashboard =
+            currentPath === "/owner/supply-chain" ||
+            currentPath === "/owner/supply-chain/" ||
+            currentPath === "/supply-chain" ||
+            currentPath === "/supply-chain/";
+        if (!isDashboard) {
+            return null;
+        }
+    }
+
+    const activeModule = shellContext?.activeModule || "overview";
+    const activeSubModule = shellContext?.activeSubModule || "";
 
     let activeSubNav = null;
-    if (currentPath.startsWith("/owner/supply-chain/inventory")) {
+    if (isShellNav && shellContext) {
+        activeSubNav = SUB_NAV_BY_MODULE[activeModule] || null;
+    } else if (currentPath.startsWith("/owner/supply-chain/inventory")) {
         activeSubNav = INVENTORY_SUB_NAV;
     } else if (
         currentPath.startsWith("/owner/supply-chain/purchase") ||
@@ -107,27 +132,48 @@ export default function SupplyChainSubNav() {
         activeSubNav = RECIPES_SUB_NAV;
     }
 
+    const handleMainClick = (item) => {
+        if (isShellNav && shellContext?.onSelectModule) {
+            shellContext.onSelectModule(item.id);
+            return;
+        }
+        navigate(item.path);
+    };
+
+    const handleSubClick = (subItem) => {
+        if (isShellNav && shellContext?.onSelectSubModule) {
+            shellContext.onSelectSubModule(activeModule, subItem.id);
+            return;
+        }
+        navigate(subItem.path);
+    };
+
     return (
         <div className="w-full bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 mb-5 shadow-xs transition-colors">
             {/* Tier 1: Main Category Tabs */}
             <div className="max-w-7xl mx-auto px-2 sm:px-4">
-                <nav className="flex items-center gap-1 overflow-x-auto py-2 scrollbar-none">
+                <nav role="tablist" aria-label="Supply Chain modules" className="flex items-center gap-1 overflow-x-auto py-2 scrollbar-none">
                     {SUPPLY_CHAIN_MAIN_NAV.map((item) => {
                         const Icon = item.icon;
-                        const isOverview = item.path === "/owner/supply-chain";
-                        const isMainActive = isOverview
-                            ? currentPath === "/owner/supply-chain" || currentPath === "/owner/supply-chain/"
-                            : item.matchPrefixes
-                            ? item.matchPrefixes.some((prefix) => currentPath.startsWith(prefix))
-                            : currentPath.startsWith(item.path);
+                        const isMainActive =
+                            isShellNav && shellContext
+                                ? activeModule === item.id
+                                : item.path === "/owner/supply-chain"
+                                ? currentPath === "/owner/supply-chain" || currentPath === "/owner/supply-chain/"
+                                : item.matchPrefixes
+                                ? item.matchPrefixes.some((prefix) => currentPath.startsWith(prefix))
+                                : currentPath.startsWith(item.path);
 
                         return (
                             <button
                                 key={item.id}
-                                onClick={() => navigate(item.path)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                                type="button"
+                                role="tab"
+                                aria-selected={isMainActive}
+                                onClick={() => handleMainClick(item)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 ${
                                     isMainActive
-                                        ? "bg-orange-500 text-white font-bold shadow-xs"
+                                        ? "bg-orange-500 text-white font-bold shadow-xs hover:bg-orange-600"
                                         : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
                                 }`}
                             >
@@ -142,17 +188,23 @@ export default function SupplyChainSubNav() {
             {/* Tier 2: Sub-View Tabs (Rendered conditionally when section has sub-views) */}
             {activeSubNav && (
                 <div className="bg-slate-50 dark:bg-slate-900/80 border-t border-slate-200/80 dark:border-slate-800/80 px-2 sm:px-4 py-1.5">
-                    <div className="max-w-7xl mx-auto flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-                        {activeSubNav.map((subItem) => {
+                    <div role="tablist" aria-label="Module sub-views" className="max-w-7xl mx-auto flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+                        {activeSubNav.map((subItem, idx) => {
                             const SubIcon = subItem.icon;
-                            const isSubActive = subItem.exact
-                                ? currentPath === subItem.path
-                                : currentPath.startsWith(subItem.path);
+                            const isSubActive =
+                                isShellNav && shellContext
+                                    ? (activeSubModule ? activeSubModule === subItem.id : idx === 0)
+                                    : subItem.exact
+                                    ? currentPath === subItem.path
+                                    : currentPath.startsWith(subItem.path);
 
                             return (
                                 <button
                                     key={subItem.id}
-                                    onClick={() => navigate(subItem.path)}
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={isSubActive}
+                                    onClick={() => handleSubClick(subItem)}
                                     className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-all cursor-pointer ${
                                         isSubActive
                                             ? "bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200 font-bold border border-amber-300 dark:border-amber-700/50"

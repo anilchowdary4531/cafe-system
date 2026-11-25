@@ -328,7 +328,7 @@ export default function OwnerSupplyChainMarketplace() {
                                 )}
                             </div>
                             <div>
-                                <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Cart Total</span>
+                                <span className="text-[10px] text-slate-300 uppercase tracking-wider block font-semibold">Cart Total</span>
                                 <span className="font-extrabold text-white">₹{(cart.cartTotal || 0).toFixed(2)}</span>
                             </div>
                             {(cart.items || []).length > 0 && (
@@ -336,7 +336,7 @@ export default function OwnerSupplyChainMarketplace() {
                                     type="button"
                                     onClick={handleCreateDirectPO}
                                     disabled={convertingPO}
-                                    className="ml-1 px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold rounded-lg text-xs transition shadow-xs cursor-pointer disabled:opacity-50"
+                                    className="ml-1 px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 text-white font-bold rounded-lg text-xs transition shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {convertingPO ? "Creating PO..." : "Convert to PO"}
                                 </button>

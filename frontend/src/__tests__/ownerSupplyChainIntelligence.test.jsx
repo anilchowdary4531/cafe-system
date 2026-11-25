@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import React from "react";
 import { MemoryRouter } from "react-router-dom";
 import OwnerSupplyChainIntelligence from "../pages/admin/OwnerSupplyChainIntelligence";
+import OwnerSupplyChainReports from "../pages/admin/OwnerSupplyChainReports";
+import ErrorBoundary from "../components/ErrorBoundary";
 import { api } from "../utils/apiClient";
 
 vi.mock("../utils/apiClient", () => ({
@@ -249,5 +251,79 @@ describe("OwnerSupplyChainIntelligence — Phase 1 Cleanup", () => {
 
         fireEvent.click(screen.getByRole("tab", { name: "Supplier" }));
         expect(screen.getByText(/Supplier Performance Scorecard/i)).toBeInTheDocument();
+    });
+
+    it("renders all 12 Supply Chain module tabs in-page while keeping the shared shell visible", async () => {
+        mockPopulatedApis();
+        render(
+            <MemoryRouter initialEntries={["/owner/supply-chain"]}>
+                <OwnerSupplyChainIntelligence />
+            </MemoryRouter>
+        );
+
+        await screen.findByRole("cell", { name: "Deccan Agro Farms" });
+
+        const moduleTabs = [
+            "Inventory",
+            "Purchasing",
+            "Suppliers",
+            "Warehouse",
+            "Recipes",
+            "Wastage",
+            "Marketplace",
+            "Negotiations",
+            "Payments",
+            "Intelligence",
+            "Settings",
+        ];
+
+        for (const label of moduleTabs) {
+            const tabBtn = screen.getByRole("tab", { name: label });
+            fireEvent.click(tabBtn);
+            expect(tabBtn).toHaveAttribute("aria-selected", "true");
+            expect(screen.getByRole("heading", { name: /Supplier Performance & Procurement Analytics/i })).toBeInTheDocument();
+            expect(screen.getByLabelText("Filter by supplier")).toBeInTheDocument();
+            expect(screen.getByTestId("supply-chain-module-panel")).toBeInTheDocument();
+        }
+
+        // Verify Tier 2 sub-tab under Inventory works in-page
+        fireEvent.click(screen.getByRole("tab", { name: "Inventory" }));
+        const lowStockTab = await screen.findByRole("tab", { name: "Low Stock" });
+        fireEvent.click(lowStockTab);
+        expect(lowStockTab).toHaveAttribute("aria-selected", "true");
+        expect(screen.getByTestId("supply-chain-module-panel")).toBeInTheDocument();
+
+        // Return to Overview tab
+        const moduleNav = screen.getByRole("tablist", { name: "Supply Chain modules" });
+        const overviewTab = within(moduleNav).getByRole("tab", { name: "Overview" });
+        fireEvent.click(overviewTab);
+        expect(overviewTab).toHaveAttribute("aria-selected", "true");
+        expect(screen.queryByTestId("supply-chain-module-panel")).toBeNull();
+        expect(await screen.findByRole("cell", { name: "Deccan Agro Farms" })).toBeInTheDocument();
+    });
+
+    it("renders OwnerSupplyChainReports without ReferenceError: OwnerMenuButton is not defined", async () => {
+        api.get.mockResolvedValue({
+            data: {
+                metrics: { totalPurchaseValue: 0, inventoryValue: 0, foodCostPct: 0, wastageValue: 0, wastagePct: 0, lowStockCount: 0 },
+                purchaseAnalytics: { purchaseTrend: [], purchaseBySupplier: [], purchaseByCategory: [] },
+                inventoryAnalytics: { lowStockItems: [] },
+                wastageAnalytics: { topWastedIngredients: [] },
+                supplierPerformance: [],
+                recommendations: [],
+            },
+        });
+
+        render(
+            <ErrorBoundary>
+                <MemoryRouter initialEntries={["/owner/supply-chain/reports"]}>
+                    <OwnerSupplyChainReports />
+                </MemoryRouter>
+            </ErrorBoundary>
+        );
+
+        expect(await screen.findByRole("heading", { name: /Supply Chain Intelligence & Analytics/i })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Open navigation menu/i })).toBeInTheDocument();
+        expect(screen.queryByText(/OwnerMenuButton is not defined/i)).toBeNull();
     });
 });

@@ -1598,6 +1598,31 @@ html[data-app-theme-tone="light"] .theme-adaptive .text-white {
     color: var(--app-text) !important;
 }
 
+/* Preserve white/light foreground contrast on solid dark or accent backgrounds in light mode */
+html[data-app-theme-tone="light"] .theme-adaptive .bg-slate-900.text-white,
+html[data-app-theme-tone="light"] .theme-adaptive .bg-slate-900 .text-white,
+html[data-app-theme-tone="light"] .theme-adaptive .bg-slate-800.text-white,
+html[data-app-theme-tone="light"] .theme-adaptive .bg-slate-800 .text-white,
+html[data-app-theme-tone="light"] .theme-adaptive .bg-orange-500.text-white,
+html[data-app-theme-tone="light"] .theme-adaptive .bg-orange-500 .text-white,
+html[data-app-theme-tone="light"] .theme-adaptive .bg-orange-600.text-white,
+html[data-app-theme-tone="light"] .theme-adaptive .bg-orange-600 .text-white,
+html[data-app-theme-tone="light"] .theme-adaptive .bg-emerald-500.text-white,
+html[data-app-theme-tone="light"] .theme-adaptive .bg-emerald-600.text-white,
+html[data-app-theme-tone="light"] .theme-adaptive .bg-indigo-600.text-white,
+html[data-app-theme-tone="light"] .theme-adaptive .bg-blue-600.text-white,
+html[data-app-theme-tone="light"] .theme-adaptive .bg-rose-600.text-white,
+html[data-app-theme-tone="light"] .theme-adaptive .bg-gradient-to-r.text-white {
+    color: #ffffff !important;
+}
+
+html[data-app-theme-tone="light"] .theme-adaptive .bg-slate-900 .text-slate-300,
+html[data-app-theme-tone="light"] .theme-adaptive .bg-slate-900 .text-slate-400,
+html[data-app-theme-tone="light"] .theme-adaptive .bg-slate-800 .text-slate-300,
+html[data-app-theme-tone="light"] .theme-adaptive .bg-slate-800 .text-slate-400 {
+    color: #cbd5e1 !important;
+}
+
 html[data-app-theme-tone="light"] .theme-adaptive .text-gray-300,
 html[data-app-theme-tone="light"] .theme-adaptive .text-slate-300 {
     color: var(--app-muted-strong) !important;

@@ -1,9 +1,65 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
 import OwnerMenuButton from "../../components/OwnerMenuButton";
-import SupplyChainSubNav from "../../components/SupplyChainSubNav";
+import SupplyChainSubNav, { SupplyChainShellContext } from "../../components/SupplyChainSubNav";
+
+const OwnerSupplyChainInventory = lazy(() => import("./OwnerSupplyChainInventory"));
+const OwnerSupplyChainLowStock = lazy(() => import("./OwnerSupplyChainLowStock"));
+const OwnerSupplyChainExpiry = lazy(() => import("./OwnerSupplyChainExpiry"));
+const OwnerSupplyChainMovements = lazy(() => import("./OwnerSupplyChainMovements"));
+const OwnerSupplyChainAdjustments = lazy(() => import("./OwnerSupplyChainAdjustments"));
+const OwnerSupplyChainValuation = lazy(() => import("./OwnerSupplyChainValuation"));
+const OwnerSupplyChainInventoryDetail = lazy(() => import("./OwnerSupplyChainInventoryDetail"));
+const OwnerSupplyChainPurchaseOrders = lazy(() => import("./OwnerSupplyChainPurchaseOrders"));
+const OwnerSupplyChainPurchaseRequests = lazy(() => import("./OwnerSupplyChainPurchaseRequests"));
+const OwnerSupplyChainReceiving = lazy(() => import("./OwnerSupplyChainReceiving"));
+const OwnerSupplyChainPurchaseReturns = lazy(() => import("./OwnerSupplyChainPurchaseReturns"));
+const OwnerSupplyChainInvoices = lazy(() => import("./OwnerSupplyChainInvoices"));
+const OwnerSupplyChainSuppliers = lazy(() => import("./OwnerSupplyChainSuppliers"));
+const OwnerSupplyChainWarehouse = lazy(() => import("./OwnerSupplyChainWarehouse"));
+const OwnerSupplyChainTransfers = lazy(() => import("./OwnerSupplyChainTransfers"));
+const OwnerSupplyChainStockCounts = lazy(() => import("./OwnerSupplyChainStockCounts"));
+const OwnerSupplyChainRecipes = lazy(() => import("./OwnerSupplyChainRecipes"));
+const OwnerSupplyChainConsumption = lazy(() => import("./OwnerSupplyChainConsumption"));
+const OwnerSupplyChainWastage = lazy(() => import("./OwnerSupplyChainWastage"));
+const OwnerSupplyChainMarketplace = lazy(() => import("./OwnerSupplyChainMarketplace"));
+const OwnerSupplyChainNegotiations = lazy(() => import("./OwnerSupplyChainNegotiations"));
+const OwnerSupplyChainPayments = lazy(() => import("./OwnerSupplyChainPayments"));
+const OwnerSupplyChainReports = lazy(() => import("./OwnerSupplyChainReports"));
+const OwnerSupplyChainSettings = lazy(() => import("./OwnerSupplyChainSettings"));
+
+function resolveRouteModule(pathname) {
+    if (!pathname || pathname === "/owner/supply-chain" || pathname === "/owner/supply-chain/") {
+        return null;
+    }
+    if (pathname.startsWith("/owner/supply-chain/inventory/low-stock")) return { module: "inventory", sub: "low-stock" };
+    if (pathname.startsWith("/owner/supply-chain/inventory/expiry")) return { module: "inventory", sub: "expiry" };
+    if (pathname.startsWith("/owner/supply-chain/inventory/movements")) return { module: "inventory", sub: "movements" };
+    if (pathname.startsWith("/owner/supply-chain/inventory/adjustments")) return { module: "inventory", sub: "adjustments" };
+    if (pathname.startsWith("/owner/supply-chain/inventory/valuation")) return { module: "inventory", sub: "valuation" };
+    if (/^\/owner\/supply-chain\/inventory\/\d+/.test(pathname)) return { module: "inventory", sub: "detail" };
+    if (pathname.startsWith("/owner/supply-chain/inventory")) return { module: "inventory", sub: "all" };
+    if (pathname.startsWith("/owner/supply-chain/purchase-requests")) return { module: "purchasing", sub: "pr" };
+    if (pathname.startsWith("/owner/supply-chain/receiving")) return { module: "purchasing", sub: "grn" };
+    if (pathname.startsWith("/owner/supply-chain/purchase-returns")) return { module: "purchasing", sub: "returns" };
+    if (pathname.startsWith("/owner/supply-chain/invoices")) return { module: "purchasing", sub: "invoices" };
+    if (pathname.startsWith("/owner/supply-chain/purchase-orders")) return { module: "purchasing", sub: "po" };
+    if (pathname.startsWith("/owner/supply-chain/suppliers")) return { module: "suppliers", sub: "" };
+    if (pathname.startsWith("/owner/supply-chain/transfers")) return { module: "warehouse", sub: "transfers" };
+    if (pathname.startsWith("/owner/supply-chain/stock-counts")) return { module: "warehouse", sub: "counts" };
+    if (pathname.startsWith("/owner/supply-chain/warehouse")) return { module: "warehouse", sub: "locations" };
+    if (pathname.startsWith("/owner/supply-chain/consumption")) return { module: "recipes", sub: "consumption" };
+    if (pathname.startsWith("/owner/supply-chain/recipes")) return { module: "recipes", sub: "all-recipes" };
+    if (pathname.startsWith("/owner/supply-chain/wastage")) return { module: "wastage", sub: "" };
+    if (pathname.startsWith("/owner/supply-chain/marketplace")) return { module: "marketplace", sub: "" };
+    if (pathname.startsWith("/owner/supply-chain/negotiations")) return { module: "negotiations", sub: "" };
+    if (pathname.startsWith("/owner/supply-chain/payments")) return { module: "payments", sub: "" };
+    if (pathname.startsWith("/owner/supply-chain/reports")) return { module: "intelligence", sub: "" };
+    if (pathname.startsWith("/owner/supply-chain/settings")) return { module: "settings", sub: "" };
+    return null;
+}
 import {
     AlertCircle,
     ArrowDownRight,
@@ -137,10 +193,67 @@ function getPeriodBounds(range, customStartDate, customEndDate) {
 
 export default function OwnerSupplyChainIntelligence() {
     const navigate = useNavigate();
+    const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
+    const routeModule = resolveRouteModule(location.pathname);
+    const activeModule = routeModule?.module || searchParams.get("module") || "overview";
+    const activeSubModule = routeModule?.sub || searchParams.get("sub") || "";
     const range = searchParams.get("range") || "7d";
     const startDateParam = searchParams.get("startDate") || "";
     const endDateParam = searchParams.get("endDate") || "";
+
+    const handleSelectModule = useCallback(
+        (moduleId) => {
+            if (location.pathname !== "/owner/supply-chain" && location.pathname !== "/owner/supply-chain/") {
+                const next = new URLSearchParams(searchParams);
+                if (!moduleId || moduleId === "overview") next.delete("module");
+                else next.set("module", moduleId);
+                next.delete("sub");
+                const qs = next.toString();
+                navigate(qs ? `/owner/supply-chain?${qs}` : "/owner/supply-chain");
+                return;
+            }
+            setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                if (!moduleId || moduleId === "overview") next.delete("module");
+                else next.set("module", moduleId);
+                next.delete("sub");
+                return next;
+            });
+        },
+        [location.pathname, navigate, searchParams, setSearchParams]
+    );
+
+    const handleSelectSubModule = useCallback(
+        (moduleId, subId) => {
+            if (location.pathname !== "/owner/supply-chain" && location.pathname !== "/owner/supply-chain/") {
+                const next = new URLSearchParams(searchParams);
+                next.set("module", moduleId);
+                if (subId) next.set("sub", subId);
+                else next.delete("sub");
+                navigate(`/owner/supply-chain?${next.toString()}`);
+                return;
+            }
+            setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                next.set("module", moduleId);
+                if (subId) next.set("sub", subId);
+                else next.delete("sub");
+                return next;
+            });
+        },
+        [location.pathname, navigate, searchParams, setSearchParams]
+    );
+
+    const shellContextValue = useMemo(
+        () => ({
+            activeModule,
+            activeSubModule,
+            onSelectModule: handleSelectModule,
+            onSelectSubModule: handleSelectSubModule,
+        }),
+        [activeModule, activeSubModule, handleSelectModule, handleSelectSubModule]
+    );
 
     const user = useMemo(() => {
         try {
@@ -718,7 +831,44 @@ export default function OwnerSupplyChainIntelligence() {
         }
     };
 
+    const renderActiveModule = () => {
+        if (activeModule === "inventory") {
+            if (activeSubModule === "low-stock") return <OwnerSupplyChainLowStock />;
+            if (activeSubModule === "expiry") return <OwnerSupplyChainExpiry />;
+            if (activeSubModule === "movements") return <OwnerSupplyChainMovements />;
+            if (activeSubModule === "adjustments") return <OwnerSupplyChainAdjustments />;
+            if (activeSubModule === "valuation") return <OwnerSupplyChainValuation />;
+            if (activeSubModule === "detail") return <OwnerSupplyChainInventoryDetail />;
+            return <OwnerSupplyChainInventory />;
+        }
+        if (activeModule === "purchasing") {
+            if (activeSubModule === "pr") return <OwnerSupplyChainPurchaseRequests />;
+            if (activeSubModule === "grn") return <OwnerSupplyChainReceiving />;
+            if (activeSubModule === "returns") return <OwnerSupplyChainPurchaseReturns />;
+            if (activeSubModule === "invoices") return <OwnerSupplyChainInvoices />;
+            return <OwnerSupplyChainPurchaseOrders />;
+        }
+        if (activeModule === "suppliers") return <OwnerSupplyChainSuppliers />;
+        if (activeModule === "warehouse") {
+            if (activeSubModule === "transfers") return <OwnerSupplyChainTransfers />;
+            if (activeSubModule === "counts") return <OwnerSupplyChainStockCounts />;
+            return <OwnerSupplyChainWarehouse />;
+        }
+        if (activeModule === "recipes") {
+            if (activeSubModule === "consumption") return <OwnerSupplyChainConsumption />;
+            return <OwnerSupplyChainRecipes />;
+        }
+        if (activeModule === "wastage") return <OwnerSupplyChainWastage />;
+        if (activeModule === "marketplace") return <OwnerSupplyChainMarketplace />;
+        if (activeModule === "negotiations") return <OwnerSupplyChainNegotiations />;
+        if (activeModule === "payments") return <OwnerSupplyChainPayments />;
+        if (activeModule === "intelligence") return <OwnerSupplyChainReports />;
+        if (activeModule === "settings") return <OwnerSupplyChainSettings />;
+        return null;
+    };
+
     return (
+        <SupplyChainShellContext.Provider value={shellContextValue}>
         <section className="space-y-4 font-sans text-sm text-[color:var(--app-text,#1e293b)] pb-12">
             {/* HEADER */}
             <header className="pb-3 border-b border-slate-200/80 dark:border-slate-800">
@@ -753,10 +903,10 @@ export default function OwnerSupplyChainIntelligence() {
                                         role="tab"
                                         aria-selected={isActive}
                                         onClick={() => setActiveSectionTab(tab.id)}
-                                        className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                                        className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 ${
                                             isActive
-                                                ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-xs"
-                                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                                                ? "bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white shadow-xs"
+                                                : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/60"
                                         }`}
                                     >
                                         {tab.label}
@@ -830,7 +980,7 @@ export default function OwnerSupplyChainIntelligence() {
             </header>
 
             {/* SHARED SUPPLY CHAIN NAVIGATION */}
-            <SupplyChainSubNav />
+            <SupplyChainSubNav isShellNav />
 
             {/* ERROR & PARTIAL WARNING BANNERS */}
             {error && (
@@ -1009,8 +1159,20 @@ export default function OwnerSupplyChainIntelligence() {
                 </div>
             </div>
 
-            {/* LOADING SKELETON */}
-            {loading ? (
+            {/* MAIN CONTENT AREA: OVERVIEW ANALYTICS OR SELECTED MODULE */}
+            {activeModule !== "overview" ? (
+                <div data-testid="supply-chain-module-panel" className="pt-1">
+                    <Suspense
+                        fallback={
+                            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 text-center text-xs text-slate-500">
+                                Loading module...
+                            </div>
+                        }
+                    >
+                        {renderActiveModule()}
+                    </Suspense>
+                </div>
+            ) : loading ? (
                 <div data-testid="supply-analytics-loading" className="grid grid-cols-1 lg:grid-cols-12 gap-4 animate-pulse">
                     <div className="lg:col-span-3 space-y-3">
                         {[1, 2, 3, 4, 5].map((n) => (
@@ -1374,7 +1536,7 @@ export default function OwnerSupplyChainIntelligence() {
                                             </div>
                                             <button
                                                 type="button"
-                                                onClick={() => navigate("/owner/supply-chain/suppliers")}
+                                                onClick={() => handleSelectModule("suppliers")}
                                                 className="text-xs font-bold text-orange-500 hover:underline cursor-pointer"
                                             >
                                                 View Full Directory ({suppliers.length}) →
@@ -1523,14 +1685,14 @@ export default function OwnerSupplyChainIntelligence() {
                         <div className="flex flex-wrap items-center gap-2">
                             <button
                                 type="button"
-                                onClick={() => navigate("/owner/supply-chain/marketplace")}
+                                onClick={() => handleSelectModule("marketplace")}
                                 className="px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-xs cursor-pointer"
                             >
                                 + B2B Marketplace
                             </button>
                             <button
                                 type="button"
-                                onClick={() => navigate("/owner/supply-chain/negotiations")}
+                                onClick={() => handleSelectModule("negotiations")}
                                 className="px-3 py-1.5 rounded-lg border border-indigo-500/40 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-xs font-bold hover:bg-indigo-500/20 cursor-pointer"
                             >
                                 + Price Quotes
@@ -1553,7 +1715,7 @@ export default function OwnerSupplyChainIntelligence() {
                             </button>
                             <button
                                 type="button"
-                                onClick={() => navigate("/owner/supply-chain/payments")}
+                                onClick={() => handleSelectModule("payments")}
                                 className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                             >
                                 + Settlement Payouts
@@ -1743,5 +1905,6 @@ export default function OwnerSupplyChainIntelligence() {
                 </div>
             )}
         </section>
+        </SupplyChainShellContext.Provider>
     );
 }
