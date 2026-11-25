@@ -102,7 +102,10 @@ export default async function supplyMarketplaceRoutes(app) {
                 include: {
                     profile: true,
                     addresses: true,
-                    products: { where: { availability: true } },
+                    products: {
+                        where: { availability: true },
+                        include: { category: { select: { id: true, name: true } } },
+                    },
                     orders: { where: { restaurantId: Number(restaurantId) }, include: { items: true } },
                     _count: { select: { products: true } },
                 },

@@ -1450,18 +1450,23 @@ export default function OwnerSupplyChainIntelligence() {
                                                 <div className="rounded-lg border border-slate-200/80 dark:border-slate-800 p-3">
                                                     <div className="text-[11px] font-bold uppercase text-slate-500">Invoices Paid (All-Time)</div>
                                                     <div className="text-lg font-black text-slate-900 dark:text-slate-100 mt-0.5">
-                                                        {paymentsSummary?.summary ? formatMoney(paymentsSummary.summary.paidAmount) : "—"}
+                                                        {(() => {
+                                                            const pm = paymentsSummary?.metrics || paymentsSummary?.summary;
+                                                            return pm && pm.paidAmount !== undefined && pm.paidAmount !== null
+                                                                ? formatMoney(pm.paidAmount)
+                                                                : "—";
+                                                        })()}
                                                     </div>
                                                 </div>
                                                 <div className="rounded-lg border border-slate-200/80 dark:border-slate-800 p-3">
                                                     <div className="text-[11px] font-bold uppercase text-slate-500">Pending / Overdue</div>
                                                     <div className="text-lg font-black text-amber-600 mt-0.5">
-                                                        {paymentsSummary?.summary
-                                                            ? formatMoney(
-                                                                  Number(paymentsSummary.summary.pendingAmount || 0) +
-                                                                      Number(paymentsSummary.summary.overdueAmount || 0)
-                                                              )
-                                                            : "—"}
+                                                        {(() => {
+                                                            const pm = paymentsSummary?.metrics || paymentsSummary?.summary;
+                                                            return pm && (pm.pendingAmount !== undefined || pm.overdueAmount !== undefined)
+                                                                ? formatMoney(Number(pm.pendingAmount || 0) + Number(pm.overdueAmount || 0))
+                                                                : "—";
+                                                        })()}
                                                     </div>
                                                 </div>
                                             </div>

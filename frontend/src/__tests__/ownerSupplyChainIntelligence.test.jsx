@@ -97,7 +97,7 @@ function mockPopulatedApis() {
         if (url === "/owner/negotiations") return Promise.resolve({ data: { negotiations: [] } });
         if (url === "/owner/supply-payments") {
             return Promise.resolve({
-                data: { summary: { paidAmount: 12000, pendingAmount: 8000, overdueAmount: 0 } },
+                data: { metrics: { paidAmount: 12000, pendingAmount: 5000, overdueAmount: 3000 } },
             });
         }
         if (url === "/owner/storage-locations") {
@@ -325,5 +325,95 @@ describe("OwnerSupplyChainIntelligence — Phase 1 Cleanup", () => {
         expect(await screen.findByRole("heading", { name: /Supply Chain Intelligence & Analytics/i })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: /Open navigation menu/i })).toBeInTheDocument();
         expect(screen.queryByText(/OwnerMenuButton is not defined/i)).toBeNull();
+    });
+
+    it("maps Financial view from /owner/supply-payments metrics and filters orders by product category", async () => {
+        const nowIso = new Date().toISOString();
+        api.get.mockImplementation((url) => {
+            if (url === "/supply-orders") {
+                return Promise.resolve({
+                    data: {
+                        orders: [
+                            {
+                                id: 10,
+                                supplierId: 1,
+                                totalAmount: 12000,
+                                subtotal: 12000,
+                                discountAmount: 0,
+                                status: "DELIVERED",
+                                createdAt: nowIso,
+                                items: [{ productId: 101, productName: "Red Onions" }],
+                            },
+                            {
+                                id: 11,
+                                supplierId: 2,
+                                totalAmount: 8000,
+                                subtotal: 8000,
+                                discountAmount: 0,
+                                status: "PLACED",
+                                createdAt: nowIso,
+                                items: [{ productId: 202, productName: "Paneer Block" }],
+                            },
+                        ],
+                    },
+                });
+            }
+            if (url === "/owner/suppliers") {
+                return Promise.resolve({
+                    data: {
+                        suppliers: [
+                            {
+                                id: 1,
+                                profile: { businessName: "Deccan Agro Farms" },
+                                addresses: [{ state: "Telangana", isPrimary: true }],
+                                products: [{ id: 101, category: { id: 1, name: "Produce" } }],
+                            },
+                            {
+                                id: 2,
+                                profile: { businessName: "Krishna Dairy Co" },
+                                addresses: [{ state: "Karnataka", isPrimary: true }],
+                                products: [{ id: 202, category: { id: 2, name: "Dairy" } }],
+                            },
+                        ],
+                    },
+                });
+            }
+            if (url === "/owner/supply-payments") {
+                return Promise.resolve({
+                    data: { metrics: { paidAmount: 45000, pendingAmount: 5000, overdueAmount: 3500 } },
+                });
+            }
+            if (url === "/owner/negotiations") return Promise.resolve({ data: { negotiations: [] } });
+            if (url === "/owner/storage-locations") return Promise.resolve({ data: { locations: [] } });
+            return Promise.resolve({ data: { materials: [] } });
+        });
+
+        render(
+            <MemoryRouter initialEntries={["/owner/supply-chain"]}>
+                <OwnerSupplyChainIntelligence />
+            </MemoryRouter>
+        );
+
+        expect(await screen.findByRole("cell", { name: "Deccan Agro Farms" })).toBeInTheDocument();
+        expect(screen.getByRole("cell", { name: "Krishna Dairy Co" })).toBeInTheDocument();
+
+        // Financial view reads metrics.paidAmount and pending + overdue
+        fireEvent.click(screen.getByRole("button", { name: "Financial" }));
+        expect(screen.getByText("₹45,000.00")).toBeInTheDocument();
+        expect(screen.getByText("₹8,500.00")).toBeInTheDocument();
+
+        // Category filter maps productId -> supplier product.category.name
+        const categorySelect = screen.getByLabelText("Filter by category");
+        fireEvent.change(categorySelect, { target: { value: "Dairy" } });
+        expect(screen.getByRole("cell", { name: "Krishna Dairy Co" })).toBeInTheDocument();
+        expect(screen.queryByRole("cell", { name: "Deccan Agro Farms" })).toBeNull();
+
+        fireEvent.change(categorySelect, { target: { value: "Produce" } });
+        expect(screen.getByRole("cell", { name: "Deccan Agro Farms" })).toBeInTheDocument();
+        expect(screen.queryByRole("cell", { name: "Krishna Dairy Co" })).toBeNull();
+
+        fireEvent.change(categorySelect, { target: { value: "ALL" } });
+        expect(screen.getByRole("cell", { name: "Deccan Agro Farms" })).toBeInTheDocument();
+        expect(screen.getByRole("cell", { name: "Krishna Dairy Co" })).toBeInTheDocument();
     });
 });
