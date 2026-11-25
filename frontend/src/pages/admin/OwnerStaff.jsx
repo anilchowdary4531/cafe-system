@@ -25,6 +25,9 @@ import {
     Shield,
     Users,
     Link2,
+    Mail,
+    Phone,
+    Calendar,
 } from "lucide-react";
 import { API } from "../../config";
 import { showToast } from "../../utils/toast";
@@ -206,6 +209,23 @@ const resolveDesignation = (staffUser) => {
     return getRoleDesignationFallback(staffUser?.role);
 };
 
+const getStaffInitials = (name) => {
+    const parts = String(name || "")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+    if (parts.length === 0) return "ST";
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+};
+
+const formatJoinedDate = (value) => {
+    if (!value) return "—";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return "—";
+    return parsed.toLocaleDateString();
+};
+
 const buildFallbackStaffLoginLink = (staffUser) => {
     const email = String(staffUser?.email || "").trim().toLowerCase();
     const params = new URLSearchParams({ mode: "staff" });
@@ -374,8 +394,17 @@ export default function OwnerStaff() {
             if (event.target.closest("[data-staff-actions-menu]")) return;
             setOpenActionMenuFor(null);
         };
+        const handleEscape = (event) => {
+            if (event.key === "Escape") {
+                setOpenActionMenuFor(null);
+            }
+        };
         document.addEventListener("mousedown", handleOutsideClick);
-        return () => document.removeEventListener("mousedown", handleOutsideClick);
+        document.addEventListener("keydown", handleEscape);
+        return () => {
+            document.removeEventListener("mousedown", handleOutsideClick);
+            document.removeEventListener("keydown", handleEscape);
+        };
     }, [openActionMenuFor]);
 
     const handleCreate = async (e) => {
@@ -943,6 +972,7 @@ export default function OwnerStaff() {
     }, [users, roleFilter, statusFilter, query]);
 
     const activeCount = useMemo(() => users.filter((u) => u.isActive).length, [users]);
+    const inactiveCount = useMemo(() => users.length - activeCount, [users.length, activeCount]);
 
     return (
         <section data-testid="owner-staff" className="space-y-5 pb-12">
@@ -1172,7 +1202,7 @@ export default function OwnerStaff() {
 
             {/* Staff Directory Controls & KPI Header */}
             <article className="space-y-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-3">
                         <OwnerMenuButton />
                         <div>
@@ -1186,27 +1216,70 @@ export default function OwnerStaff() {
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                        {/* Search Input */}
-                        <div className="flex min-w-[200px] flex-1 sm:w-64 items-center gap-2 rounded-xl border border-[#D6D3D1] bg-white px-3.5 py-2 text-xs transition-colors focus-within:border-[#F97316] focus-within:ring-1 focus-within:ring-[#F97316] shadow-xs">
-                            <Search size={14} className="text-[#78716C] shrink-0" />
-                            <input
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                                placeholder="Search by name, email, role..."
-                                className="w-full bg-transparent outline-none text-[#292524] placeholder-[#78716C] font-medium"
-                            />
-                            {query && (
-                                <button
-                                    type="button"
-                                    onClick={() => setQuery("")}
-                                    className="text-stone-400 hover:text-[#1C1917] cursor-pointer"
-                                >
-                                    <X size={12} />
-                                </button>
-                            )}
-                        </div>
+                    {/* Add Staff Toggle */}
+                    <button
+                        type="button"
+                        onClick={() => setShowAddStaffForm((prev) => !prev)}
+                        className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#F97316] hover:bg-[#EA580C] active:bg-[#C2410C] px-4 py-2 text-xs font-bold text-white shadow-md transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
+                    >
+                        <UserPlus size={15} />
+                        <span>{showAddStaffForm ? "Hide Form" : "Add Staff"}</span>
+                    </button>
+                </div>
 
+                {/* Compact Overview Row */}
+                <div className="grid grid-cols-3 gap-3" data-testid="staff-overview-row">
+                    <div className="rounded-xl border border-[#E7E5E4] bg-white px-3.5 py-2.5 shadow-2xs">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#78716C]">
+                            All Members
+                        </p>
+                        <p className="mt-0.5 text-lg font-bold text-[#1C1917]" data-testid="staff-total-count">
+                            {users.length}
+                        </p>
+                    </div>
+                    <div className="rounded-xl border border-[#A7F3D0] bg-[#ECFDF5]/60 px-3.5 py-2.5 shadow-2xs">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#047857]">
+                            Active Staff
+                        </p>
+                        <p className="mt-0.5 text-lg font-bold text-[#047857]" data-testid="staff-active-count">
+                            {activeCount}
+                        </p>
+                    </div>
+                    <div className="rounded-xl border border-[#E7E5E4] bg-stone-50/80 px-3.5 py-2.5 shadow-2xs">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#57534E]">
+                            Inactive Staff
+                        </p>
+                        <p className="mt-0.5 text-lg font-bold text-[#57534E]" data-testid="staff-inactive-count">
+                            {inactiveCount}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Search & Filters Bar */}
+                <div className="flex flex-col gap-2 rounded-2xl border border-[#E7E5E4] bg-white p-3 shadow-2xs sm:flex-row sm:items-center">
+                    {/* Search Input */}
+                    <div className="flex min-w-[200px] flex-1 items-center gap-2 rounded-xl border border-[#D6D3D1] bg-white px-3.5 py-2 text-xs transition-colors focus-within:border-[#F97316] focus-within:ring-1 focus-within:ring-[#F97316] shadow-xs">
+                        <Search size={14} className="text-[#78716C] shrink-0" />
+                        <input
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder="Search by name, email, role, or ID..."
+                            aria-label="Search staff by name, email, role, or ID"
+                            className="w-full bg-transparent outline-none text-[#292524] placeholder-[#78716C] font-medium"
+                        />
+                        {query && (
+                            <button
+                                type="button"
+                                onClick={() => setQuery("")}
+                                aria-label="Clear search"
+                                className="text-stone-400 hover:text-[#1C1917] cursor-pointer"
+                            >
+                                <X size={12} />
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
                         {/* Role Filter */}
                         <select
                             value={roleFilter}
@@ -1234,16 +1307,6 @@ export default function OwnerStaff() {
                                 </option>
                             ))}
                         </select>
-
-                        {/* Add Staff Toggle */}
-                        <button
-                            type="button"
-                            onClick={() => setShowAddStaffForm((prev) => !prev)}
-                            className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#F97316] hover:bg-[#EA580C] active:bg-[#C2410C] px-4 py-2 text-xs font-bold text-white shadow-md transition cursor-pointer"
-                        >
-                            <UserPlus size={15} />
-                            <span>{showAddStaffForm ? "Hide Form" : "Add Staff"}</span>
-                        </button>
                     </div>
                 </div>
 
@@ -1279,16 +1342,31 @@ export default function OwnerStaff() {
                         )}
                     </div>
                 ) : (
-                    <div className="space-y-3">
+                    <div
+                        data-testid="staff-directory-grid"
+                        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                    >
                         {filteredUsers.map((staffUser) => {
                             const isAccessOpen = selectedAccessUserId === staffUser.id;
                             const isEditing = editingStaffId === staffUser.id;
                             const staffLoginLink = getStaffLoginLink(staffUser);
+                            const staffPhoto =
+                                staffUser.photoUrl ||
+                                staffUser.avatarUrl ||
+                                staffUser.imageUrl ||
+                                staffUser.profileImage ||
+                                "";
+                            const staffTypeLabel =
+                                staffUser.staffType ||
+                                (staffUser.role === "OWNER" ? "Owner" : "Restaurant Staff");
 
                             return (
                                 <div
                                     key={staffUser.id}
-                                    className="relative rounded-2xl border border-[#E7E5E4] bg-white p-4 shadow-xs hover:border-[#FDBA74] hover:bg-[#FFF7ED]/30 transition"
+                                    data-testid={`staff-card-${staffUser.id}`}
+                                    className={`relative flex flex-col justify-between rounded-2xl border border-[#E7E5E4] bg-white p-4 shadow-xs hover:border-[#FDBA74] hover:shadow-sm transition ${
+                                        isEditing || isAccessOpen ? "col-span-full" : ""
+                                    }`}
                                 >
                                     {isEditing ? (
                                         /* In-Place Edit Form */
@@ -1536,274 +1614,335 @@ export default function OwnerStaff() {
                                             </div>
                                         </div>
                                     ) : (
-                                        /* Normal Staff Card View */
-                                        <div className="flex flex-col gap-3 pr-24">
-                                            {/* Identity Row */}
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <span className="text-xs font-mono font-bold text-[#57534E] bg-stone-100 px-2 py-0.5 rounded-md border border-stone-200">
-                                                    #{staffUser.id}
-                                                </span>
-                                                <p className="text-base font-bold text-[#1C1917]">
-                                                    {staffUser.name}
-                                                </p>
-                                                <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${getDesignationBadgeClass(resolveDesignation(staffUser))}`}>
-                                                    {resolveDesignation(staffUser)}
-                                                </span>
-                                                <span className="rounded-full bg-stone-100 text-[#57534E] border border-stone-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                                                    {staffUser.role}
-                                                </span>
-                                                <span
-                                                    className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold border ${getStatusBadgeClass(staffUser.isActive)}`}
-                                                >
-                                                    {staffUser.isActive ? "ACTIVE" : "DISABLED"}
-                                                </span>
-                                                <span className="flex items-center gap-1 text-[11px] font-medium text-[#57534E] bg-stone-100 border border-stone-200 px-2 py-0.5 rounded-md">
-                                                    <Building2 size={12} className="text-[#78716C]" />
-                                                    {restaurantName}
-                                                </span>
-                                            </div>
+                                        /* Compact SaaS Staff Card View */
+                                        <div className="flex h-full flex-col justify-between gap-3">
+                                            <div className="space-y-3">
+                                                {/* Card Header: Avatar + Name + ID + Overflow Menu */}
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="flex min-w-0 items-center gap-2.5">
+                                                        {staffPhoto ? (
+                                                            <img
+                                                                src={staffPhoto}
+                                                                alt={staffUser.name || "Staff avatar"}
+                                                                className="h-10 w-10 shrink-0 rounded-full border border-[#E7E5E4] object-cover"
+                                                            />
+                                                        ) : (
+                                                            <span
+                                                                aria-hidden="true"
+                                                                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#FDBA74] bg-[#FFF7ED] text-xs font-bold text-[#C2410C]"
+                                                            >
+                                                                {getStaffInitials(staffUser.name)}
+                                                            </span>
+                                                        )}
 
-                                            {/* Contact Details */}
-                                            <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs">
-                                                <span className="text-[#57534E]">Email: <strong className="text-[#1C1917] font-semibold">{staffUser.email}</strong></span>
-                                                <span className="text-[#57534E]">Phone: <strong className="text-[#1C1917] font-semibold">{staffUser.phone || "None"}</strong></span>
-                                                <span className="text-[#57534E]">Joined: <strong className="text-[#1C1917] font-semibold">{new Date(staffUser.createdAt).toLocaleDateString()}</strong></span>
-                                            </div>
+                                                        <div className="min-w-0">
+                                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                                <p className="truncate text-sm font-bold text-[#1C1917]">
+                                                                    {staffUser.name}
+                                                                </p>
+                                                                <span className="shrink-0 rounded-md border border-stone-200 bg-stone-100 px-1.5 py-0.5 font-mono text-[10px] font-bold text-[#57534E]">
+                                                                    #{staffUser.id}
+                                                                </span>
+                                                            </div>
+                                                            <p className="mt-0.5 truncate text-[11px] font-medium text-[#78716C]">
+                                                                {staffTypeLabel}
+                                                            </p>
+                                                        </div>
+                                                    </div>
 
-                                            {/* Safe Pre-fill Login URL (No tokens) */}
-                                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-                                                <span className="text-[#57534E] font-semibold">Login URL:</span>
-                                                <code className="rounded bg-[#F5F5F4] border border-[#D6D3D1] px-2.5 py-1 text-[11px] font-mono text-[#44403C] select-all break-all">
-                                                    {staffLoginLink}
-                                                </code>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => copyStaffLoginLink(staffUser)}
-                                                    className="inline-flex items-center gap-1 rounded-md bg-white border border-[#D6D3D1] px-2.5 py-1 text-[11px] font-semibold text-[#44403C] hover:bg-stone-50 hover:text-[#1C1917] transition cursor-pointer"
-                                                >
-                                                    <Copy size={12} />
-                                                    <span>Copy Link</span>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => shareStaffLoginOnWhatsApp(staffUser)}
-                                                    className="inline-flex items-center gap-1 rounded-md bg-[#ECFDF5] border border-[#A7F3D0] px-2.5 py-1 text-[11px] font-semibold text-[#047857] hover:bg-emerald-100 transition cursor-pointer"
-                                                >
-                                                    <span>WhatsApp</span>
-                                                </button>
-                                            </div>
-
-                                            {/* Temporary Password Row */}
-                                            <div className="flex flex-wrap items-center gap-2 text-xs">
-                                                <span className="text-[#57534E] font-semibold">Password:</span>
-                                                {temporaryPasswords[staffUser.id] ? (
-                                                    <>
-                                                        <code className="rounded bg-amber-50 border border-amber-300 px-2.5 py-1 font-mono text-[11px] font-bold text-amber-900 select-all">
-                                                            {temporaryPasswords[staffUser.id]}
-                                                        </code>
+                                                    {/* Overflow Menu */}
+                                                    <div className="relative shrink-0" data-staff-actions-menu>
                                                         <button
                                                             type="button"
-                                                            onClick={() => copyTemporaryPassword(staffUser.id, temporaryPasswords[staffUser.id])}
-                                                            className="inline-flex items-center gap-1 rounded-md bg-white border border-stone-300 px-2.5 py-1 text-[11px] font-semibold text-[#44403C] hover:bg-stone-50 transition cursor-pointer"
-                                                            title="Copy Temporary Password"
-                                                            aria-label={`Copy temporary password for ${staffUser.name}`}
+                                                            onClick={() =>
+                                                                setOpenActionMenuFor((prev) =>
+                                                                    prev === staffUser.id ? null : staffUser.id
+                                                                )
+                                                            }
+                                                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#D6D3D1] bg-white text-[#57534E] hover:bg-stone-100 hover:text-[#1C1917] transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
+                                                            aria-label="Open staff actions"
+                                                            aria-haspopup="menu"
+                                                            aria-expanded={openActionMenuFor === staffUser.id}
                                                         >
-                                                            {copiedPasswordId === staffUser.id ? (
-                                                                <>
-                                                                    <Check size={12} className="text-[#047857]" />
-                                                                    <span className="text-[#047857] font-bold">Copied</span>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <Copy size={12} />
-                                                                    <span>Copy</span>
-                                                                </>
-                                                            )}
+                                                            <MoreVertical size={15} />
                                                         </button>
-                                                        <span className="text-[11px] text-[#78716C] italic">
-                                                            Temporary password — shown only after reset.
+
+                                                        {openActionMenuFor === staffUser.id && (
+                                                            <div
+                                                                aria-label={`Actions for ${staffUser.name}`}
+                                                                className="absolute right-0 top-full z-20 mt-1.5 w-48 rounded-xl border border-stone-200 bg-white p-1.5 shadow-xl"
+                                                            >
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => startEditRow(staffUser)}
+                                                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#292524] hover:bg-[#FFF7ED] hover:text-[#C2410C] transition cursor-pointer"
+                                                                >
+                                                                    <Pencil size={14} className="text-[#F97316]" />
+                                                                    Edit Profile
+                                                                </button>
+
+                                                                {staffUser.role !== "OWNER" && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleGenerateTempPassword(staffUser)}
+                                                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#292524] hover:bg-[#FFF7ED] hover:text-[#C2410C] transition cursor-pointer"
+                                                                    >
+                                                                        <KeyRound size={14} className="text-[#F97316]" />
+                                                                        Reset Password
+                                                                    </button>
+                                                                )}
+
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => confirmToggleStatus(staffUser)}
+                                                                    disabled={
+                                                                        updatingStatusFor === staffUser.id ||
+                                                                        staffUser.role === "OWNER"
+                                                                    }
+                                                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#292524] hover:bg-stone-100 transition disabled:opacity-50 cursor-pointer"
+                                                                >
+                                                                    {staffUser.isActive ? (
+                                                                        <UserRoundX size={14} className="text-[#B91C1C]" />
+                                                                    ) : (
+                                                                        <UserRoundCheck size={14} className="text-[#047857]" />
+                                                                    )}
+                                                                    {staffUser.isActive ? "Deactivate / Disable" : "Activate Staff"}
+                                                                </button>
+
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openAccessPanel(staffUser)}
+                                                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#292524] hover:bg-stone-100 transition cursor-pointer"
+                                                                >
+                                                                    <ShieldCheck size={14} className="text-indigo-600" />
+                                                                    Permissions Matrix
+                                                                </button>
+
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => confirmDeleteStaff(staffUser)}
+                                                                    disabled={deletingFor === staffUser.id || staffUser.role === "OWNER"}
+                                                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#B91C1C] hover:bg-red-50 hover:text-red-700 transition disabled:opacity-50 cursor-pointer"
+                                                                >
+                                                                    <Trash2 size={14} />
+                                                                    Delete Staff
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Badges Row */}
+                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${getDesignationBadgeClass(resolveDesignation(staffUser))}`}>
+                                                        {resolveDesignation(staffUser)}
+                                                    </span>
+                                                    <span className="rounded-full bg-stone-100 text-[#57534E] border border-stone-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                                                        {staffUser.role}
+                                                    </span>
+                                                    <span
+                                                        className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold border ${getStatusBadgeClass(staffUser.isActive)}`}
+                                                    >
+                                                        {staffUser.isActive ? "ACTIVE" : "DISABLED"}
+                                                    </span>
+                                                </div>
+
+                                                {/* Contact, Branch & Joined Details */}
+                                                <div className="space-y-1.5 rounded-xl border border-stone-100 bg-stone-50/70 p-2.5 text-xs">
+                                                    <div className="flex items-center gap-1.5 text-[#57534E] min-w-0">
+                                                        <Building2 size={12} className="shrink-0 text-[#78716C]" />
+                                                        <span className="truncate font-medium text-[#292524]">
+                                                            {staffUser.branchName || restaurantName}
                                                         </span>
-                                                    </>
-                                                ) : (
-                                                    <div className="flex items-center gap-2.5">
-                                                        <span className="font-mono tracking-widest text-[#57534E] select-none text-xs font-bold">
-                                                            ••••••••••
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 text-[#57534E] min-w-0">
+                                                        <Mail size={12} className="shrink-0 text-[#78716C]" />
+                                                        <span className="truncate font-semibold text-[#1C1917]" title={staffUser.email}>
+                                                            {staffUser.email}
                                                         </span>
-                                                        {staffUser.role !== "OWNER" && (
+                                                    </div>
+                                                    <div className="flex items-center justify-between gap-2 text-[#57534E]">
+                                                        <span className="inline-flex items-center gap-1.5 min-w-0">
+                                                            <Phone size={12} className="shrink-0 text-[#78716C]" />
+                                                            <span className="truncate font-semibold text-[#1C1917]">
+                                                                {staffUser.phone || "None"}
+                                                            </span>
+                                                        </span>
+                                                        <span className="inline-flex shrink-0 items-center gap-1 text-[11px] text-[#78716C]">
+                                                            <Calendar size={11} />
+                                                            <span>{formatJoinedDate(staffUser.createdAt)}</span>
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Safe Pre-fill Login URL (No tokens) */}
+                                                <div className="space-y-1.5 text-xs">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <span className="text-[11px] font-semibold text-[#57534E]">Login URL</span>
+                                                        <div className="flex items-center gap-1.5">
                                                             <button
                                                                 type="button"
-                                                                onClick={() => handleGenerateStaffLoginLink(staffUser)}
-                                                                disabled={generatingLoginLinkFor === staffUser.id || !staffUser.isActive}
-                                                                className="inline-flex items-center gap-1.5 rounded-lg border border-[#FDBA74] bg-[#FFF7ED] px-2.5 py-1 text-[11px] font-bold text-[#C2410C] transition hover:bg-[#F97316] hover:text-white cursor-pointer shadow-xs disabled:opacity-50"
-                                                                title="Generate a secure 10-minute, single-use passwordless login link"
-                                                                data-testid={`generate-login-link-${staffUser.id}`}
+                                                                onClick={() => copyStaffLoginLink(staffUser)}
+                                                                className="inline-flex items-center gap-1 rounded-md bg-white border border-[#D6D3D1] px-2 py-0.5 text-[11px] font-semibold text-[#44403C] hover:bg-stone-50 hover:text-[#1C1917] transition cursor-pointer"
                                                             >
-                                                                <Link2 size={12} />
-                                                                <span>{generatingLoginLinkFor === staffUser.id ? "Generating..." : "Generate Login Link"}</span>
+                                                                <Copy size={11} />
+                                                                <span>Copy Link</span>
                                                             </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => shareStaffLoginOnWhatsApp(staffUser)}
+                                                                className="inline-flex items-center gap-1 rounded-md bg-[#ECFDF5] border border-[#A7F3D0] px-2 py-0.5 text-[11px] font-semibold text-[#047857] hover:bg-emerald-100 transition cursor-pointer"
+                                                            >
+                                                                <span>WhatsApp</span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <code className="block truncate rounded bg-[#F5F5F4] border border-[#D6D3D1] px-2 py-1 text-[11px] font-mono text-[#44403C] select-all" title={staffLoginLink}>
+                                                        {staffLoginLink}
+                                                    </code>
+                                                </div>
+
+                                                {/* Temporary Password Row */}
+                                                <div className="space-y-1.5 text-xs">
+                                                    <div className="flex flex-wrap items-center justify-between gap-1.5">
+                                                        <span className="text-[11px] font-semibold text-[#57534E]">Password:</span>
+                                                        {temporaryPasswords[staffUser.id] ? (
+                                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                                <code className="rounded bg-amber-50 border border-amber-300 px-2 py-0.5 font-mono text-[11px] font-bold text-amber-900 select-all">
+                                                                    {temporaryPasswords[staffUser.id]}
+                                                                </code>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => copyTemporaryPassword(staffUser.id, temporaryPasswords[staffUser.id])}
+                                                                    className="inline-flex items-center gap-1 rounded-md bg-white border border-stone-300 px-2 py-0.5 text-[11px] font-semibold text-[#44403C] hover:bg-stone-50 transition cursor-pointer"
+                                                                    title="Copy Temporary Password"
+                                                                    aria-label={`Copy temporary password for ${staffUser.name}`}
+                                                                >
+                                                                    {copiedPasswordId === staffUser.id ? (
+                                                                        <>
+                                                                            <Check size={11} className="text-[#047857]" />
+                                                                            <span className="text-[#047857] font-bold">Copied</span>
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <Copy size={11} />
+                                                                            <span>Copy</span>
+                                                                        </>
+                                                                    )}
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-mono tracking-widest text-[#57534E] select-none text-[11px] font-bold">
+                                                                    ••••••••••
+                                                                </span>
+                                                                {staffUser.role !== "OWNER" && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleGenerateStaffLoginLink(staffUser)}
+                                                                        disabled={generatingLoginLinkFor === staffUser.id || !staffUser.isActive}
+                                                                        className="inline-flex items-center gap-1 rounded-lg border border-[#FDBA74] bg-[#FFF7ED] px-2 py-0.5 text-[11px] font-bold text-[#C2410C] transition hover:bg-[#F97316] hover:text-white cursor-pointer shadow-xs disabled:opacity-50"
+                                                                        title="Generate a secure 10-minute, single-use passwordless login link"
+                                                                        data-testid={`generate-login-link-${staffUser.id}`}
+                                                                    >
+                                                                        <Link2 size={11} />
+                                                                        <span>{generatingLoginLinkFor === staffUser.id ? "Generating..." : "Generate Login Link"}</span>
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                         )}
                                                     </div>
-                                                )}
-                                            </div>
 
-                                            {/* Generated One-Time Login Link Card */}
-                                            {loginLinks[staffUser.id] && (
-                                                <div className="mt-2.5 rounded-xl border border-[#FDBA74] bg-[#FFF7ED] p-3 text-xs space-y-2" data-testid={`login-link-container-${staffUser.id}`}>
-                                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                                        <span className="font-bold text-[#C2410C] flex items-center gap-1.5">
-                                                            <ShieldCheck size={14} className="text-[#047857]" />
-                                                            Staff Login Link
-                                                        </span>
-                                                        <span className="text-[11px] text-[#7C2D12] font-semibold">
-                                                            Expires in 10 minutes • Single use
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        <span className="text-[#57534E] font-semibold">Login Link:</span>
-                                                        <code className="rounded bg-white border border-[#D6D3D1] px-2.5 py-1 text-[11px] text-[#292524] select-all font-mono break-all flex-1 min-w-[200px]">
+                                                    {temporaryPasswords[staffUser.id] ? (
+                                                        <p className="text-[10px] text-[#78716C] italic">
+                                                            Temporary password — shown only after reset.
+                                                        </p>
+                                                    ) : null}
+                                                </div>
+
+                                                {/* Generated One-Time Login Link Card */}
+                                                {loginLinks[staffUser.id] && (
+                                                    <div className="rounded-xl border border-[#FDBA74] bg-[#FFF7ED] p-2.5 text-xs space-y-2" data-testid={`login-link-container-${staffUser.id}`}>
+                                                        <div className="flex flex-wrap items-center justify-between gap-1.5">
+                                                            <span className="font-bold text-[#C2410C] flex items-center gap-1">
+                                                                <ShieldCheck size={13} className="text-[#047857]" />
+                                                                Staff Login Link
+                                                            </span>
+                                                            <span className="text-[10px] text-[#7C2D12] font-semibold">
+                                                                Expires in 10 minutes • Single use
+                                                            </span>
+                                                        </div>
+                                                        <code className="block rounded bg-white border border-[#D6D3D1] px-2 py-1 text-[11px] text-[#292524] select-all font-mono break-all">
                                                             {loginLinks[staffUser.id].loginUrl}
                                                         </code>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => copyGeneratedLoginLink(staffUser.id, loginLinks[staffUser.id].loginUrl)}
-                                                            className="inline-flex items-center gap-1 rounded-md bg-[#F97316] px-3 py-1 text-[11px] font-bold text-white hover:bg-[#EA580C] transition cursor-pointer shadow-xs"
-                                                            data-testid={`copy-login-link-${staffUser.id}`}
-                                                        >
-                                                            {copiedLoginLinkId === staffUser.id ? (
-                                                                <>
-                                                                    <Check size={12} />
-                                                                    <span>Copied</span>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <Copy size={12} />
-                                                                    <span>Copy Link</span>
-                                                                </>
-                                                            )}
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => shareStaffLoginOnWhatsApp(staffUser)}
-                                                            className="inline-flex items-center gap-1 rounded-md bg-[#ECFDF5] border border-[#A7F3D0] px-2.5 py-1 text-[11px] font-semibold text-[#047857] hover:bg-emerald-100 transition cursor-pointer"
-                                                        >
-                                                            <span>WhatsApp</span>
-                                                        </button>
+                                                        <div className="flex flex-wrap items-center gap-1.5">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => copyGeneratedLoginLink(staffUser.id, loginLinks[staffUser.id].loginUrl)}
+                                                                className="inline-flex items-center gap-1 rounded-md bg-[#F97316] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[#EA580C] transition cursor-pointer shadow-xs"
+                                                                data-testid={`copy-login-link-${staffUser.id}`}
+                                                            >
+                                                                {copiedLoginLinkId === staffUser.id ? (
+                                                                    <>
+                                                                        <Check size={11} />
+                                                                        <span>Copied</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <Copy size={11} />
+                                                                        <span>Copy Link</span>
+                                                                    </>
+                                                                )}
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => shareStaffLoginOnWhatsApp(staffUser)}
+                                                                className="inline-flex items-center gap-1 rounded-md bg-[#ECFDF5] border border-[#A7F3D0] px-2 py-1 text-[11px] font-semibold text-[#047857] hover:bg-emerald-100 transition cursor-pointer"
+                                                            >
+                                                                <span>WhatsApp</span>
+                                                            </button>
+                                                        </div>
+                                                        <div className="flex flex-wrap items-center gap-2 text-[10px] text-[#57534E]">
+                                                            <span>Status: <strong className="text-[#047857] font-semibold">Single-use login link</strong></span>
+                                                            <span>•</span>
+                                                            <span>Expires: <strong className="text-[#C2410C] font-semibold">10 minutes</strong></span>
+                                                            <span>•</span>
+                                                            <span className="text-[#78716C]">No password in link</span>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex flex-wrap items-center gap-3 text-[11px] text-[#57534E]">
-                                                        <span>Status: <strong className="text-[#047857] font-semibold">Single-use login link</strong></span>
-                                                        <span>•</span>
-                                                        <span>Expires: <strong className="text-[#C2410C] font-semibold">10 minutes</strong></span>
-                                                        <span>•</span>
-                                                        <span className="text-[#78716C]">No password in link</span>
-                                                    </div>
+                                                )}
+
+                                                <div className="flex items-start gap-1.5 text-[10px] text-[#57534E] font-medium">
+                                                    <KeyRound size={11} className="text-[#EA580C] shrink-0 mt-0.5" />
+                                                    <span>Password must be entered separately at login (never shared in link for security).</span>
                                                 </div>
-                                            )}
-
-                                            <div className="flex items-center gap-1.5 text-[11px] text-[#57534E] font-medium">
-                                                <KeyRound size={12} className="text-[#EA580C] shrink-0" />
-                                                <span>Password must be entered separately at login (never shared in link for security).</span>
                                             </div>
-                                        </div>
-                                    )}
 
-                                    {/* Action Buttons Top-Right */}
-                                    {!isEditing && (
-                                        <div className="absolute right-4 top-4 flex items-center gap-2" data-staff-actions-menu>
-                                            <button
-                                                type="button"
-                                                onClick={() => startEditRow(staffUser)}
-                                                className="inline-flex items-center gap-1.5 rounded-xl border border-[#FDBA74] bg-[#FFF7ED] px-3 py-1.5 text-xs font-bold text-[#C2410C] transition hover:bg-[#F97316] hover:text-white cursor-pointer shadow-xs"
-                                                title="Edit staff member profile and permissions"
-                                            >
-                                                <Pencil size={13} />
-                                                <span>Edit</span>
-                                            </button>
-
-                                            {staffUser.role !== "OWNER" && (
+                                            {/* Card Footer Quick Actions */}
+                                            <div className="flex flex-wrap items-center gap-2 border-t border-stone-100 pt-2.5">
                                                 <button
                                                     type="button"
-                                                    onClick={() => handleGenerateTempPassword(staffUser)}
-                                                    disabled={generatingTempPasswordFor === staffUser.id}
-                                                    className="inline-flex items-center gap-1.5 rounded-xl border border-stone-300 bg-stone-100 px-3 py-1.5 text-xs font-bold text-[#1C1917] transition hover:bg-stone-200 cursor-pointer shadow-xs disabled:opacity-50"
-                                                    title="Issue / Reset Temporary Password"
+                                                    onClick={() => startEditRow(staffUser)}
+                                                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#FDBA74] bg-[#FFF7ED] px-3 py-1.5 text-xs font-bold text-[#C2410C] transition hover:bg-[#F97316] hover:text-white cursor-pointer shadow-xs"
+                                                    title="Edit staff member profile and permissions"
                                                 >
-                                                    <KeyRound size={13} className="text-[#57534E]" />
-                                                    <span>{generatingTempPasswordFor === staffUser.id ? "Issuing..." : "Reset Password"}</span>
+                                                    <Pencil size={13} />
+                                                    <span>Edit</span>
                                                 </button>
-                                            )}
 
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    setOpenActionMenuFor((prev) =>
-                                                        prev === staffUser.id ? null : staffUser.id
-                                                    )
-                                                }
-                                                className="inline-flex items-center justify-center rounded-xl bg-white border border-[#D6D3D1] p-2 text-[#57534E] hover:bg-stone-100 hover:text-[#1C1917] transition cursor-pointer shadow-xs"
-                                                aria-label="Open staff actions"
-                                            >
-                                                <MoreVertical size={16} />
-                                            </button>
-
-                                            {openActionMenuFor === staffUser.id && (
-                                                <div className="absolute right-0 top-full z-20 mt-2 w-48 rounded-xl border border-stone-200 bg-white p-1.5 shadow-xl">
+                                                {staffUser.role !== "OWNER" && (
                                                     <button
                                                         type="button"
-                                                        onClick={() => startEditRow(staffUser)}
-                                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#292524] hover:bg-[#FFF7ED] hover:text-[#C2410C] transition cursor-pointer"
+                                                        onClick={() => handleGenerateTempPassword(staffUser)}
+                                                        disabled={generatingTempPasswordFor === staffUser.id}
+                                                        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-stone-300 bg-stone-100 px-3 py-1.5 text-xs font-bold text-[#1C1917] transition hover:bg-stone-200 cursor-pointer shadow-xs disabled:opacity-50"
+                                                        title="Issue / Reset Temporary Password"
                                                     >
-                                                        <Pencil size={14} className="text-[#F97316]" />
-                                                        Edit Profile
+                                                        <KeyRound size={13} className="text-[#57534E]" />
+                                                        <span>{generatingTempPasswordFor === staffUser.id ? "Issuing..." : "Reset Password"}</span>
                                                     </button>
-
-                                                    {staffUser.role !== "OWNER" && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleGenerateTempPassword(staffUser)}
-                                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#292524] hover:bg-[#FFF7ED] hover:text-[#C2410C] transition cursor-pointer"
-                                                        >
-                                                            <KeyRound size={14} className="text-[#F97316]" />
-                                                            Reset Password
-                                                        </button>
-                                                    )}
-
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => confirmToggleStatus(staffUser)}
-                                                        disabled={
-                                                            updatingStatusFor === staffUser.id ||
-                                                            staffUser.role === "OWNER"
-                                                        }
-                                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#292524] hover:bg-stone-100 transition disabled:opacity-50 cursor-pointer"
-                                                    >
-                                                        {staffUser.isActive ? (
-                                                            <UserRoundX size={14} className="text-[#B91C1C]" />
-                                                        ) : (
-                                                            <UserRoundCheck size={14} className="text-[#047857]" />
-                                                        )}
-                                                        {staffUser.isActive ? "Deactivate / Disable" : "Activate Staff"}
-                                                    </button>
-
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => openAccessPanel(staffUser)}
-                                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#292524] hover:bg-stone-100 transition cursor-pointer"
-                                                    >
-                                                        <ShieldCheck size={14} className="text-indigo-600" />
-                                                        Permissions Matrix
-                                                    </button>
-
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => confirmDeleteStaff(staffUser)}
-                                                        disabled={deletingFor === staffUser.id || staffUser.role === "OWNER"}
-                                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#B91C1C] hover:bg-red-50 hover:text-red-700 transition disabled:opacity-50 cursor-pointer"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                        Delete Staff
-                                                    </button>
-                                                </div>
-                                            )}
+                                                )}
+                                            </div>
                                         </div>
                                     )}
 
