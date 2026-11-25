@@ -21,6 +21,7 @@ import {
     Eye,
     FileSpreadsheet,
     Filter,
+    History,
     Layers,
     LoaderCircle,
     Minus,
