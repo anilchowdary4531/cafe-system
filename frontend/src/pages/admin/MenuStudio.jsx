@@ -8,6 +8,10 @@ import { resolveImageUrl } from "../../utils/resolveImageUrl";
 import { api, invalidateGetCache } from "../../utils/apiClient";
 import { useAuth } from "../../context/AuthContext";
 import DigitalMenuQrModal from "../../components/DigitalMenuQrModal";
+import {
+    isTobaccoItem as isTobaccoUtilItem,
+    isTobaccoCategory as isTobaccoUtilCategory,
+} from "../../utils/tobaccoUtils";
 
 const emptyForm = {
     name: "",
@@ -70,6 +74,8 @@ export default function MenuStudio() {
     const [restaurantInfo, setRestaurantInfo] = useState(null);
     const [showDigitalMenuModal, setShowDigitalMenuModal] = useState(false);
     const [search, setSearch] = useState("");
+    const [selectedCategory, setSelectedCategory] = useState(null);
+    const [showTobacco, setShowTobacco] = useState(false);
     const [form, setForm] = useState(emptyForm);
     const [formType, setFormType] = useState("NORMAL"); // "NORMAL" | "TOBACCO"
     const [formOpen, setFormOpen] = useState(false);
@@ -275,9 +281,10 @@ export default function MenuStudio() {
     };
 
     const isTobaccoItem = (item) => {
+        if (!item) return false;
         if (item.isTobacco) return true;
         if (TOBACCO_CATEGORIES.some((cat) => item.category?.toLowerCase()?.includes(cat.toLowerCase()))) return true;
-        return false;
+        return isTobaccoUtilItem(item) || isTobaccoUtilCategory(item.category);
     };
 
     const startEdit = (item) => {
@@ -433,14 +440,41 @@ export default function MenuStudio() {
         });
     };
 
-    const filteredItems = items.filter((item) => {
+    const normalItems = useMemo(
+        () => items.filter((item) => !isTobaccoItem(item)),
+        [items]
+    );
+
+    const tobaccoItems = useMemo(
+        () => items.filter((item) => isTobaccoItem(item)),
+        [items]
+    );
+
+    const normalCategoryEntries = useMemo(() => {
+        const groups = new Map();
+        normalItems.forEach((item) => {
+            const category = String(item?.category || "").trim() || "Uncategorized";
+            if (!groups.has(category)) groups.set(category, []);
+            groups.get(category).push(item);
+        });
+        return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0], "en", { sensitivity: "base" }));
+    }, [normalItems]);
+
+    const filteredItems = useMemo(() => {
+        const pool = showTobacco ? tobaccoItems : normalItems;
         const q = search.trim().toLowerCase();
-        if (!q) return true;
-        return (
-            item.name?.toLowerCase().includes(q) ||
-            item.category?.toLowerCase().includes(q)
-        );
-    });
+        return pool.filter((item) => {
+            if (!showTobacco && selectedCategory) {
+                const itemCat = String(item?.category || "").trim() || "Uncategorized";
+                if (itemCat !== selectedCategory) return false;
+            }
+            if (!q) return true;
+            return (
+                item.name?.toLowerCase().includes(q) ||
+                item.category?.toLowerCase().includes(q)
+            );
+        });
+    }, [showTobacco, tobaccoItems, normalItems, selectedCategory, search]);
 
     const groupedItems = useMemo(() => {
         const groups = new Map();
@@ -1017,20 +1051,46 @@ export default function MenuStudio() {
                 </form>
             )}
 
-            {!loading && groupedItems.length > 0 && (
-                <div className="mt-4 flex flex-wrap items-center gap-2">
+            {!loading && items.length > 0 && (
+                <div className="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label="Menu categories">
                     <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--app-muted)]">Categories</span>
-                    {groupedItems.map(([category, categoryItems]) => (
-                        <span
-                            key={category}
-                            className="rounded-lg bg-black/5 dark:bg-white/10 px-2.5 py-0.5 text-xs font-semibold theme-muted flex items-center gap-1"
-                        >
-                            {TOBACCO_CATEGORIES.some((c) => category.toLowerCase().includes(c.toLowerCase())) && (
-                                <span className="text-[10px]">🚬</span>
-                            )}
-                            {category} ({categoryItems.length})
-                        </span>
-                    ))}
+                    {normalCategoryEntries.map(([category, categoryItems]) => {
+                        const isActive = !showTobacco && selectedCategory === category;
+                        return (
+                            <button
+                                key={category}
+                                type="button"
+                                aria-pressed={isActive}
+                                onClick={() => {
+                                    setShowTobacco(false);
+                                    setSelectedCategory((prev) => (prev === category && !showTobacco ? null : category));
+                                }}
+                                className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition cursor-pointer flex items-center gap-1 ${
+                                    isActive
+                                        ? "border-[color:var(--app-primary)] bg-[color:var(--app-primary)]/15 font-bold text-[color:var(--app-primary)] shadow-xs"
+                                        : "border-[color:var(--app-border)]/40 bg-black/5 dark:bg-white/10 theme-muted hover:bg-black/10 dark:hover:bg-white/15"
+                                }`}
+                            >
+                                <span>{category} ({categoryItems.length})</span>
+                            </button>
+                        );
+                    })}
+                    <button
+                        type="button"
+                        aria-pressed={showTobacco}
+                        onClick={() => {
+                            setShowTobacco((prev) => !prev);
+                            setSelectedCategory(null);
+                        }}
+                        className={`rounded-lg border px-2.5 py-1 text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                            showTobacco
+                                ? "border-orange-500 bg-gradient-to-r from-amber-700 to-orange-600 text-white shadow-sm shadow-orange-900/25"
+                                : "border-amber-700/40 bg-amber-950/15 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 hover:bg-amber-500/20"
+                        }`}
+                    >
+                        <span className="text-[11px]">🚬</span>
+                        <span>Tobacco ({tobaccoItems.length})</span>
+                    </button>
                 </div>
             )}
 
