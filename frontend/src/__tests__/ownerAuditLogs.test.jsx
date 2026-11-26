@@ -264,8 +264,8 @@ describe("TIFFZY PHASE 3D-2 — Owner Security Audit Logs UI Test Suite", () => 
         expect(screen.queryByRole("heading", { name: "Audit Logs" })).not.toBeInTheDocument();
     });
 
-    // 5. Audit Logs appears in navigation for authorized users
-    it("5. Audit Logs appears in navigation sidebar for OWNER", async () => {
+    // 5. Audit Logs is removed from the main OwnerLayout navigation sidebar
+    it("5. Audit Logs does not appear in main navigation sidebar for OWNER", async () => {
         vi.spyOn(AuthContextModule, "useAuth").mockReturnValue({
             user: {
                 id: 1,
@@ -282,9 +282,8 @@ describe("TIFFZY PHASE 3D-2 — Owner Security Audit Logs UI Test Suite", () => 
             </MemoryRouter>
         );
 
-        const auditLinks = screen.getAllByRole("link", { name: /audit logs/i });
-        expect(auditLinks.length).toBeGreaterThan(0);
-        expect(auditLinks[0]).toHaveAttribute("href", "/owner/audit-logs");
+        expect(screen.queryByRole("link", { name: /audit logs/i })).not.toBeInTheDocument();
+        expect(screen.getAllByRole("link", { name: /profile/i }).length).toBeGreaterThan(0);
     });
 
     // 6. Audit Logs does not appear for unauthorized roles

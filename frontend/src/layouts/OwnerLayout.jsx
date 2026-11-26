@@ -993,13 +993,6 @@ export default function OwnerLayout() {
             accessKey: "staff",
         },
         {
-            label: "Audit Logs",
-            path: "/owner/audit-logs",
-            icon: <ShieldCheck size={18} />,
-            accessKey: "audit",
-            fallbackKey: "reports",
-        },
-        {
             label: "Profile",
             path: "/owner/settings",
             icon: <User size={18} />,
