@@ -7,6 +7,7 @@ import {
     CheckCircle2,
     ChevronDown,
     ChevronUp,
+    History,
     LayoutDashboard,
     LoaderCircle,
     MapPin,
@@ -29,6 +30,7 @@ import { resolveImageUrl } from "../../utils/resolveImageUrl";
 import { uploadToS3Presigned } from "../../utils/s3Upload";
 import MapLocationPicker from "../../components/MapLocationPicker";
 import OwnerMenuButton from "../../components/OwnerMenuButton";
+import OwnerAuditLogs from "./OwnerAuditLogs";
 
 const emptyForm = {
     name: "",
@@ -93,6 +95,12 @@ const NAV_SECTIONS = [
         label: "Operations & Preferences",
         description: "Timezone, theme & alerts",
         icon: Settings2,
+    },
+    {
+        id: "audit-logs",
+        label: "Audit Logs",
+        description: "Security & activity history",
+        icon: History,
     },
 ];
 
@@ -923,7 +931,13 @@ export default function OwnerSettings() {
                 </aside>
 
                 {/* Active Section Content */}
-                <form onSubmit={handleSubmit} noValidate className="min-w-0 flex-1 space-y-5">
+                <div className="min-w-0 flex-1 space-y-5">
+                    {activeSection === "audit-logs" ? (
+                        <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-xs">
+                            <OwnerAuditLogs embedded />
+                        </div>
+                    ) : (
+                    <form onSubmit={handleSubmit} noValidate className="space-y-5">
                     {/* 1. PROFILE OVERVIEW */}
                     {activeSection === "overview" ? (
                         <div className="space-y-5">
@@ -1862,7 +1876,9 @@ export default function OwnerSettings() {
                             </div>
                         </div>
                     ) : null}
-                </form>
+                    </form>
+                    )}
+                </div>
             </div>
         </section>
     );

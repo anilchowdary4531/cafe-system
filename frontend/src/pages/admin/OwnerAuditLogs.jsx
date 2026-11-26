@@ -126,8 +126,9 @@ export const escapeCsvCell = (value) => {
     return `"${str.replace(/"/g, '""')}"`;
 };
 
-export default function OwnerAuditLogs() {
-    const { user } = useAuth();
+export default function OwnerAuditLogs({ embedded = false } = {}) {
+    const auth = useAuth();
+    const user = auth?.user;
     const restaurantId = Number(
         user?.restaurantId ||
         user?.restaurant?.id ||
@@ -384,17 +385,23 @@ export default function OwnerAuditLogs() {
     const endRecord = Math.min(pagination.page * pagination.limit, pagination.total);
 
     return (
-        <section className="space-y-4 font-sans text-sm text-[color:var(--app-text)] pb-12">
+        <section className={`space-y-4 font-sans text-sm text-[color:var(--app-text)] ${embedded ? "" : "pb-12"}`}>
             {/* HEADER CONSOLE BAR */}
             <header className="pb-3 border-b border-[color:var(--app-border)]/50 space-y-3">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div>
                         <div className="flex items-center gap-3">
-                            <OwnerMenuButton />
+                            {!embedded && <OwnerMenuButton />}
                             <div className="flex items-center gap-2">
-                                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[color:var(--app-text)]">
-                                    Audit Logs
-                                </h1>
+                                {embedded ? (
+                                    <h2 className="text-lg sm:text-xl font-bold tracking-tight text-[color:var(--app-text)]">
+                                        Audit Logs
+                                    </h2>
+                                ) : (
+                                    <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[color:var(--app-text)]">
+                                        Audit Logs
+                                    </h1>
+                                )}
                                 <span className="inline-flex items-center rounded-md bg-orange-500/10 px-2 py-0.5 text-[11px] font-semibold text-orange-600 dark:text-orange-400 border border-orange-500/20">
                                     SECURITY CONSOLE
                                 </span>

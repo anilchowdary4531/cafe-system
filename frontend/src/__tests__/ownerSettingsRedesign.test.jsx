@@ -10,6 +10,33 @@ vi.mock("axios");
 vi.mock("../utils/s3Upload", () => ({
     uploadToS3Presigned: vi.fn(),
 }));
+vi.mock("../utils/apiClient", () => ({
+    api: {
+        get: vi.fn().mockResolvedValue({
+            data: {
+                logs: [
+                    {
+                        id: 501,
+                        action: "SETTINGS_UPDATED",
+                        entity: "Restaurant",
+                        entityId: "1",
+                        actorName: "Aarav Sharma",
+                        actorRole: "OWNER",
+                        severity: "INFO",
+                        status: "SUCCESS",
+                        createdAt: "2026-03-01T10:00:00.000Z",
+                    },
+                ],
+                pagination: { total: 1, page: 1, limit: 50, totalPages: 1 },
+            },
+        }),
+    },
+}));
+vi.mock("../context/AuthContext", () => ({
+    useAuth: () => ({
+        user: { id: 2, restaurantId: 1, role: "OWNER" },
+    }),
+}));
 
 const mockRestaurant = {
     id: 1,
@@ -139,6 +166,12 @@ describe("OwnerSettings — SaaS Redesign", () => {
         expect(screen.getByDisplayValue("Asia/Kolkata")).toBeDefined();
         expect(screen.getByDisplayValue("INR")).toBeDefined();
         expect(screen.getByRole("link", { name: /Delete Account/i })).toBeDefined();
+
+        // 5. Audit Logs
+        fireEvent.click(getNavButton(/Audit Logs/i));
+        expect(await screen.findByRole("heading", { name: /Audit Logs/i })).toBeDefined();
+        expect(await screen.findByText(/Filter Security Events/i)).toBeDefined();
+        expect(await screen.findByText("Aarav Sharma")).toBeDefined();
     });
 
     it("supports Edit, Cancel, validation errors, Save, and API failure feedback", async () => {
